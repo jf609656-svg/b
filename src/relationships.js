@@ -13,7 +13,84 @@ function switchRelTab(tab){
   renderRelationships();
 }
 
+function ensureRelationshipDramaState(){
+  if(!G.social) G.social = { reputation:50, dramaFlags:{} };
+  if(typeof G.social.reputation!=='number') G.social.reputation = 50;
+  if(!G.social.dramaFlags || typeof G.social.dramaFlags!=='object') G.social.dramaFlags = {};
+  const d = G.social.dramaFlags;
+  if(!Array.isArray(d.secretAffairs)) d.secretAffairs = [];
+  if(typeof d.cheatingScandals!=='number') d.cheatingScandals = 0;
+  if(typeof d.friendDrama!=='number') d.friendDrama = 0;
+  if(typeof d.familyDrama!=='number') d.familyDrama = 0;
+}
+
+function relationshipPopup(title, body, actions){
+  if(typeof showPopup==='function'){
+    showPopup(title, body, actions, 'normal');
+  } else if(actions && actions[0] && typeof actions[0].onClick==='function'){
+    actions[0].onClick();
+  }
+}
+
+function applyCheatingScandal(otherName, label){
+  ensureRelationshipDramaState();
+  const d = G.social.dramaFlags;
+  d.cheatingScandals++;
+  G.social.reputation = clamp((G.social.reputation||50) - rnd(8,16));
+  if(G.sm){
+    G.sm.controversies = (G.sm.controversies||0) + 1;
+    G.sm.cancelCount = Math.max(0, (G.sm.cancelCount||0) + (Math.random()<0.24?1:0));
+  }
+  addEv(`Cheating scandal: your involvement with ${otherName} became public (${label}).`, 'bad');
+  flash('Cheating scandal exploded.','bad');
+
+  if(G.spouse && G.spouse.alive){
+    const spouseName = G.spouse.firstName;
+    const divorceChance = Math.min(0.9, 0.34 + d.cheatingScandals*0.12 + ((G.spouse.relation||50)<45 ? 0.2 : 0));
+    if(Math.random()<divorceChance){
+      G.divorces++;
+      const split = Math.floor(G.money*0.38 + (G.assets?.homeValue||0)*0.42);
+      G.money = Math.max(0, G.money - split);
+      addEv(`${spouseName} filed for divorce after the scandal. Settlement cost: ${fmt$(split)}.`, 'bad');
+      if(Array.isArray(G.children) && G.children.length){
+        G.children.forEach(c=>{
+          const r = Math.random();
+          c.custody = r < 0.42 ? 'shared' : r < 0.6 ? 'you' : 'other';
+          if(c.custody==='other') c.relation = clamp((c.relation||60) - rnd(6,14));
+        });
+        addEv('Custody arrangements changed after the scandal.', 'warn');
+      }
+      G.spouse = null;
+      G.marriageYears = 0;
+    } else {
+      G.spouse.relation = clamp((G.spouse.relation||50) - rnd(18,34));
+      addEv(`${spouseName} stayed, but trust was badly damaged.`, 'warn');
+    }
+  }
+  if(Array.isArray(G.lovers) && G.lovers.length){
+    G.lovers = G.lovers.filter(l=>Math.random()>0.28);
+  }
+  G.happy = clamp(G.happy - rnd(10,22));
+  G.stress = clamp((G.stress||35) + rnd(8,16));
+}
+
+function maybeExposeAffair(otherName, label, baseChance=0.24){
+  ensureRelationshipDramaState();
+  const fameBoost = Math.min(0.22, (G.sm?.totalFame||0)/420);
+  const controversyBoost = Math.min(0.16, (G.sm?.controversies||0)/30);
+  const chance = Math.max(0.04, Math.min(0.9, baseChance + fameBoost + controversyBoost));
+  if(Math.random()<chance){
+    applyCheatingScandal(otherName, label);
+    return true;
+  }
+  G.social.dramaFlags.secretAffairs.push({ year:G.age, with:otherName, label });
+  if(G.social.dramaFlags.secretAffairs.length>8) G.social.dramaFlags.secretAffairs.shift();
+  addEv(`Your secret with ${otherName} stayed hidden for now.`, 'warn');
+  return false;
+}
+
 function renderRelationships(){
+  ensureRelationshipDramaState();
   const tab = G.relTab || 'family';
   // Make sure correct tab is highlighted
   ['family','romance','friends','children','pets','tree'].forEach(t=>{
@@ -106,6 +183,7 @@ function famPersonCard(p){
       <button class="btn btn-ghost btn-sm" onclick="famAct('${n}','call')">📞 Call</button>
       <button class="btn btn-ghost btn-sm" onclick="famAct('${n}','visit')">🏠 Visit</button>
       <button class="btn btn-ghost btn-sm" onclick="famAct('${n}','gift')">🎁 Gift</button>
+      <button class="btn btn-ghost btn-sm" onclick="famAct('${n}','moment')">🗨️ Moment</button>
       <button class="btn btn-ghost btn-sm" onclick="famAct('${n}','meal')">🍽️ Meal</button>
       <button class="btn btn-ghost btn-sm" onclick="famAct('${n}','fight')">😤 Fight</button>
       ${G.age>=18?`<button class="btn btn-ghost btn-sm" onclick="famAct('${n}','borrow')">💸 Borrow</button>`:''}
@@ -114,6 +192,7 @@ function famPersonCard(p){
 }
 
 function famAct(name, type){
+  ensureRelationshipDramaState();
   const p = G.family.find(x=>x.name===name);
   if(!p||!p.alive){ flash('They\'re no longer with us.','warn'); return; }
   const fn = p.firstName;
@@ -136,6 +215,33 @@ function famAct(name, type){
       `${fn} was surprised to see you. In the good way.`,
     ]),'love');
     flash(`+Happy +Relationship · visited ${fn}`);
+  } else if(type==='moment'){
+    relationshipPopup(
+      `${fn}: family moment`,
+      `${fn} opens up about something real. How do you respond?`,
+      [
+        { label:'Listen and support', cls:'btn-primary', onClick:()=>{
+          p.relation = clamp(p.relation + rnd(8,16));
+          G.happy = clamp(G.happy + rnd(4,9));
+          addEv(`You listened to ${fn} without judgment. It brought you closer.`, 'love');
+          updateHUD(); renderRelationships();
+        }},
+        { label:'Set a hard boundary', cls:'btn-ghost', onClick:()=>{
+          p.relation = clamp(p.relation - rnd(1,6));
+          G.stress = clamp((G.stress||35) - rnd(0,3));
+          addEv(`You set boundaries with ${fn}. It was tense, but healthier long-term.`, 'warn');
+          updateHUD(); renderRelationships();
+        }},
+        { label:'Turn it into gossip', cls:'btn-ghost', onClick:()=>{
+          p.relation = clamp(p.relation - rnd(8,16));
+          G.social.reputation = clamp((G.social.reputation||50) - rnd(2,6));
+          G.social.dramaFlags.familyDrama = (G.social.dramaFlags.familyDrama||0) + 1;
+          addEv(`Family gossip spread after your conversation with ${fn}. Trust dropped.`, 'bad');
+          updateHUD(); renderRelationships();
+        }},
+      ]
+    );
+    return;
   } else if(type==='meal'){
     const cost = rnd(30,90); G.money -= cost;
     p.relation = clamp(p.relation + rnd(6,13));
@@ -265,6 +371,7 @@ function renderRomanceTab(){
 }
 
 function spouseAct(type){
+  ensureRelationshipDramaState();
   const s = G.spouse;
   if(!s||!s.alive){ flash('No spouse.','warn'); return; }
   const fn = s.firstName;
@@ -325,26 +432,13 @@ function spouseAct(type){
     flash(`Fight with ${fn}`,'bad');
   } else if(type==='cheat'){
     G.darkScore++;
-    if(Math.random()<0.52){
-      G.divorces++;
-      const split = Math.floor(G.money*0.5 + G.assets.homeValue*0.5);
-      G.money = Math.max(0, G.money - split);
-      G.happy = clamp(G.happy-28); G.social.reputation=clamp(G.social.reputation-15);
-      addEv(`You cheated on ${fn}. They found out. Divorce proceedings: immediate. Cost: ${fmt$(split)}.`,'bad');
-      flash(`${fn} found out. Divorce. -${fmt$(split)}`,'bad');
-      if(G.children.length){
-        G.children.forEach(c=>{
-          const r = Math.random();
-          c.custody = r < 0.4 ? 'shared' : r < 0.6 ? 'you' : 'other';
-          if(c.custody==='other') c.relation = clamp(c.relation - rnd(8,16));
-        });
-        addEv('Custody was decided. Co‑parenting begins.', 'warn');
-      }
-      G.spouse = null;
+    if(Math.random()<0.58){
+      applyCheatingScandal('an affair partner', 'spousal infidelity');
     } else {
       G.happy=clamp(G.happy+4);
-      addEv(`You cheated on ${fn} and got away with it. The universe keeps score.`,'warn');
-      flash('Got away with it. For now.','warn');
+      addEv(`You cheated on ${fn} and hid it for now.`, 'warn');
+      maybeExposeAffair('an affair partner', 'hidden spousal affair', 0.3);
+      flash('Hidden for now.','warn');
     }
   } else if(type==='divorce'){
     G.divorces++;
@@ -367,10 +461,164 @@ function spouseAct(type){
   updateHUD(); renderRelationships();
 }
 
+function runLoverEncounterPopup(l, type){
+  const fn = l.firstName;
+  const complete = ()=>{ updateHUD(); renderRelationships(); };
+  if(type==='date'){
+    relationshipPopup(`Date with ${fn}`, `How do you play tonight?`, [
+      { label:'Go all out', cls:'btn-primary', onClick:()=>{
+        const cost = rnd(120,420);
+        G.money -= cost;
+        l.relation = clamp(l.relation + rnd(12,22));
+        G.happy = clamp(G.happy + rnd(10,18));
+        addEv(`Luxury date with ${fn}. Sparks everywhere. (-${fmt$(cost)})`, 'love');
+        if(G.spouse) maybeExposeAffair(fn, 'public date spotted online', 0.26);
+        complete();
+      }},
+      { label:'Keep it low-key', cls:'btn-ghost', onClick:()=>{
+        const cost = rnd(30,110);
+        G.money -= cost;
+        l.relation = clamp(l.relation + rnd(7,13));
+        G.happy = clamp(G.happy + rnd(6,11));
+        addEv(`Simple date night with ${fn}. Calm and real. (-${fmt$(cost)})`, 'love');
+        complete();
+      }},
+      { label:'Cancel last minute', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(8,15));
+        addEv(`You canceled on ${fn} late. They were hurt.`, 'warn');
+        complete();
+      }},
+    ]);
+    return true;
+  }
+  if(type==='convo'){
+    relationshipPopup(`${fn} wants to talk`, `The conversation gets serious.`, [
+      { label:'Be honest', cls:'btn-primary', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(6,14));
+        G.happy = clamp(G.happy + rnd(4,9));
+        addEv(`You were vulnerable with ${fn}. It deepened trust.`, 'love');
+        complete();
+      }},
+      { label:'Deflect', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(3,9));
+        addEv(`You avoided the hard conversation with ${fn}.`, 'warn');
+        complete();
+      }},
+      { label:'Start a fight', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(10,18));
+        G.happy = clamp(G.happy - rnd(5,11));
+        addEv(`The talk with ${fn} blew up into an argument.`, 'bad');
+        complete();
+      }},
+    ]);
+    return true;
+  }
+  if(type==='movie'){
+    relationshipPopup(`Movie plan with ${fn}`, `What vibe are you going for tonight?`, [
+      { label:'Their pick', cls:'btn-primary', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(5,11));
+        G.happy = clamp(G.happy + rnd(4,9));
+        addEv(`You watched ${fn}'s pick and made them feel seen.`, 'good');
+        complete();
+      }},
+      { label:'Your pick', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(2,7));
+        G.happy = clamp(G.happy + rnd(3,7));
+        addEv(`Movie night with ${fn}. You talked more than watched.`, 'love');
+        complete();
+      }},
+      { label:'Argue about choices', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(3,8));
+        addEv(`Movie debate turned into a petty argument with ${fn}.`, 'warn');
+        complete();
+      }},
+    ]);
+    return true;
+  }
+  if(type==='makeout'){
+    relationshipPopup(`Chemistry check with ${fn}`, `The tension is obvious.`, [
+      { label:'Lean in', cls:'btn-primary', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(7,13));
+        G.happy = clamp(G.happy + rnd(6,12));
+        addEv(`You and ${fn} shared a perfect spontaneous moment.`, 'love');
+        if(G.spouse) maybeExposeAffair(fn, 'public makeout sighting', 0.2);
+        complete();
+      }},
+      { label:'Keep it subtle', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(3,7));
+        addEv(`You kept things subtle with ${fn}, but the connection grew.`, 'good');
+        complete();
+      }},
+      { label:'Pull away', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(4,9));
+        addEv(`${fn} felt rejected when you pulled away.`, 'warn');
+        complete();
+      }},
+    ]);
+    return true;
+  }
+  if(type==='intimate'){
+    relationshipPopup(`Private moment with ${fn}`, `Things get intense between you two.`, [
+      { label:'Keep it private', cls:'btn-primary', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(9,16));
+        G.happy = clamp(G.happy + rnd(8,14));
+        addEv(`An intimate night with ${fn} brought you closer.`, 'love');
+        if(G.spouse) maybeExposeAffair(fn, 'private affair rumor', 0.24);
+        complete();
+      }},
+      { label:'Post a hint online', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation + rnd(4,10));
+        G.sm.totalFame = clamp((G.sm.totalFame||0) + rnd(1,4));
+        addEv(`You posted suggestive clues about ${fn}. Attention surged.`, 'warn');
+        if(G.spouse || (G.lovers||[]).length>1) maybeExposeAffair(fn, 'social media leak', 0.42);
+        complete();
+      }},
+      { label:'Back out', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(4,10));
+        addEv(`You pulled back with ${fn}. Mixed feelings all around.`, 'warn');
+        complete();
+      }},
+    ]);
+    return true;
+  }
+  if(type==='special'){
+    relationshipPopup(`Plan something special for ${fn}?`, `This can be unforgettable if you commit.`, [
+      { label:'Grand gesture', cls:'btn-primary', onClick:()=>{
+        const cost = rnd(250,900);
+        if(G.money<cost){ flash(`Need ${fmt$(cost)}`,'warn'); complete(); return; }
+        G.money -= cost;
+        l.relation = clamp(l.relation + rnd(14,24));
+        G.happy = clamp(G.happy + rnd(12,20));
+        addEv(`You planned a huge romantic gesture for ${fn}. It landed perfectly. (-${fmt$(cost)})`, 'love');
+        complete();
+      }},
+      { label:'Thoughtful surprise', cls:'btn-ghost', onClick:()=>{
+        const cost = rnd(80,240);
+        G.money -= cost;
+        l.relation = clamp(l.relation + rnd(8,14));
+        G.happy = clamp(G.happy + rnd(7,12));
+        addEv(`You surprised ${fn} with something meaningful. (-${fmt$(cost)})`, 'good');
+        complete();
+      }},
+      { label:'Do nothing', cls:'btn-ghost', onClick:()=>{
+        l.relation = clamp(l.relation - rnd(2,7));
+        addEv(`${fn} expected effort and felt disappointed.`, 'warn');
+        complete();
+      }},
+    ]);
+    return true;
+  }
+  return false;
+}
+
 function loveAct(name, type){
+  ensureRelationshipDramaState();
   const l = G.lovers.find(x=>x.name===name);
   if(!l||!l.alive){ renderRelationships(); return; }
   const fn = l.firstName;
+  if(['date','movie','convo','makeout','intimate','special'].includes(type)){
+    if(runLoverEncounterPopup(l, type)) return;
+  }
 
   if(type==='date'){
     const cost=rnd(30,120); G.money-=cost;
@@ -443,11 +691,13 @@ function loveAct(name, type){
     if(Math.random()<0.52){
       G.lovers=G.lovers.filter(x=>x.name!==name);
       G.happy=clamp(G.happy-22); G.social.reputation=clamp(G.social.reputation-14);
-      addEv(`You cheated on ${fn}. They found out. They always find out.`,'bad');
+      addEv(`You cheated on ${fn}. They found out.`, 'bad');
+      if(G.spouse) maybeExposeAffair(fn, 'cheating with lover exposed', 0.5);
       flash(`${fn} is gone.`,'bad');
     } else {
       G.happy=clamp(G.happy+4);
-      addEv(`You cheated on ${fn} and got away with it. For now.`,'warn');
+      addEv(`You cheated on ${fn} and hid it for now.`, 'warn');
+      if(G.spouse) maybeExposeAffair(fn, 'secret lover affair', 0.3);
     }
   } else if(type==='breakup'){
     G.lovers=G.lovers.filter(x=>x.name!==name);
@@ -567,9 +817,11 @@ function renderFriendsTab(){
       <div style="display:flex;gap:5px;flex-wrap:wrap;padding-left:53px">
         <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','hangout')">🍺 Hang Out</button>
         <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','meal')">🍽️ Grab Food</button>
+        <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','story')">🎲 Scenario</button>
         <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','compliment')">💬 Compliment</button>
         <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','advice')">🧠 Ask Advice</button>
         <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','compete')">🏆 Compete</button>
+        ${G.age>=16?`<button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','hookup')">🔥 Hook Up</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="friendAct('${n}','loan')">💸 Lend Money</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="friendAct('${n}','ditch')">🚮 Ditch</button>
       </div>
@@ -583,6 +835,7 @@ function renderFriendsTab(){
 }
 
 function friendAct(name, type){
+  ensureRelationshipDramaState();
   const f = G.friends.find(x=>x.name===name);
   if(!f||!f.alive){ flash('Can\'t find them.','warn'); return; }
   const fn = f.firstName;
@@ -602,6 +855,34 @@ function friendAct(name, type){
     f.relation=clamp(f.relation+rnd(5,12)+compBoost); G.happy=clamp(G.happy+rnd(5,9));
     addEv(`Grabbed food with ${fn}. (-$${cost}) Easy conversation.`,'love');
     flash(`🍽️ Food with ${fn}`);
+  } else if(type==='story'){
+    relationshipPopup(
+      `${fn}: what kind of night?`,
+      `You and ${fn} have the evening free.`,
+      [
+        { label:'Spontaneous adventure', cls:'btn-primary', onClick:()=>{
+          f.relation = clamp(f.relation + rnd(6,13) + compBoost);
+          G.happy = clamp(G.happy + rnd(6,12));
+          G.stress = clamp((G.stress||35) - rnd(2,5));
+          addEv(`You and ${fn} improvised an unforgettable night.`, 'love');
+          updateHUD(); renderRelationships();
+        }},
+        { label:'Venting session', cls:'btn-ghost', onClick:()=>{
+          f.relation = clamp(f.relation + rnd(3,8));
+          G.happy = clamp(G.happy + rnd(2,6));
+          G.stress = clamp((G.stress||35) - rnd(1,4));
+          addEv(`You and ${fn} vented about life and left lighter.`, 'good');
+          updateHUD(); renderRelationships();
+        }},
+        { label:'Flake last minute', cls:'btn-ghost', onClick:()=>{
+          f.relation = clamp(f.relation - rnd(4,11));
+          G.social.dramaFlags.friendDrama = (G.social.dramaFlags.friendDrama||0) + 1;
+          addEv(`You bailed on ${fn}. They took it personally.`, 'warn');
+          updateHUD(); renderRelationships();
+        }},
+      ]
+    );
+    return;
   } else if(type==='compliment'){
     if(Math.random()>.18){
       f.relation=clamp(f.relation+rnd(5,10)+compBoost); G.happy=clamp(G.happy+4);
@@ -625,6 +906,45 @@ function friendAct(name, type){
       G.happy=clamp(G.happy-4); f.relation=clamp(f.relation+5);
       addEv(`${fn} beat you. You congratulated them through gritted teeth.`,'warn');
     }
+  } else if(type==='hookup'){
+    relationshipPopup(
+      `Chemistry with ${fn}`,
+      `The vibe turns romantic. What do you do?`,
+      [
+        { label:'Make a move', cls:'btn-primary', onClick:()=>{
+          const chance = Math.min(0.9, 0.34 + (f.relation||50)/170 + (f.compat||50)/220 + (G.looks||50)/300);
+          if(Math.random()<chance){
+            f.relation = clamp(f.relation + rnd(10,18));
+            G.happy = clamp(G.happy + rnd(8,14));
+            addEv(`You hooked up with ${fn}. The friendship changed instantly.`, 'love');
+            if(!G.lovers.some(x=>x.name===f.name) && Math.random()<0.72){
+              const lover = { ...f, role:'Lover', relation:Math.max(55, f.relation), milestones:{ intimate:true } };
+              G.friends = G.friends.filter(x=>x.name!==f.name);
+              G.lovers.push(lover);
+              addEv(`${fn} is now more than a friend.`, 'love');
+            }
+            if(G.spouse || G.lovers.length>1) maybeExposeAffair(fn, 'hookup with a friend', 0.28);
+          } else {
+            f.relation = clamp(f.relation - rnd(10,18));
+            addEv(`You made a move on ${fn}. It landed badly and things got awkward.`, 'bad');
+          }
+          updateHUD(); renderRelationships();
+        }},
+        { label:'Keep it platonic', cls:'btn-ghost', onClick:()=>{
+          f.relation = clamp(f.relation + rnd(2,6));
+          addEv(`You chose to keep things platonic with ${fn}.`, 'good');
+          updateHUD(); renderRelationships();
+        }},
+        { label:'Start a secret affair', cls:'btn-ghost', onClick:()=>{
+          f.relation = clamp(f.relation + rnd(6,12));
+          G.darkScore++;
+          addEv(`You and ${fn} started something secret.`, 'warn');
+          maybeExposeAffair(fn, 'secret affair with a friend', 0.36);
+          updateHUD(); renderRelationships();
+        }},
+      ]
+    );
+    return;
   } else if(type==='loan'){
     const amt = rnd(50,500);
     if(G.money<amt){ flash(`You don't have $${amt} to lend`,'warn'); return; }
@@ -645,6 +965,53 @@ function friendAct(name, type){
     flash(`${fn} removed from your life`,'warn');
   }
   updateHUD(); renderRelationships();
+}
+
+function relationshipYearPulse(){
+  ensureRelationshipDramaState();
+  const d = G.social.dramaFlags;
+  const aliveFriends = (G.friends||[]).filter(f=>f && f.alive!==false);
+  const aliveFamily = (G.family||[]).filter(f=>f && f.alive!==false);
+  const aliveLovers = (G.lovers||[]).filter(l=>l && l.alive!==false);
+
+  if(aliveFriends.length && Math.random()<0.18){
+    const f = pick(aliveFriends);
+    if(Math.random()<0.56){
+      f.relation = clamp((f.relation||50) + rnd(2,7));
+      addEv(`${f.firstName} checked in during a rough week. Real friend energy.`, 'good');
+    } else {
+      f.relation = clamp((f.relation||50) - rnd(3,9));
+      d.friendDrama = (d.friendDrama||0) + 1;
+      addEv(`A misunderstanding with ${f.firstName} cooled the friendship this year.`, 'warn');
+    }
+  }
+
+  if(aliveFamily.length && Math.random()<0.16){
+    const m = pick(aliveFamily);
+    if(Math.random()<0.45 && G.age>=18){
+      const ask = rnd(300,3000);
+      if(G.money>=ask && Math.random()<0.62){
+        G.money -= ask;
+        m.relation = clamp((m.relation||50) + rnd(4,9));
+        addEv(`${m.firstName} needed support. You covered ${fmt$(ask)}.`, 'good');
+      } else {
+        m.relation = clamp((m.relation||50) - rnd(4,10));
+        d.familyDrama = (d.familyDrama||0) + 1;
+        addEv(`Family tension rose with ${m.firstName} over money and boundaries.`, 'warn');
+      }
+    }
+  }
+
+  if(aliveLovers.length>1 && Math.random()<0.22){
+    const l = pick(aliveLovers);
+    l.relation = clamp((l.relation||50) - rnd(8,16));
+    addEv(`${l.firstName} suspects you're seeing someone else. Trust dropped.`, 'bad');
+    maybeExposeAffair(l.firstName, 'lover jealousy spiral', 0.22);
+  }
+
+  if(G.spouse && aliveLovers.length && Math.random()<0.14){
+    maybeExposeAffair(pick(aliveLovers).firstName, 'a leaked message thread', 0.32);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

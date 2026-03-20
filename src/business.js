@@ -47,6 +47,14 @@ const CRYPTO_COINS_V2 = [
   { id:'meme', label:'Meme Coin', icon:'🐸', minAge:18, vol:0.14, drift:0.004, color:'#a7f34f' },
 ];
 
+const RIVAL_NAME_BANK = {
+  SaaS:['IronPeak Cloud','Mercury Stack','Northbyte Systems','Kiteflow Labs','NeonGrid Software'],
+  Consumer:['Elm & Pine Co','Velvet Harbor','Bloomline Goods','Hearthwell Brands','Urban Quill Supply'],
+  'E-commerce':['CartNova','SwiftBasket','ParcelPilot','VelociMart','Nexa Commerce'],
+  FinTech:['Sterling Ledger','AtlasPay','BlueCrest Finance','MetricBank Labs','Pioneer Capital Tech'],
+  Media:['Studio Signal','Pulsewave Media','Loudline Network','Orbit Storyworks','SilverFrame Collective'],
+};
+
 function ensureBusinessTabState(){
   if(typeof ensureAdvancedFinanceState === 'function') ensureAdvancedFinanceState();
   else ensureFinanceShape();
@@ -78,7 +86,18 @@ function ensureBusinessTabState(){
   if(typeof b.investorName !== 'string') b.investorName = '';
   if(typeof b.actionsThisYear !== 'number') b.actionsThisYear = 0;
   if(typeof b.negativeYears !== 'number') b.negativeYears = 0;
+  if(typeof b.marketShare !== 'number') b.marketShare = 12;
+  if(typeof b.moat !== 'number') b.moat = 24;
+  if(typeof b.warReadiness !== 'number') b.warReadiness = 28;
+  if(typeof b.priceWar !== 'boolean') b.priceWar = false;
+  if(typeof b.espionageRisk !== 'number') b.espionageRisk = 8;
+  if(typeof b.prHeat !== 'number') b.prHeat = 12;
+  if(typeof b.openDisputes !== 'number') b.openDisputes = 0;
+  if(!Array.isArray(b.rivals)) b.rivals = [];
   if(!Array.isArray(b.timeline)) b.timeline = [];
+  if(b.active && !b.rivals.length){
+    b.rivals = generateStartupRivals(b.sector || 'SaaS');
+  }
   if(!G.finance.crypto.history.length){
     const base = {
       btc:G.finance.crypto.prices.btc||100,
@@ -99,6 +118,32 @@ function ensureBusinessTabState(){
 }
 
 function startupById(id){ return STARTUP_OPTIONS_25.find(s=>s.id===id); }
+
+function generateStartupRivals(sector){
+  const pool = (RIVAL_NAME_BANK[sector] || ['Axiom Ventures','Rival Labs','Summit Dynamics']).slice();
+  const rivals = [];
+  for(let i=0;i<3;i++){
+    const name = pool.length ? pool.splice(rnd(0,pool.length-1),1)[0] : `Rival ${i+1}`;
+    rivals.push({
+      name,
+      strength:rnd(42,78),
+      aggression:rnd(25,72),
+      marketShare:rnd(8,24),
+      legalThreat:rnd(0,18),
+    });
+  }
+  return rivals;
+}
+
+function businessLeadRival(b){
+  const rivals = b.rivals || [];
+  if(!rivals.length) return null;
+  let lead = rivals[0];
+  for(let i=1;i<rivals.length;i++){
+    if((rivals[i].strength||0) > (lead.strength||0)) lead = rivals[i];
+  }
+  return lead;
+}
 
 function starDifficulty(n){ return '★'.repeat(Math.max(1, Math.min(5, n))); }
 
@@ -245,6 +290,14 @@ function startBusiness(startupId){
   b.investorName = '';
   b.actionsThisYear = 0;
   b.negativeYears = 0;
+  b.marketShare = rnd(10,22);
+  b.moat = clamp(18 + Math.floor((G.smarts||50)/5) + rnd(-4,6));
+  b.warReadiness = clamp(24 + rnd(-5,8));
+  b.priceWar = false;
+  b.espionageRisk = rnd(5,16);
+  b.prHeat = rnd(8,20);
+  b.openDisputes = 0;
+  b.rivals = generateStartupRivals(s.sector);
   b.timeline = [{ year:G.age, text:`Founded ${b.name} (${s.name})` }];
 
   G.stress = clamp((G.stress||35) + rnd(8,14));
@@ -279,6 +332,8 @@ function businessRaise(round){
     b.equitySold = Math.min(85, (b.equitySold||0) + equity);
     b.stage = round==='seed' ? 'seed' : 'growth';
     b.managementSkill = clamp((b.managementSkill||24) + rnd(1,4));
+    b.warReadiness = clamp((b.warReadiness||28) + rnd(2,6));
+    b.prHeat = clamp((b.prHeat||12) + rnd(3,8));
     addEv(`${investor} invested ${fmt$(raise)} in ${b.name}. Fame and traction helped your pitch.`, 'love');
   } else {
     b.reputation = clamp((b.reputation||45) - rnd(1,4));
@@ -351,6 +406,79 @@ function businessAction(action){
     b.complexity = clamp(b.complexity - rnd(0,3));
     consumeBusinessAction(rnd(1,4));
     addEv(`Cost-cutting reduced runway pressure at ${b.name}.`, 'bad');
+  } else if(action==='intel'){
+    const cost = 3000 + rnd(600,2400);
+    if(!businessSpendCheck(cost)) return;
+    const lead = businessLeadRival(b);
+    b.warReadiness = clamp((b.warReadiness||28) + rnd(4,9));
+    b.espionageRisk = clamp((b.espionageRisk||8) + rnd(2,7));
+    b.complexity = clamp((b.complexity||20) + rnd(1,3));
+    if(lead){
+      lead.strength = clamp((lead.strength||50) - rnd(1,4));
+      addEv(`Competitive intelligence exposed weakness at ${lead.name}.`, 'good');
+    } else {
+      addEv('Your intel team mapped competitor positioning in detail.', 'good');
+    }
+    consumeBusinessAction(rnd(2,5));
+  } else if(action==='price_war'){
+    const lead = businessLeadRival(b);
+    b.priceWar = true;
+    b.marketShare = clamp((b.marketShare||12) + rnd(2,6));
+    b.customerBase += rnd(180,880);
+    b.reputation = clamp((b.reputation||50) + rnd(0,3));
+    b.complexity = clamp((b.complexity||20) + rnd(2,5));
+    if(lead) lead.marketShare = clamp((lead.marketShare||18) - rnd(2,6));
+    consumeBusinessAction(rnd(3,7));
+    addEv(`${b.name} kicked off aggressive pricing to pressure rivals.`, 'warn');
+  } else if(action==='moat'){
+    const cost = 5000 + s.difficulty*1200;
+    if(!businessSpendCheck(cost)) return;
+    b.moat = clamp((b.moat||24) + rnd(6,12));
+    b.warReadiness = clamp((b.warReadiness||28) + rnd(1,4));
+    b.complexity = clamp((b.complexity||20) + rnd(1,4));
+    b.openDisputes = Math.max(0, (b.openDisputes||0) - 1);
+    consumeBusinessAction(rnd(2,4));
+    addEv(`You fortified product moat with patents, exclusives, and contracts.`, 'good');
+  } else if(action==='poach'){
+    const cost = 9000 + rnd(2000,9000);
+    if(!businessSpendCheck(cost)) return;
+    const lead = businessLeadRival(b);
+    if(Math.random()<0.63){
+      b.product = clamp((b.product||45) + rnd(4,9));
+      b.operations = clamp((b.operations||45) + rnd(3,8));
+      b.warReadiness = clamp((b.warReadiness||28) + rnd(2,6));
+      if(lead) lead.strength = clamp((lead.strength||55) - rnd(3,8));
+      addEv(`You poached key talent from a rival and upgraded execution speed.`, 'love');
+    } else {
+      b.prHeat = clamp((b.prHeat||12) + rnd(3,8));
+      b.openDisputes = clamp((b.openDisputes||0) + 1);
+      addEv(`Poaching attempt failed and triggered legal threats from competitors.`, 'bad');
+    }
+    consumeBusinessAction(rnd(2,6));
+  } else if(action==='pr_blitz'){
+    const cost = 3500 + rnd(1000,5500);
+    if(!businessSpendCheck(cost)) return;
+    b.reputation = clamp((b.reputation||50) + rnd(4,10));
+    b.marketShare = clamp((b.marketShare||12) + rnd(1,4));
+    b.prHeat = clamp((b.prHeat||12) + rnd(2,6));
+    b.customerBase += rnd(120,720);
+    consumeBusinessAction(rnd(1,4));
+    addEv(`PR blitz improved public perception and brand demand for ${b.name}.`, 'good');
+  } else if(action==='legal_strike'){
+    const cost = 7000 + rnd(3000,12000);
+    if(!businessSpendCheck(cost)) return;
+    const lead = businessLeadRival(b);
+    b.openDisputes = clamp((b.openDisputes||0) + 1);
+    b.prHeat = clamp((b.prHeat||12) + rnd(2,7));
+    if(lead && Math.random()<0.56){
+      lead.strength = clamp((lead.strength||55) - rnd(5,12));
+      lead.legalThreat = clamp((lead.legalThreat||10) + rnd(3,8));
+      addEv(`Your legal strike forced ${lead.name} to back off on key accounts.`, 'good');
+    } else {
+      b.reputation = clamp((b.reputation||50) - rnd(1,4));
+      addEv(`The legal strike turned messy and expensive without clear wins.`, 'warn');
+    }
+    consumeBusinessAction(rnd(2,6));
   } else if(action==='raise_seed'){
     consumeBusinessAction(rnd(2,5));
     businessRaise('seed');
@@ -380,6 +508,7 @@ function businessAction(action){
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
       startupId:'', difficulty:1, complexity:20, managementSkill:b.managementSkill||30, founderExp:(b.founderExp||0)+4,
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     };
   } else if(action==='shutdown'){
     addEv(`You shut down ${b.name} and preserved what capital was left.`, 'warn');
@@ -388,6 +517,7 @@ function businessAction(action){
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
       startupId:'', difficulty:1, complexity:20, managementSkill:b.managementSkill||28, founderExp:(b.founderExp||0)+2,
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     };
     G.stress = clamp((G.stress||35) - rnd(2,6));
   }
@@ -510,16 +640,23 @@ function processBusinessYear(ledger){
   const overload = Math.max(0, (b.complexity||20) - ceiling);
   const overloadPenalty = Math.min(0.55, overload * 0.012);
   const climate = ((G.gov?.policy?.businessClimate||50)-50)/260;
+  const leadRival = businessLeadRival(b);
+  const rivalStrength = leadRival ? (leadRival.strength||55) : 52;
+  const warfareDefense = ((b.moat||24) + (b.warReadiness||28)) / 220;
+  const rivalPressure = Math.max(0, (rivalStrength/130) - warfareDefense);
 
   const growthFactor = Math.max(0.15, 0.55 + (b.product||40)/140 + (b.marketing||40)/170 + s.growthBias + climate - overloadPenalty + rnd(-8,14)/100);
   const grossAdds = Math.floor((rnd(120,1400) + (b.marketing||40)*11 + (b.product||40)*8) * growthFactor / Math.max(0.8, s.difficulty*0.7));
-  const churnRate = Math.max(0.04, 0.12 + s.risk*0.1 + overloadPenalty*0.5 - (b.operations||40)/280);
+  const churnRate = Math.max(0.04, 0.12 + s.risk*0.1 + overloadPenalty*0.5 + rivalPressure*0.25 - (b.operations||40)/280);
   const churn = Math.floor((b.customerBase||0) * churnRate);
-  b.customerBase = Math.max(0, (b.customerBase||0) + grossAdds - churn);
+  const rivalSteal = Math.floor((b.customerBase||0) * rivalPressure * rnd(5,14)/100);
+  b.customerBase = Math.max(0, (b.customerBase||0) + grossAdds - churn - rivalSteal);
 
-  const efficiency = Math.max(0.18, 0.28 + (b.operations||40)/180 + (b.product||40)/220 - overloadPenalty);
+  const priceWarPenalty = b.priceWar ? 0.08 : 0;
+  const efficiency = Math.max(0.18, 0.28 + (b.operations||40)/180 + (b.product||40)/220 - overloadPenalty - priceWarPenalty);
   const revenue = Math.floor((b.customerBase||0) * s.arpu * efficiency);
-  const operatingCost = Math.floor((b.burn||0) + (b.employees||0)*rnd(15000,36000) + rnd(3000,18000));
+  const warfareCost = Math.floor((b.openDisputes||0) * rnd(3000,12000) + (b.prHeat||12)*120);
+  const operatingCost = Math.floor((b.burn||0) + (b.employees||0)*rnd(15000,36000) + rnd(3000,18000) + warfareCost);
   const profit = revenue - operatingCost;
   b.lastProfit = profit;
   b.cashReserve += profit;
@@ -536,6 +673,28 @@ function processBusinessYear(ledger){
   } else {
     b.reputation = clamp((b.reputation||50) - rnd(1,3));
     G.stress = clamp((G.stress||35) + rnd(2,6));
+  }
+  b.marketShare = clamp((b.marketShare||12) + Math.floor((grossAdds - churn - rivalSteal)/Math.max(600, (b.customerBase||1))) * 5 + rnd(-1,2));
+
+  if(leadRival){
+    if(Math.random()<0.26){
+      const attackPower = Math.max(0, (leadRival.aggression||40) - (b.moat||24)/2 - (b.warReadiness||28)/3);
+      if(attackPower>24){
+        const hit = rnd(2500,14000) + attackPower*120;
+        b.cashReserve -= hit;
+        b.reputation = clamp((b.reputation||50) - rnd(2,6));
+        b.openDisputes = clamp((b.openDisputes||0) + 1);
+        addEv(`${leadRival.name} launched a competitive attack. Damage: ${fmt$(hit)}.`, 'warn');
+      } else {
+        b.moat = clamp((b.moat||24) + rnd(1,4));
+        addEv(`${leadRival.name} pushed hard, but your moat held this year.`, 'good');
+      }
+    }
+    if(Math.random()<0.2){
+      leadRival.strength = clamp((leadRival.strength||55) + rnd(-4,5));
+      leadRival.aggression = clamp((leadRival.aggression||45) + rnd(-4,5));
+      leadRival.marketShare = clamp((leadRival.marketShare||18) + rnd(-3,3));
+    }
   }
 
   if(Math.random()<0.24){
@@ -558,6 +717,21 @@ function processBusinessYear(ledger){
     addEv(`Investor reporting increased pressure at ${b.name}.`, 'warn');
   }
 
+  if((b.espionageRisk||8)>20 && Math.random()<0.14){
+    const leakCost = rnd(4000,18000);
+    b.cashReserve -= leakCost;
+    b.reputation = clamp((b.reputation||50) - rnd(2,7));
+    addEv(`A competitive leak hurt ${b.name}'s roadmap. Loss: ${fmt$(leakCost)}.`, 'bad');
+  }
+
+  if((b.prHeat||12)>55 && Math.random()<0.18){
+    const controversy = rnd(1,3);
+    G.sm.controversies = (G.sm.controversies||0) + controversy;
+    G.social.reputation = clamp((G.social.reputation||50) - rnd(2,7));
+    b.reputation = clamp((b.reputation||50) - rnd(2,6));
+    addEv(`Corporate controversy cycle hit ${b.name}. Public perception slipped.`, 'warn');
+  }
+
   if((b.cashReserve||0)<0){
     b.negativeYears = (b.negativeYears||0) + 1;
   } else {
@@ -572,6 +746,7 @@ function processBusinessYear(ledger){
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
       startupId:'', difficulty:1, complexity:20, managementSkill:Math.max(24, b.managementSkill||24), founderExp:(b.founderExp||0)+2,
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     };
     return;
   }
@@ -579,6 +754,11 @@ function processBusinessYear(ledger){
   b.timeline.push({ year:G.age, text:`Revenue ${fmt$(revenue)} · Profit ${fmt$(profit)} · Customers ${(b.customerBase||0).toLocaleString()}` });
   if(b.timeline.length>8) b.timeline.shift();
   b.complexity = clamp((b.complexity||20) + rnd(0,3) + Math.floor((b.employees||0)/8) - Math.floor((b.managementSkill||24)/35));
+  b.warReadiness = clamp((b.warReadiness||28) + rnd(-2,2) - (b.openDisputes||0));
+  b.prHeat = clamp((b.prHeat||12) + rnd(-4,3));
+  b.espionageRisk = clamp((b.espionageRisk||8) + rnd(-2,3));
+  if(b.priceWar && Math.random()<0.68) b.priceWar = false;
+  b.openDisputes = Math.max(0, (b.openDisputes||0) - (Math.random()<0.45 ? 1 : 0));
   b.actionsThisYear = 0;
 }
 
@@ -634,12 +814,15 @@ function renderBusiness(){
   } else {
     const s = startupById(b.startupId);
     const cap = businessActionCap(b);
+    const lead = businessLeadRival(b);
     html += `<p style="font-size:.78rem;color:var(--muted2)"><strong style="color:var(--text)">${b.name}</strong> · ${s?.name||'Startup'} · ${s?.sector||b.sector}</p>
       <p style="font-size:.78rem;color:var(--muted2)">Difficulty ${starDifficulty(b.difficulty||1)} · Stage ${b.stage} · Employees ${b.employees}</p>
       <p style="font-size:.78rem;color:var(--muted2)">Customers ${(b.customerBase||0).toLocaleString()} · Burn ${fmt$(b.burn||0)}/yr · Reserve ${fmt$(b.cashReserve||0)} · Valuation ${fmt$(b.valuation||0)}</p>
       <p style="font-size:.78rem;color:var(--muted2)">Product ${b.product} · Ops ${b.operations} · Marketing ${b.marketing} · Reputation ${b.reputation}</p>
       <p style="font-size:.78rem;color:${overload>0?'var(--danger)':'var(--muted2)'}">Skill ceiling ${ceiling} vs complexity ${b.complexity||0} ${overload>0?`(Overload +${overload}, yearly execution penalty)`:''}</p>
       <p style="font-size:.78rem;color:var(--muted2)">Actions this year: ${b.actionsThisYear||0}/${cap} · Investor: ${b.hasInvestor?`${b.investorName} (Tier ${b.investorTier}, ${b.equitySold}% sold)`:'Bootstrapped'}</p>
+      <p style="font-size:.78rem;color:var(--muted2)">Corporate Warfare → Share ${b.marketShare||0}% · Moat ${b.moat||0} · War readiness ${b.warReadiness||0} · PR heat ${b.prHeat||0} · Disputes ${b.openDisputes||0} ${b.priceWar?'· Price war ACTIVE':''}</p>
+      ${lead?`<p style="font-size:.78rem;color:var(--muted2)">Lead rival: ${lead.name} · Strength ${lead.strength||0} · Aggression ${lead.aggression||0} · Share ${lead.marketShare||0}%</p>`:''}
       <div class="choice-grid">
         <div class="choice" onclick="businessAction('build')"><div class="choice-icon">🛠️</div><div class="choice-name">Build Product</div><div class="choice-desc">Ship features, raise complexity</div></div>
         <div class="choice" onclick="businessAction('market')"><div class="choice-icon">📣</div><div class="choice-name">Growth Campaign</div><div class="choice-desc">Acquire customers faster</div></div>
@@ -647,12 +830,19 @@ function renderBusiness(){
         <div class="choice" onclick="businessAction('systems')"><div class="choice-icon">⚙️</div><div class="choice-name">Systemize Ops</div><div class="choice-desc">Raise skill, reduce overload</div></div>
         <div class="choice" onclick="businessAction('learn')"><div class="choice-icon">🎓</div><div class="choice-name">Founder Training</div><div class="choice-desc">Raise management ceiling</div></div>
         <div class="choice" onclick="businessAction('cut')"><div class="choice-icon">✂️</div><div class="choice-name">Cut Burn</div><div class="choice-desc">Protect runway, reputation risk</div></div>
+        <div class="choice" onclick="businessAction('intel')"><div class="choice-icon">🕵️</div><div class="choice-name">Competitor Intel</div><div class="choice-desc">Scout rivals, raise readiness</div></div>
+        <div class="choice" onclick="businessAction('price_war')"><div class="choice-icon">⚔️</div><div class="choice-name">Start Price War</div><div class="choice-desc">Win share, hurt margins</div></div>
+        <div class="choice" onclick="businessAction('moat')"><div class="choice-icon">🧱</div><div class="choice-name">Build Moat</div><div class="choice-desc">Patents/exclusives/defense</div></div>
+        <div class="choice" onclick="businessAction('poach')"><div class="choice-icon">🎯</div><div class="choice-name">Poach Talent</div><div class="choice-desc">Steal talent from rivals</div></div>
+        <div class="choice" onclick="businessAction('pr_blitz')"><div class="choice-icon">📺</div><div class="choice-name">PR Blitz</div><div class="choice-desc">Narrative control + demand</div></div>
+        <div class="choice" onclick="businessAction('legal_strike')"><div class="choice-icon">⚖️</div><div class="choice-name">Legal Strike</div><div class="choice-desc">IP/contract pressure play</div></div>
         <div class="choice" onclick="businessAction('raise_seed')"><div class="choice-icon">💰</div><div class="choice-name">Raise Seed</div><div class="choice-desc">Fame/traction increases odds</div></div>
         <div class="choice${(b.investorTier||0)<1?' disabled':''}" onclick="businessAction('raise_series')"><div class="choice-icon">🏦</div><div class="choice-name">Raise Series</div><div class="choice-desc">${(b.investorTier||0)>=1?'Larger round, more pressure':'Needs seed investor'}</div></div>
         <div class="choice" onclick="businessAction('salary')"><div class="choice-icon">🏧</div><div class="choice-name">Founder Salary</div><div class="choice-desc">Pay from business reserve</div></div>
         <div class="choice" onclick="businessAction('exit')"><div class="choice-icon">🏁</div><div class="choice-name">Exit Company</div><div class="choice-desc">Liquidity event</div></div>
         <div class="choice" onclick="businessAction('shutdown')"><div class="choice-icon">🧯</div><div class="choice-name">Shut Down</div><div class="choice-desc">Stop losses and reset</div></div>
       </div>
+      ${(b.rivals||[]).length?`<div style="margin-top:10px"><div style="font-size:.78rem;color:var(--muted2);margin-bottom:6px">Competitive Landscape</div>${(b.rivals||[]).map(r=>`<div style="font-size:.74rem;color:var(--muted2);padding:2px 0">• ${r.name}: Strength ${r.strength||0} · Aggression ${r.aggression||0} · Share ${r.marketShare||0}%</div>`).join('')}</div>`:''}
       ${(b.timeline||[]).length?`<div style="margin-top:10px">${(b.timeline||[]).slice().reverse().map(t=>`<div style="font-size:.75rem;color:var(--muted2);padding:2px 0">• Age ${t.year}: ${t.text}</div>`).join('')}</div>`:''}`;
   }
   html += `</div>`;

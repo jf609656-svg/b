@@ -220,6 +220,7 @@ function beginLife(){
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
       startupId:'', difficulty:1, complexity:20, managementSkill:24, founderExp:0,
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',

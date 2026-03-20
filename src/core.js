@@ -32,6 +32,7 @@ const G = {
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
       startupId:'', difficulty:1, complexity:20, managementSkill:24, founderExp:0,
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
@@ -494,6 +495,14 @@ function ensureFinanceShape(){
   if(typeof G.finance.business.investorName!=='string') G.finance.business.investorName = '';
   if(typeof G.finance.business.actionsThisYear!=='number') G.finance.business.actionsThisYear = 0;
   if(typeof G.finance.business.negativeYears!=='number') G.finance.business.negativeYears = 0;
+  if(typeof G.finance.business.marketShare!=='number') G.finance.business.marketShare = 12;
+  if(typeof G.finance.business.moat!=='number') G.finance.business.moat = 24;
+  if(typeof G.finance.business.warReadiness!=='number') G.finance.business.warReadiness = 28;
+  if(typeof G.finance.business.priceWar!=='boolean') G.finance.business.priceWar = false;
+  if(typeof G.finance.business.espionageRisk!=='number') G.finance.business.espionageRisk = 8;
+  if(typeof G.finance.business.prHeat!=='number') G.finance.business.prHeat = 12;
+  if(typeof G.finance.business.openDisputes!=='number') G.finance.business.openDisputes = 0;
+  if(!Array.isArray(G.finance.business.rivals)) G.finance.business.rivals = [];
   if(!Array.isArray(G.finance.business.timeline)) G.finance.business.timeline = [];
   if(!G.finance.tax) G.finance.tax = {};
   if(typeof G.finance.tax.lastPaid!=='number') G.finance.tax.lastPaid = 0;
@@ -1558,6 +1567,9 @@ function ageUp(){
       G.lovers = G.lovers.filter(x=>x.name!==l.name);
     }
   });
+  if(typeof relationshipYearPulse==='function'){
+    runYearStepSafe('relationships', ()=>relationshipYearPulse());
+  }
 
   // ── Random life event pool ───────────────────────────────────
   const eligible = LIFE_EVENTS.filter(e => a>=e[0] && a<=e[1]);
