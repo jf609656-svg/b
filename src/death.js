@@ -49,6 +49,8 @@ function showDeath(){
       <p style="margin-bottom:5px">👨‍👩‍👧 Family members: ${G.family.length}</p>
       <p style="margin-bottom:5px">📖 Life events: ${G.lifeEvents.length}</p>
       <p style="margin-bottom:5px">🧠 Final stress: ${G.stress||35}/100</p>
+      ${Array.isArray(G.pets)&&G.pets.filter(p=>p.alive).length?`<p style="margin-bottom:5px">🐾 Pets: ${G.pets.filter(p=>p.alive).length} current companions</p>`:''}
+      ${Array.isArray(G.pets)&&G.pets.filter(p=>!p.alive).length?`<p style="margin-bottom:5px">🕊️ Pets remembered: ${G.pets.filter(p=>!p.alive).length}</p>`:''}
       ${G.school.uni.course?`<p style="margin-bottom:5px">🎓 Degree: ${G.school.uni.course}</p>`:''}
       ${G.school.gpa>=3.7?`<p style="margin-bottom:5px">⭐ Honor Roll GPA: ${G.school.gpa.toFixed(1)}</p>`:''}
       ${sport&&G.school.sportMVP?`<p style="margin-bottom:5px">🏆 ${sport.label} MVP</p>`:''}

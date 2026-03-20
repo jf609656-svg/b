@@ -200,6 +200,7 @@ function beginLife(){
     totalEarned:0,
   };
   G.children    = [];
+  G.pets        = [];
   G.spouse      = null;
   G.marriageYears = 0;
   G.divorces    = 0;

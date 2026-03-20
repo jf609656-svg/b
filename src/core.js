@@ -38,6 +38,7 @@ const G = {
   relTab: 'family',     // which sub-tab is active
   // relationships
   family:[], friends:[], lovers:[],
+  pets:[],
   traits:[],
   familyFlags:{ parentsDivorced:false, stepFamilyAdded:false },
   // history
@@ -1125,6 +1126,62 @@ function ageUp(){
     }
   });
 
+  // ── Pets aging, care costs, companionship ─────────────────────
+  if(!Array.isArray(G.pets)) G.pets = [];
+  G.pets.forEach(p=>{
+    if(!p || !p.alive) return;
+    p.age = (p.age||0) + 1;
+    p.health = clamp((p.health??70) + rnd(-3,2));
+    p.happiness = clamp((p.happiness??65) + rnd(-4,3));
+    p.bond = clamp((p.bond??55) + (p.happiness>=60 ? rnd(0,2) : rnd(-2,1)));
+
+    const annualCare = p.annualCost||0;
+    if(G.age>=18 && annualCare>0){
+      if(G.money>=annualCare){
+        G.money -= annualCare;
+      } else {
+        const deficit = annualCare - Math.max(0, G.money);
+        G.money = 0;
+        G.finance.debt += Math.floor(deficit * 1.08);
+        p.happiness = clamp(p.happiness - rnd(6,12));
+        G.stress = clamp((G.stress||35) + rnd(4,8));
+        addEv(`${p.name}'s care costs were hard to cover this year. Debt increased by ${fmt$(Math.floor(deficit*1.08))}.`, 'warn');
+      }
+    }
+
+    if(p.happiness>=70 && p.bond>=70){
+      G.happy = clamp(G.happy + rnd(1,3));
+      G.stress = clamp((G.stress||35) - rnd(2,5));
+    } else if(p.happiness<=30){
+      G.happy = clamp(G.happy - rnd(1,3));
+      G.stress = clamp((G.stress||35) + rnd(2,4));
+    }
+
+    const lifespan = p.lifespan||14;
+    if(p.health<35 && Math.random()<0.2){
+      const vetBill = rnd(250,1400);
+      if(G.age>=18 && G.money>=vetBill){
+        G.money -= vetBill;
+        p.health = clamp(p.health + rnd(8,16));
+        addEv(`${p.name} needed urgent vet care. You paid ${fmt$(vetBill)} and they recovered.`, 'warn');
+      } else if(G.age>=18){
+        p.health = clamp(p.health - rnd(5,12));
+        addEv(`${p.name} needed veterinary care, but finances were tight.`, 'bad');
+      } else if(Math.random()<0.6){
+        p.health = clamp(p.health + rnd(6,12));
+        addEv(`Your family took ${p.name} to the vet and covered the bill.`, 'good');
+      }
+    }
+
+    const oldAgeRisk = p.age>lifespan ? Math.min(0.75, 0.16 + (p.age-lifespan)*0.08) : 0;
+    if(oldAgeRisk>0 && Math.random()<oldAgeRisk){
+      p.alive = false;
+      G.happy = clamp(G.happy - rnd(12,26));
+      G.stress = clamp((G.stress||35) + rnd(6,14));
+      addEv(`${p.name} passed away peacefully at age ${p.age}. You miss them deeply.`, 'bad');
+    }
+  });
+
   // ── Spouse aging & marriage anniversary ─────────────────────
   if(G.spouse && G.spouse.alive){
     G.spouse.age++;
@@ -1717,6 +1774,23 @@ function ageUp(){
   switchTab('life');
   renderLife();
 }
+
+// Safety wrapper: never let one runtime error permanently block Age Up.
+const __ageUpImpl = ageUp;
+ageUp = function(){
+  try{
+    __ageUpImpl();
+  }catch(err){
+    console.error('Fatal ageUp error', err);
+    try{
+      addEv('A simulation error occurred this year. The game recovered automatically.', 'warn');
+      flash('Recovered from age-up error. Try again.','warn');
+      updateHUD();
+      switchTab('life');
+      renderLife();
+    }catch(_e){}
+  }
+};
 
 // ── LIFE TAB ────────────────────────────────────────────────────
 function renderLife(){

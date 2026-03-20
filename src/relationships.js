@@ -6,7 +6,7 @@
 // ── SUB-TAB NAVIGATION ──────────────────────────────────────────
 function switchRelTab(tab){
   G.relTab = tab;
-  ['family','romance','friends','children','tree'].forEach(t=>{
+  ['family','romance','friends','children','pets','tree'].forEach(t=>{
     const el = document.getElementById('rtab-'+t);
     if(el) el.classList.toggle('active', t===tab);
   });
@@ -16,7 +16,7 @@ function switchRelTab(tab){
 function renderRelationships(){
   const tab = G.relTab || 'family';
   // Make sure correct tab is highlighted
-  ['family','romance','friends','children','tree'].forEach(t=>{
+  ['family','romance','friends','children','pets','tree'].forEach(t=>{
     const el = document.getElementById('rtab-'+t);
     if(el) el.classList.toggle('active', t===tab);
   });
@@ -27,6 +27,7 @@ function renderRelationships(){
   if(tab==='romance')  rc.innerHTML = renderRomanceTab();
   if(tab==='friends')  rc.innerHTML = renderFriendsTab();
   if(tab==='children') rc.innerHTML = renderChildrenTab();
+  if(tab==='pets')     rc.innerHTML = renderPetsTab();
   if(tab==='tree')     rc.innerHTML = renderFamilyTree();
 
   // Passive friend decay
@@ -828,6 +829,176 @@ function tryAdopt(){
   G.happy=clamp(G.happy+rnd(14,22));
   addEv(`You adopted ${fn}, age ${childAge}. They looked at you and your entire world reoriented. (-${fmt$(cost)})`,'love');
   flash(`💗 Adopted ${fn}!`,'good');
+  renderRelationships();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PETS TAB
+// ══════════════════════════════════════════════════════════════
+const PET_SPECIES = [
+  { id:'dog',    label:'Dog',    icon:'🐶', minAge:8,  fee:[120,650], annual:[350,1500], lifespan:[10,15] },
+  { id:'cat',    label:'Cat',    icon:'🐱', minAge:8,  fee:[90,450],  annual:[280,1200], lifespan:[12,18] },
+  { id:'bird',   label:'Bird',   icon:'🦜', minAge:10, fee:[60,300],  annual:[120,650],  lifespan:[6,12] },
+  { id:'rabbit', label:'Rabbit', icon:'🐰', minAge:8,  fee:[50,220],  annual:[140,700],  lifespan:[7,12] },
+  { id:'reptile',label:'Reptile',icon:'🦎', minAge:12, fee:[100,550], annual:[180,900],  lifespan:[8,16] },
+];
+
+const PET_NAMES = [
+  'Milo','Luna','Coco','Rocky','Bella','Simba','Nala','Mocha','Pepper','Oreo',
+  'Daisy','Leo','Chai','Loki','Mochi','Scout','Biscuit','Maple','Poppy','Nova'
+];
+
+function ensurePetState(){
+  if(!Array.isArray(G.pets)) G.pets = [];
+  G.pets.forEach(p=>{
+    if(typeof p.alive!=='boolean') p.alive = true;
+    if(typeof p.health!=='number') p.health = 70;
+    if(typeof p.happiness!=='number') p.happiness = 65;
+    if(typeof p.bond!=='number') p.bond = 55;
+    if(typeof p.age!=='number') p.age = 0;
+    if(typeof p.annualCost!=='number') p.annualCost = 350;
+    if(typeof p.lifespan!=='number') p.lifespan = 12;
+  });
+}
+
+function renderPetsTab(){
+  ensurePetState();
+  const alive = G.pets.filter(p=>p.alive);
+  const departed = G.pets.filter(p=>!p.alive);
+  let html = '';
+
+  html += `<div class="card">
+    <div class="card-title">Pets</div>
+    <p style="font-size:.78rem;color:var(--muted2)">Companionship lowers stress but adds annual care costs and responsibility.</p>
+  </div>`;
+
+  if(alive.length){
+    alive.forEach(p=>{
+      html += `
+      <div class="person-card" style="flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:11px;width:100%">
+          <div class="p-avatar av-friend">${p.icon||'🐾'}</div>
+          <div style="flex:1">
+            <div class="p-name">${p.name}</div>
+            <div class="p-role">${p.label||p.species||'Pet'} · Age ${p.age} · Annual care ${fmt$(p.annualCost||0)}</div>
+            <div class="p-role">Bond ${p.bond}% · Health ${p.health}% · Happiness ${p.happiness}%</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;padding-left:53px">
+          <button class="btn btn-ghost btn-sm" onclick="petAct('${p.id}','play')">🎾 Play</button>
+          <button class="btn btn-ghost btn-sm" onclick="petAct('${p.id}','feed')">🍖 Feed</button>
+          <button class="btn btn-ghost btn-sm" onclick="petAct('${p.id}','train')">🦴 Train</button>
+          <button class="btn btn-ghost btn-sm" onclick="petAct('${p.id}','groom')">🧼 Groom</button>
+          <button class="btn btn-ghost btn-sm" onclick="petAct('${p.id}','vet')">🩺 Vet</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="petAct('${p.id}','rehome')">🏠 Rehome</button>
+        </div>
+      </div>`;
+    });
+  } else {
+    html += `<div class="notif warn" style="margin-bottom:12px">No pets yet.</div>`;
+  }
+
+  html += `<div class="card"><div class="card-title">Adopt a Pet</div><div class="choice-grid">`;
+  PET_SPECIES.forEach(s=>{
+    html += `<div class="choice" onclick="adoptPet('${s.id}')">
+      <div class="choice-icon">${s.icon}</div>
+      <div class="choice-name">${s.label}</div>
+      <div class="choice-desc">Adoption ${fmt$(rnd(s.fee[0], s.fee[1]))} · lifespan ${s.lifespan[0]}-${s.lifespan[1]} yr</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  if(departed.length){
+    html += `<div class="card"><div class="card-title">In Memory</div>`;
+    departed.forEach(p=>{
+      html += `<div style="font-size:.8rem;color:var(--muted2);padding:3px 0">✝ ${p.name} · ${p.label||p.species} · Age ${p.age}</div>`;
+    });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function adoptPet(speciesId){
+  ensurePetState();
+  const s = PET_SPECIES.find(x=>x.id===speciesId);
+  if(!s){ flash('Species not found','warn'); return; }
+  if(G.age < s.minAge){ flash(`${s.label} adoption unlocks at age ${s.minAge}.`,'warn'); return; }
+  const fee = rnd(s.fee[0], s.fee[1]);
+  if(G.age>=18){
+    if(G.money<fee){ flash(`Need ${fmt$(fee)} for adoption fees.`,'warn'); return; }
+    G.money -= fee;
+  }
+  const name = pick(PET_NAMES);
+  const pet = {
+    id:`pet_${G.age}_${Math.random().toString(36).slice(2,8)}`,
+    species:s.id, label:s.label, icon:s.icon,
+    name,
+    age:0,
+    health:rnd(62,90),
+    happiness:rnd(60,90),
+    bond:rnd(45,72),
+    annualCost:rnd(s.annual[0], s.annual[1]),
+    lifespan:rnd(s.lifespan[0], s.lifespan[1]),
+    alive:true,
+  };
+  G.pets.push(pet);
+  G.happy = clamp(G.happy + rnd(6,14));
+  G.stress = clamp((G.stress||35) - rnd(4,10));
+  addEv(`You adopted ${name} the ${s.label.toLowerCase()}. Your home instantly felt warmer.${G.age>=18?` (-${fmt$(fee)})`:''}`, 'love');
+  flash(`${s.icon} ${name} joined your family!`,'good');
+  updateHUD();
+  renderRelationships();
+}
+
+function petAct(petId, action){
+  ensurePetState();
+  const p = G.pets.find(x=>x.id===petId);
+  if(!p || !p.alive){ flash('Pet not found.','warn'); return; }
+
+  if(action==='play'){
+    p.happiness = clamp(p.happiness + rnd(8,16));
+    p.bond = clamp(p.bond + rnd(5,10));
+    G.happy = clamp(G.happy + rnd(3,8));
+    G.stress = clamp((G.stress||35) - rnd(3,7));
+    addEv(`You spent quality play time with ${p.name}.`, 'good');
+  } else if(action==='feed'){
+    const cost = rnd(15,70);
+    if(G.age>=18 && G.money<cost){ flash(`Need ${fmt$(cost)} for food.`,'warn'); return; }
+    if(G.age>=18) G.money -= cost;
+    p.health = clamp(p.health + rnd(3,9));
+    p.happiness = clamp(p.happiness + rnd(2,6));
+    addEv(`You stocked up food and fed ${p.name}.${G.age>=18?` (-${fmt$(cost)})`:''}`, 'good');
+  } else if(action==='train'){
+    p.bond = clamp(p.bond + rnd(4,9));
+    p.happiness = clamp(p.happiness + rnd(1,5));
+    G.smarts = clamp(G.smarts + rnd(0,2));
+    G.stress = clamp((G.stress||35) - rnd(1,4));
+    addEv(`Training session with ${p.name}. Better behavior, stronger bond.`, 'good');
+  } else if(action==='groom'){
+    const cost = rnd(40,180);
+    if(G.age>=18 && G.money<cost){ flash(`Need ${fmt$(cost)} for grooming.`,'warn'); return; }
+    if(G.age>=18) G.money -= cost;
+    p.happiness = clamp(p.happiness + rnd(2,7));
+    p.health = clamp(p.health + rnd(1,4));
+    G.happy = clamp(G.happy + rnd(1,4));
+    addEv(`${p.name} got groomed and looks immaculate.${G.age>=18?` (-${fmt$(cost)})`:''}`, 'good');
+  } else if(action==='vet'){
+    const cost = rnd(120,950);
+    if(G.age>=18 && G.money<cost){ flash(`Need ${fmt$(cost)} for vet care.`,'warn'); return; }
+    if(G.age>=18) G.money -= cost;
+    p.health = clamp(p.health + rnd(12,24));
+    p.happiness = clamp(p.happiness + rnd(3,9));
+    G.stress = clamp((G.stress||35) - rnd(2,5));
+    addEv(`Vet visit for ${p.name}. They are doing much better now.${G.age>=18?` (-${fmt$(cost)})`:''}`, 'good');
+  } else if(action==='rehome'){
+    p.alive = false;
+    p.health = clamp(p.health);
+    G.happy = clamp(G.happy - rnd(7,16));
+    G.stress = clamp((G.stress||35) + rnd(4,10));
+    addEv(`You rehomed ${p.name}. It was the practical decision, but it hurt.`, 'warn');
+  }
+
+  updateHUD();
   renderRelationships();
 }
 
