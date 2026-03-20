@@ -19,15 +19,19 @@ const G = {
   assets: { home:false, homeValue:0, savings:0 },   // shared assets tracked for divorce
   finance:{
     rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
-    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0 },
+    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0, growthEtf:0, dividendFund:0, commodities:0, treasuries:0 },
     crypto:{
       btc:0, eth:0, sol:0, meme:0,
       marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'',
+      prices:{ btc:100, eth:100, sol:100, meme:100 }, history:[],
+      dayTradesThisYear:0, traderSkill:20, tradesWon:0, tradesLost:0,
     },
     business:{
       active:false, name:'', sector:'', stage:'idea',
       employees:0, reputation:50, product:45, operations:45, marketing:40,
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+      startupId:'', difficulty:1, complexity:20, managementSkill:24, founderExp:0,
+      customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
     },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
@@ -444,6 +448,10 @@ function ensureFinanceShape(){
   if(typeof G.finance.portfolio.bonds!=='number') G.finance.portfolio.bonds = 0;
   if(typeof G.finance.portfolio.realEstateFund!=='number') G.finance.portfolio.realEstateFund = 0;
   if(typeof G.finance.portfolio.ventureFund!=='number') G.finance.portfolio.ventureFund = 0;
+  if(typeof G.finance.portfolio.growthEtf!=='number') G.finance.portfolio.growthEtf = 0;
+  if(typeof G.finance.portfolio.dividendFund!=='number') G.finance.portfolio.dividendFund = 0;
+  if(typeof G.finance.portfolio.commodities!=='number') G.finance.portfolio.commodities = 0;
+  if(typeof G.finance.portfolio.treasuries!=='number') G.finance.portfolio.treasuries = 0;
   if(!G.finance.crypto) G.finance.crypto = {};
   if(typeof G.finance.crypto.btc!=='number') G.finance.crypto.btc = 0;
   if(typeof G.finance.crypto.eth!=='number') G.finance.crypto.eth = 0;
@@ -453,6 +461,12 @@ function ensureFinanceShape(){
   if(typeof G.finance.crypto.marketMomentum!=='number') G.finance.crypto.marketMomentum = 0;
   if(typeof G.finance.crypto.lastYearPnl!=='number') G.finance.crypto.lastYearPnl = 0;
   if(typeof G.finance.crypto.lastEvent!=='string') G.finance.crypto.lastEvent = '';
+  if(!G.finance.crypto.prices) G.finance.crypto.prices = { btc:100, eth:100, sol:100, meme:100 };
+  if(!Array.isArray(G.finance.crypto.history)) G.finance.crypto.history = [];
+  if(typeof G.finance.crypto.dayTradesThisYear!=='number') G.finance.crypto.dayTradesThisYear = 0;
+  if(typeof G.finance.crypto.traderSkill!=='number') G.finance.crypto.traderSkill = 20;
+  if(typeof G.finance.crypto.tradesWon!=='number') G.finance.crypto.tradesWon = 0;
+  if(typeof G.finance.crypto.tradesLost!=='number') G.finance.crypto.tradesLost = 0;
   if(!G.finance.business) G.finance.business = {};
   if(typeof G.finance.business.active!=='boolean') G.finance.business.active = false;
   if(typeof G.finance.business.name!=='string') G.finance.business.name = '';
@@ -469,6 +483,18 @@ function ensureFinanceShape(){
   if(typeof G.finance.business.years!=='number') G.finance.business.years = 0;
   if(typeof G.finance.business.lastProfit!=='number') G.finance.business.lastProfit = 0;
   if(typeof G.finance.business.hasInvestor!=='boolean') G.finance.business.hasInvestor = false;
+  if(typeof G.finance.business.startupId!=='string') G.finance.business.startupId = '';
+  if(typeof G.finance.business.difficulty!=='number') G.finance.business.difficulty = 1;
+  if(typeof G.finance.business.complexity!=='number') G.finance.business.complexity = 20;
+  if(typeof G.finance.business.managementSkill!=='number') G.finance.business.managementSkill = 24;
+  if(typeof G.finance.business.founderExp!=='number') G.finance.business.founderExp = 0;
+  if(typeof G.finance.business.customerBase!=='number') G.finance.business.customerBase = 0;
+  if(typeof G.finance.business.equitySold!=='number') G.finance.business.equitySold = 0;
+  if(typeof G.finance.business.investorTier!=='number') G.finance.business.investorTier = 0;
+  if(typeof G.finance.business.investorName!=='string') G.finance.business.investorName = '';
+  if(typeof G.finance.business.actionsThisYear!=='number') G.finance.business.actionsThisYear = 0;
+  if(typeof G.finance.business.negativeYears!=='number') G.finance.business.negativeYears = 0;
+  if(!Array.isArray(G.finance.business.timeline)) G.finance.business.timeline = [];
   if(!G.finance.tax) G.finance.tax = {};
   if(typeof G.finance.tax.lastPaid!=='number') G.finance.tax.lastPaid = 0;
   if(typeof G.finance.tax.lastRefund!=='number') G.finance.tax.lastRefund = 0;
@@ -1126,6 +1152,7 @@ function switchTab(t){
     media:         'screen-media',
     crime:         'screen-crime',
     jobs:          'screen-jobs',
+    business:      'screen-business',
     acting:        'screen-acting',
     prosports:     'screen-prosports',
     activities:    'screen-activities',
@@ -1139,6 +1166,7 @@ function switchTab(t){
   if(t==='media')         renderMedia();
   if(t==='crime')         renderCrime();
   if(t==='jobs')          renderJobs();
+  if(t==='business')      renderBusiness();
   if(t==='acting')        renderActing();
   if(t==='prosports')     renderProSports();
   if(t==='activities')    renderActivities();

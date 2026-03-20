@@ -207,12 +207,19 @@ function beginLife(){
   G.assets      = { home:false, homeValue:0, savings:0 };
   G.finance     = {
     rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
-    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0 },
-    crypto:{ btc:0, eth:0, sol:0, meme:0, marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'' },
+    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0, growthEtf:0, dividendFund:0, commodities:0, treasuries:0 },
+    crypto:{
+      btc:0, eth:0, sol:0, meme:0,
+      marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'',
+      prices:{ btc:100, eth:100, sol:100, meme:100 }, history:[],
+      dayTradesThisYear:0, traderSkill:20, tradesWon:0, tradesLost:0,
+    },
     business:{
       active:false, name:'', sector:'', stage:'idea',
       employees:0, reputation:50, product:45, operations:45, marketing:40,
       burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+      startupId:'', difficulty:1, complexity:20, managementSkill:24, founderExp:0,
+      customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
     },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',

@@ -846,11 +846,6 @@ function renderJobs(){
 
   // Finances
   const tax = G.finance.tax || {};
-  const pf = G.finance.portfolio || {};
-  const cx = G.finance.crypto || {};
-  const biz = G.finance.business || {};
-  const portfolioTotal = portfolioTotalValue();
-  const cryptoTotal = cryptoTotalValue();
   const effPct = ((tax.lastEffectiveRate||0)*100).toFixed(1);
   const statePct = ((tax.lastStateRate||0)*100).toFixed(1);
   const filedLine = tax.lastPaid>0
@@ -862,12 +857,11 @@ function renderJobs(){
     <div class="card-title">Finances</div>
     <p style="font-size:.78rem;color:var(--muted2)">Credit score: <strong style="color:${G.finance.credit>=720?'var(--accent)':G.finance.credit>=660?'var(--gold)':'var(--danger)'}">${G.finance.credit}</strong></p>
     <p style="font-size:.78rem;color:var(--muted2)">Rent: ${G.finance.rent?fmt$(G.finance.rent*12)+'/yr':'None'} · Mortgage: ${G.finance.mortgage?fmt$(G.finance.mortgage)+'/yr':'None'} · Debt: ${fmt$(G.finance.debt)}</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Portfolio total: ${fmt$(portfolioTotal)} · Crypto total: ${fmt$(cryptoTotal)} · Retirement: ${fmt$(G.finance.retirement||0)}</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Index ${fmt$(pf.indexFund||0)} · Bonds ${fmt$(pf.bonds||0)} · REIT ${fmt$(pf.realEstateFund||0)} · Venture ${fmt$(pf.ventureFund||0)}</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Crypto: BTC ${fmt$(cx.btc||0)} · ETH ${fmt$(cx.eth||0)} · SOL ${fmt$(cx.sol||0)} · MEME ${fmt$(cx.meme||0)} · ${cx.marketCycle||'neutral'} market</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Retirement: ${fmt$(G.finance.retirement||0)}</p>
     <p style="font-size:.78rem;color:var(--muted2)">Last tax filing: ${filedLine}</p>
     <p style="font-size:.78rem;color:var(--muted2)">State tax estimate: ${statePct}% · Taxable income: ${fmt$(tax.lastTaxableIncome||0)}</p>
     ${tax.delinquentYears>0?`<div class="notif bad" style="margin-bottom:10px">⚠️ Tax delinquency: ${tax.delinquentYears} year(s) unresolved. Penalties are compounding your debt.</div>`:''}
+    <p style="font-size:.78rem;color:var(--muted2);margin:8px 0 4px">Founder tools and market investing moved to the <strong style="color:var(--text)">Business</strong> tab.</p>
     <div class="choice-grid">
       ${HOUSING_OPTIONS.map(o=>`<div class="choice" onclick="setRent('${o.id}')">
         <div class="choice-icon">🏠</div><div class="choice-name">${o.label}</div><div class="choice-desc">${fmt$(o.rent*12)}/yr · ${o.minCredit}+ credit</div>
@@ -879,46 +873,8 @@ function renderJobs(){
       </div>`).join('')}
     </div>
     <div class="choice-grid" style="margin-top:10px">
-      <div class="choice" onclick="investAsset('indexFund',1000)"><div class="choice-icon">📈</div><div class="choice-name">Index $1k</div><div class="choice-desc">Diversified equity exposure</div></div>
-      <div class="choice" onclick="investAsset('bonds',1000)"><div class="choice-icon">🧾</div><div class="choice-name">Bonds $1k</div><div class="choice-desc">Lower volatility</div></div>
-      <div class="choice" onclick="investAsset('realEstateFund',2000)"><div class="choice-icon">🏢</div><div class="choice-name">REIT $2k</div><div class="choice-desc">Property market exposure</div></div>
-      <div class="choice" onclick="investAsset('ventureFund',3000)"><div class="choice-icon">🚀</div><div class="choice-name">Venture $3k</div><div class="choice-desc">High risk / high upside</div></div>
       <div class="choice" onclick="payDebt(1000)"><div class="choice-icon">💳</div><div class="choice-name">Pay Debt $1k</div><div class="choice-desc">Boost credit</div></div>
     </div>
-    <div class="choice-grid" style="margin-top:10px">
-      <div class="choice" onclick="buyCrypto('btc',1000)"><div class="choice-icon">₿</div><div class="choice-name">Buy BTC $1k</div><div class="choice-desc">Lower relative volatility</div></div>
-      <div class="choice" onclick="buyCrypto('eth',1000)"><div class="choice-icon">Ξ</div><div class="choice-name">Buy ETH $1k</div><div class="choice-desc">Smart-contract beta</div></div>
-      <div class="choice" onclick="buyCrypto('sol',1000)"><div class="choice-icon">◎</div><div class="choice-name">Buy SOL $1k</div><div class="choice-desc">High volatility growth</div></div>
-      <div class="choice" onclick="buyCrypto('meme',500)"><div class="choice-icon">🐸</div><div class="choice-name">Buy MEME $500</div><div class="choice-desc">Speculative mania coin</div></div>
-      <div class="choice" onclick="sellCrypto('btc',0.5)"><div class="choice-icon">💸</div><div class="choice-name">Sell 50% BTC</div><div class="choice-desc">De-risk position</div></div>
-      <div class="choice" onclick="sellCrypto('eth',0.5)"><div class="choice-icon">💸</div><div class="choice-name">Sell 50% ETH</div><div class="choice-desc">Take liquidity</div></div>
-      <div class="choice" onclick="sellCrypto('sol',0.5)"><div class="choice-icon">💸</div><div class="choice-name">Sell 50% SOL</div><div class="choice-desc">Reduce drawdown risk</div></div>
-      <div class="choice" onclick="sellCrypto('meme',1)"><div class="choice-icon">💸</div><div class="choice-name">Exit MEME</div><div class="choice-desc">Full liquidation</div></div>
-    </div>
-  </div>`;
-
-  html += `<div class="card">
-    <div class="card-title">Business Builder</div>
-    ${
-      !biz.active
-      ? `<p style="font-size:.78rem;color:var(--muted2);margin-bottom:10px">Start a company, manage runway, and scale toward a meaningful exit.</p>
-         <div class="choice-grid">
-           ${BUSINESS_SECTORS.map(s=>`<div class="choice" onclick="startBusiness('${s.id}')"><div class="choice-icon">${s.icon}</div><div class="choice-name">${s.label}</div><div class="choice-desc">${fmt$(s.startCost)} start · ${fmt$(s.burn)}/yr burn baseline</div></div>`).join('')}
-         </div>`
-      : `<p style="font-size:.78rem;color:var(--muted2)"><strong style="color:var(--text)">${biz.name}</strong> · ${biz.sector} · Stage: ${biz.stage}</p>
-         <p style="font-size:.78rem;color:var(--muted2)">Employees ${biz.employees} · Burn ${fmt$(biz.burn)}/yr · Cash reserve ${fmt$(biz.cashReserve)}</p>
-         <p style="font-size:.78rem;color:var(--muted2)">Product ${biz.product} · Ops ${biz.operations} · Marketing ${biz.marketing} · Reputation ${biz.reputation}</p>
-         <p style="font-size:.78rem;color:var(--muted2)">Valuation ${fmt$(biz.valuation)} · Last profit ${fmt$(biz.lastProfit)} · ${biz.hasInvestor?'Investor-backed':'Bootstrapped'}</p>
-         <div class="choice-grid">
-           <div class="choice" onclick="businessAction('build')"><div class="choice-icon">🛠️</div><div class="choice-name">Build Product</div><div class="choice-desc">Increase product quality</div></div>
-           <div class="choice" onclick="businessAction('market')"><div class="choice-icon">📣</div><div class="choice-name">Marketing Push</div><div class="choice-desc">Grow awareness and demand</div></div>
-           <div class="choice" onclick="businessAction('hire')"><div class="choice-icon">🧑‍💼</div><div class="choice-name">Hire</div><div class="choice-desc">Scale team and operations</div></div>
-           <div class="choice" onclick="businessAction('cut')"><div class="choice-icon">✂️</div><div class="choice-name">Cut Costs</div><div class="choice-desc">Lower burn, reputational risk</div></div>
-           <div class="choice" onclick="businessAction('fund')"><div class="choice-icon">💰</div><div class="choice-name">Raise Funding</div><div class="choice-desc">Extend runway, dilute control</div></div>
-           <div class="choice" onclick="businessAction('salary')"><div class="choice-icon">🏧</div><div class="choice-name">Founder Salary</div><div class="choice-desc">Pay yourself from reserve</div></div>
-           <div class="choice" onclick="businessAction('exit')"><div class="choice-icon">🏁</div><div class="choice-name">Exit Business</div><div class="choice-desc">Cash out if valuation is ready</div></div>
-         </div>`
-    }
   </div>`;
 
   const lawsuits = G.legal.lawsuits || [];
