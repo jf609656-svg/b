@@ -924,15 +924,18 @@ function renderProSports(){
   const tab = G.proSportsTab || 'nfl';
   const nflActive = tab==='nfl' ? 'active' : '';
   const nbaActive = tab==='nba' ? 'active' : '';
+  const mmaActive = tab==='mma' ? 'active' : '';
   pc.innerHTML = `
     <div style="display:flex;border-bottom:1px solid var(--border);padding:0 0 6px 0;gap:6px;overflow-x:auto">
       <button class="tab ${nflActive}" onclick="setProSportTab('nfl')">🏈 NFL</button>
       <button class="tab ${nbaActive}" onclick="setProSportTab('nba')">🏀 NBA</button>
+      <button class="tab ${mmaActive}" onclick="setProSportTab('mma')">🥋 MMA</button>
     </div>
     <div style="margin-top:10px" id="prosports-inner"></div>
   `;
   if(tab==='nfl'){ renderNFLInto('prosports-inner'); }
   if(tab==='nba'){ renderNBAInto('prosports-inner'); }
+  if(tab==='mma'){ renderMMAInto('prosports-inner'); }
 }
 
 function setProSportTab(t){
@@ -954,6 +957,14 @@ function renderNBAInto(id){
   renderNBA();
   const nba = document.getElementById('nba-content');
   if(nba) el.innerHTML = nba.innerHTML;
+}
+
+function renderMMAInto(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(typeof renderMMA==='function') renderMMA();
+  const mma = document.getElementById('mma-content');
+  if(mma) el.innerHTML = mma.innerHTML;
 }
 
 

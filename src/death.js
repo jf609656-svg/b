@@ -68,6 +68,8 @@ function showDeath(){
       ${G.nba.active||G.nba.retired?`<p style="margin-bottom:5px">🏀 NBA: ${G.nba.year-1} seasons · ${G.nba.championshipRings} rings · ${G.nba.allStarSelections}× All-Star · ${fmt$(G.nba.totalEarned)}</p>`:''}
       ${G.nba.mvpAwards>0?`<p style="margin-bottom:5px">🏆 NBA MVP × ${G.nba.mvpAwards}</p>`:''}
       ${G.nba.sneakerDeal?`<p style="margin-bottom:5px">👟 Sneaker deal: ${G.nba.sneakerDeal} · ${fmt$(G.nba.sneakerRevenue)} lifetime</p>`:''}
+      ${G.mma&&G.mma.active?`<p style="margin-bottom:5px">🥋 MMA: Amateur ${G.mma.amateur.wins}-${G.mma.amateur.losses}${G.mma.amateur.draws?`-${G.mma.amateur.draws}`:''} · Pro ${G.mma.pro.wins}-${G.mma.pro.losses}${G.mma.pro.draws?`-${G.mma.pro.draws}`:''} · ${fmt$(G.mma.totalEarned)} earned</p>`:''}
+      ${G.mma&&G.mma.pro&&G.mma.pro.ufc&&G.mma.pro.ufc.inUFC?`<p style="margin-bottom:5px">🏟️ UFC: ${G.mma.pro.ufc.wins}-${G.mma.pro.ufc.losses}${G.mma.pro.ufc.draws?`-${G.mma.pro.ufc.draws}`:''} · ${G.mma.pro.ufc.champ?'Champion':''}${G.mma.pro.ufc.interimChamp?' Interim Champion':''}${G.mma.pro.ufc.champWeight2?' · Double Champ':''}</p>`:''}
       ${(G.nfl.endorsementIncome+G.nba.endorsementIncome)>0?`<p style="margin-bottom:5px">💼 Endorsements: ${fmt$(G.nfl.endorsementIncome+G.nba.endorsementIncome)} total</p>`:''}
       ${G.sm.onlyfans&&G.sm.onlyfans.revenue>0?`<p style="margin-bottom:5px">💗 OnlyFans lifetime: ${fmt$(G.sm.onlyfans.revenue)}</p>`:''}
       ${G.social.rival?`<p style="margin-bottom:5px">😤 Unresolved nemesis: ${G.social.rival.firstName}. They outlived you. They\'re smug about it.</p>`:''}

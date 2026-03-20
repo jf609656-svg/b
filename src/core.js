@@ -17,7 +17,13 @@ const G = {
   marriageYears: 0,     // years married
   divorces: 0,
   assets: { home:false, homeValue:0, savings:0 },   // shared assets tracked for divorce
-  finance:{ rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0 },
+  finance:{
+    rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
+    tax:{
+      lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
+      lastStateRate:0, lastYearSummary:null, delinquentYears:0,
+    }
+  },
   housing:{ type:'none', comfort:40, neighborhood:50, roommates:0, roommateList:[], upkeep:0, utilities:0 },
   relTab: 'family',     // which sub-tab is active
   // relationships
@@ -280,6 +286,58 @@ const G = {
     g_league:false,           // sent down to G-League
     twoWay:false,             // two-way contract
   },
+  // mma career
+  mma:{
+    active:false,
+    gymTier:0,
+    discipline:{ bjj:0, wrestling:0, muaythai:0, judo:0, boxing:0 },
+    mmaSkill:0,
+    conditioning:45,
+    fightIQ:40,
+    confidence:50,
+    injuries:[],
+    injured:false,
+    recoveryWeeks:0,
+    trainingSessionsThisYear:0,
+    sparsThisYear:0,
+    compsThisYear:0,
+    officialFightsThisYear:0,
+    amateur:{
+      wins:0, losses:0, draws:0,
+      byKO:0, bySub:0, byDec:0,
+      titleWins:0,
+      log:[],
+    },
+    pro:{
+      isPro:false, org:'regional',
+      wins:0, losses:0, draws:0,
+      byKO:0, bySub:0, byDec:0,
+      streak:0,
+      ranking:0,
+      popularity:18,
+      marketability:25,
+      controversies:0,
+      rivals:[],
+      callouts:0,
+      hype:0,
+      recordLog:[],
+      ufc:{
+        inUFC:false,
+        rank:0,
+        wins:0, losses:0, draws:0,
+        titleShots:0, titleWins:0, titleDefenses:0,
+        interimTitleWins:0,
+        champ:false,
+        interimChamp:false,
+        champWeight:'',
+        champWeight2:'',
+        doubleChampAttempt:false,
+      },
+      weightClass:'Lightweight',
+      purse:12000,
+    },
+    totalEarned:0,
+  },
   // meta
   darkScore:0,
   totalYears:0,
@@ -313,6 +371,164 @@ const fmt$  = n => {
 };
 const relLabel = r => r>=85?'Inseparable':r>=70?'Very Close':r>=55?'Good':r>=40?'Decent':r>=25?'Distant':'Strained';
 const relColor = r => r>=65?'rel-color-good':r>=40?'rel-color-ok':'rel-color-bad';
+
+const FEDERAL_BRACKETS_SINGLE = [
+  [11600, 0.10], [47150, 0.12], [100525, 0.22], [191950, 0.24],
+  [243725, 0.32], [609350, 0.35], [Infinity, 0.37]
+];
+const FEDERAL_BRACKETS_MARRIED = [
+  [23200, 0.10], [94300, 0.12], [201050, 0.22], [383900, 0.24],
+  [487450, 0.32], [731200, 0.35], [Infinity, 0.37]
+];
+const NO_STATE_INCOME_TAX = new Set(['Alaska','Florida','Nevada','South Dakota','Tennessee','Texas','Washington','Wyoming','New Hampshire']);
+const SOCIAL_SECURITY_WAGE_CAP = 168600;
+
+function ensureFinanceShape(){
+  if(!G.finance) G.finance = {};
+  if(typeof G.finance.rent!=='number') G.finance.rent = 0;
+  if(typeof G.finance.mortgage!=='number') G.finance.mortgage = 0;
+  if(typeof G.finance.mortgageYears!=='number') G.finance.mortgageYears = 0;
+  if(typeof G.finance.debt!=='number') G.finance.debt = 0;
+  if(typeof G.finance.credit!=='number') G.finance.credit = 680;
+  if(typeof G.finance.investments!=='number') G.finance.investments = 0;
+  if(typeof G.finance.retirement!=='number') G.finance.retirement = 0;
+  if(!G.finance.tax) G.finance.tax = {};
+  if(typeof G.finance.tax.lastPaid!=='number') G.finance.tax.lastPaid = 0;
+  if(typeof G.finance.tax.lastRefund!=='number') G.finance.tax.lastRefund = 0;
+  if(typeof G.finance.tax.lastTaxableIncome!=='number') G.finance.tax.lastTaxableIncome = 0;
+  if(typeof G.finance.tax.lastEffectiveRate!=='number') G.finance.tax.lastEffectiveRate = 0;
+  if(typeof G.finance.tax.lastBracket!=='string') G.finance.tax.lastBracket = 'None';
+  if(typeof G.finance.tax.lastStateRate!=='number') G.finance.tax.lastStateRate = 0;
+  if(typeof G.finance.tax.delinquentYears!=='number') G.finance.tax.delinquentYears = 0;
+  if(!G.finance.tax.lastYearSummary) G.finance.tax.lastYearSummary = null;
+}
+
+function calcProgressiveTax(income, brackets){
+  const inc = Math.max(0, Math.floor(income));
+  let tax = 0;
+  let prev = 0;
+  for(let i=0;i<brackets.length;i++){
+    const cap = brackets[i][0];
+    const rate = brackets[i][1];
+    if(inc<=prev) break;
+    const taxed = Math.min(inc, cap) - prev;
+    if(taxed>0) tax += taxed * rate;
+    prev = cap;
+  }
+  return Math.floor(tax);
+}
+
+function taxBracketLabel(taxableIncome, married){
+  const br = married ? FEDERAL_BRACKETS_MARRIED : FEDERAL_BRACKETS_SINGLE;
+  const income = Math.max(0, Math.floor(taxableIncome));
+  for(let i=0;i<br.length;i++){
+    if(income<=br[i][0]) return `${Math.round(br[i][1]*100)}%`;
+  }
+  return '37%';
+}
+
+function estimateStateIncomeTaxRate(){
+  if(!G.state || NO_STATE_INCOME_TAX.has(G.state)) return 0;
+  let seed = 0;
+  for(let i=0;i<G.state.length;i++) seed += G.state.charCodeAt(i) * (i+3);
+  const jitter = (seed % 36) / 1000; // 0.0% to 3.5%
+  return Math.min(0.095, 0.028 + jitter);
+}
+
+function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
+  ensureFinanceShape();
+
+  const creatorIncome = Math.max(0, (G.sm.totalRevenue||0) - (totalsAtYearStart.smRevenue||0));
+  const actingIncome  = Math.max(0, (G.acting.totalEarned||0) - (totalsAtYearStart.actingEarned||0));
+  const sportsIncome  = Math.max(0,
+    ((G.nfl.totalEarned||0) - (totalsAtYearStart.nflEarned||0)) +
+    ((G.nba.totalEarned||0) - (totalsAtYearStart.nbaEarned||0)) +
+    ((G.mma?.totalEarned||0) - (totalsAtYearStart.mmaEarned||0))
+  );
+  ledger.creatorIncome += creatorIncome;
+  ledger.actingIncome  += actingIncome;
+  ledger.sportsIncome  += sportsIncome;
+
+  const trackedIncome = ledger.wages + ledger.bonuses + ledger.creatorIncome + ledger.actingIncome + ledger.sportsIncome + ledger.investmentGains;
+  const trackedExpenses = ledger.rentPaid + ledger.mortgagePaid + ledger.utilitiesPaid + ledger.upkeepPaid + ledger.debtInterest + ledger.retirementContrib + ledger.propertyTax;
+  const cashDelta = G.money - moneyAtYearStart;
+  const untrackedNet = cashDelta - (trackedIncome - trackedExpenses);
+  if(untrackedNet>0) ledger.otherIncome += Math.floor(untrackedNet);
+
+  const ordinaryIncome = ledger.wages + ledger.bonuses + ledger.creatorIncome + ledger.actingIncome + ledger.sportsIncome + ledger.otherIncome;
+  const grossIncome = ordinaryIncome + ledger.investmentGains;
+  const married = !!G.spouse;
+  const standardDeduction = married ? 29200 : 14600;
+  const retirementDeduction = Math.min(23000, ledger.retirementContrib);
+  const mortgageInterestDeduction = Math.floor(Math.max(0, ledger.mortgagePaid) * 0.32);
+  const totalDeductions = standardDeduction + retirementDeduction + mortgageInterestDeduction;
+  const taxableOrdinary = Math.max(0, ordinaryIncome - totalDeductions);
+
+  const fedBrackets = married ? FEDERAL_BRACKETS_MARRIED : FEDERAL_BRACKETS_SINGLE;
+  const federalTax = calcProgressiveTax(taxableOrdinary, fedBrackets);
+  const stateRate = estimateStateIncomeTaxRate();
+  const stateTax = Math.floor(taxableOrdinary * stateRate);
+  const payrollTax = Math.floor(Math.min(SOCIAL_SECURITY_WAGE_CAP, ledger.wages + ledger.bonuses) * 0.0765);
+  const capitalGainsTax = Math.floor(Math.max(0, ledger.investmentGains) * 0.15);
+
+  const dependents = (G.children||[]).filter(ch=>ch && ch.alive!==false && ch.age<17).length;
+  const childCredit = dependents * 1200;
+  const educationCredit = (G.school.uni.enrolled || G.career.medSchool.enrolled || G.career.lawSchool.enrolled) ? 1000 : 0;
+  const lowIncomeCredit = grossIncome>0 && grossIncome<26000 ? 450 : 0;
+  const totalCredits = childCredit + educationCredit + lowIncomeCredit;
+
+  const totalBeforeCredits = federalTax + stateTax + payrollTax + capitalGainsTax;
+  const totalTax = Math.max(0, totalBeforeCredits - totalCredits);
+  let refund = 0;
+  let taxDebtLoaded = 0;
+
+  if(totalTax>0){
+    G.money -= totalTax;
+    if(G.money<0){
+      taxDebtLoaded = Math.abs(G.money);
+      G.money = 0;
+      const withPenalty = Math.floor(taxDebtLoaded * 1.15);
+      G.finance.debt += withPenalty;
+      G.finance.credit = Math.max(300, G.finance.credit - rnd(18,38));
+      G.finance.tax.delinquentYears++;
+      addEv(`Tax season hit hard. You couldn't cover ${fmt$(taxDebtLoaded)} and rolled ${fmt$(withPenalty)} into debt with penalties.`, 'bad');
+    } else {
+      G.finance.tax.delinquentYears = Math.max(0, G.finance.tax.delinquentYears-1);
+    }
+    addEv(`Taxes filed: paid ${fmt$(totalTax)} on ${fmt$(grossIncome)} income (${(grossIncome>0?(totalTax/grossIncome)*100:0).toFixed(1)}% effective).`, totalTax>Math.max(20000, grossIncome*0.22)?'warn':'');
+  } else if(totalCredits>0){
+    refund = Math.floor(totalCredits * 0.25);
+    if(refund>0){
+      G.money += refund;
+      addEv(`Taxes filed: deductions and credits wiped your bill. Refund received: ${fmt$(refund)}.`, 'good');
+    } else {
+      addEv('Taxes filed: no tax owed this year after deductions and credits.', 'good');
+    }
+  }
+
+  G.finance.tax.lastPaid = totalTax;
+  G.finance.tax.lastRefund = refund;
+  G.finance.tax.lastTaxableIncome = taxableOrdinary + Math.max(0, ledger.investmentGains);
+  G.finance.tax.lastEffectiveRate = grossIncome>0 ? totalTax / grossIncome : 0;
+  G.finance.tax.lastBracket = taxBracketLabel(taxableOrdinary, married);
+  G.finance.tax.lastStateRate = stateRate;
+  G.finance.tax.lastYearSummary = {
+    grossIncome,
+    ordinaryIncome,
+    taxableOrdinary,
+    deductions:totalDeductions,
+    federalTax,
+    stateTax,
+    payrollTax,
+    capitalGainsTax,
+    propertyTax:ledger.propertyTax,
+    credits:totalCredits,
+    paid:totalTax,
+    refund,
+    taxDebtLoaded,
+    effectiveRate:grossIncome>0 ? totalTax/grossIncome : 0,
+  };
+}
 
 // ── FLASH TOAST ─────────────────────────────────────────────────
 let _flashTimer;
@@ -607,10 +823,26 @@ function genFamily(){
 
 // ── AGE UP ENGINE ────────────────────────────────────────────────
 function ageUp(){
+  ensureFinanceShape();
+  if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];
   G.totalYears++;
   const a = G.age;
+  const moneyAtYearStart = G.money;
+  const totalsAtYearStart = {
+    smRevenue: G.sm.totalRevenue||0,
+    actingEarned: G.acting.totalEarned||0,
+    nflEarned: G.nfl.totalEarned||0,
+    nbaEarned: G.nba.totalEarned||0,
+    mmaEarned: G.mma?.totalEarned||0,
+  };
+  const yearLedger = {
+    wages:0, bonuses:0,
+    creatorIncome:0, actingIncome:0, sportsIncome:0, investmentGains:0, otherIncome:0,
+    rentPaid:0, mortgagePaid:0, utilitiesPaid:0, upkeepPaid:0, debtInterest:0, propertyTax:0,
+    retirementContrib:0,
+  };
 
   // ── Passive stat drift ───────────────────────────────────────
   if(a>40) G.health = clamp(G.health - rnd(0,2));
@@ -845,6 +1077,7 @@ function ageUp(){
   if(G.career.employed){
     const c = G.career;
     G.money += c.salary;
+    yearLedger.wages += c.salary;
     c.years++;
     c.performance = clamp(c.performance + rnd(-4,6));
     c.reputation = clamp(c.reputation + rnd(-2,3));
@@ -881,6 +1114,7 @@ function ageUp(){
     const bonus = Math.floor(G.career.salary * G.career.bonusRate * (G.career.performance/100));
     if(bonus>0){
       G.money += bonus;
+      yearLedger.bonuses += bonus;
       addEv(`Annual bonus: ${fmt$(bonus)} from ${G.career.company}.`, 'good');
     }
     if(G.career.benefits.healthPlan) G.health = clamp(G.health + rnd(1,3));
@@ -895,16 +1129,34 @@ function ageUp(){
         addEv(`You cashed out some stock options: ${fmt$(cashout)}.`, 'good');
       }
     }
+
+    // Auto-retirement contributions for employed adults with retirement benefits.
+    if(G.age>=22 && G.career.benefits.retirement && G.career.salary>0){
+      const employeeRate = G.career.level>=4 ? 0.08 : G.career.level>=2 ? 0.06 : 0.04;
+      const employeeContrib = Math.floor(G.career.salary * employeeRate);
+      const employerMatch = Math.floor(employeeContrib * 0.5);
+      if(employeeContrib>0){
+        const actualContrib = Math.min(employeeContrib, Math.max(0, G.money));
+        if(actualContrib>0){
+          G.money -= actualContrib;
+          G.finance.retirement += actualContrib + employerMatch;
+          yearLedger.retirementContrib += actualContrib;
+          addEv(`Retirement contributions: ${fmt$(actualContrib)} (+${fmt$(employerMatch)} employer match).`, 'good');
+        }
+      }
+    }
   }
 
   // ── Finance: housing, debt, investments ─────────────────────
   if(G.finance.rent>0){
     const rentAnnual = G.finance.rent * 12;
     G.money -= rentAnnual;
+    yearLedger.rentPaid += rentAnnual;
     addEv(`Rent paid: ${fmt$(rentAnnual)} this year.`, '');
   }
   if(G.finance.mortgage>0){
     G.money -= G.finance.mortgage;
+    yearLedger.mortgagePaid += G.finance.mortgage;
     G.finance.mortgageYears = Math.max(0, G.finance.mortgageYears-1);
     addEv(`Mortgage paid: ${fmt$(G.finance.mortgage)} this year.`, '');
     if(G.finance.mortgageYears===0){
@@ -916,11 +1168,21 @@ function ageUp(){
   if(G.housing.utilities>0){
     const util = G.housing.utilities * 12;
     G.money -= util;
+    yearLedger.utilitiesPaid += util;
     addEv(`Utilities paid: ${fmt$(util)} this year.`, '');
   }
   if(G.housing.upkeep>0){
     G.money -= G.housing.upkeep;
+    yearLedger.upkeepPaid += G.housing.upkeep;
     addEv(`Home upkeep: ${fmt$(G.housing.upkeep)} this year.`, '');
+  }
+  if(G.assets.home && G.assets.homeValue>0){
+    const propertyTax = Math.floor(G.assets.homeValue * 0.0095);
+    if(propertyTax>0){
+      G.money -= propertyTax;
+      yearLedger.propertyTax += propertyTax;
+      addEv(`Property tax: ${fmt$(propertyTax)} this year.`, '');
+    }
   }
   if(G.housing.roommates>0 && Math.random()<0.6){
     const ev = pick(ROOMMATE_EVENTS);
@@ -941,21 +1203,18 @@ function ageUp(){
   if(G.finance.debt>0){
     const interest = Math.floor(G.finance.debt * 0.08);
     G.finance.debt += interest;
+    yearLedger.debtInterest += interest;
     addEv(`Debt interest accrued: ${fmt$(interest)}.`, 'warn');
   }
   if(G.finance.investments>0){
     const pct = rnd(-5,12)/100;
     const delta = Math.floor(G.finance.investments * pct);
     G.finance.investments = Math.max(0, G.finance.investments + delta);
-    if(delta>=0) addEv(`Investments gained ${fmt$(delta)} this year.`, 'good');
+    if(delta>=0){
+      yearLedger.investmentGains += delta;
+      addEv(`Investments gained ${fmt$(delta)} this year.`, 'good');
+    }
     else addEv(`Investments lost ${fmt$(Math.abs(delta))} this year.`, 'warn');
-  }
-
-  // Credit score drift
-  if(G.money < 0){
-    G.finance.credit = Math.max(300, G.finance.credit - rnd(15,40));
-  } else {
-    G.finance.credit = Math.min(850, G.finance.credit + rnd(1,6));
   }
 
   // ── HS sport passive bonus ───────────────────────────────────
@@ -1098,6 +1357,9 @@ function ageUp(){
   if(G.nba.active && !G.nba.retired){
     nbaSeasonPassive();
   }
+  if(G.mma && (G.mma.active || G.mma.pro?.isPro)){
+    mmaSeasonPassive();
+  }
 
   // ── Fame -> Social Media growth ──────────────────────────────
   const activePlatforms = Object.keys(G.sm.platforms).filter(k=>G.sm.platforms[k].active);
@@ -1105,6 +1367,7 @@ function ageUp(){
     let fameBoost = 0;
     if(G.nfl.active || G.nfl.retired) fameBoost += 1.8;
     if(G.nba.active || G.nba.retired) fameBoost += 1.8;
+    if(G.mma && (G.mma.pro.isPro || G.mma.pro.ufc.inUFC)) fameBoost += 1.5;
     if(G.acting.active) fameBoost += 0.9;
     if(G.sm.music && G.sm.music.active) fameBoost += 1.2;
     if(G.sm.totalFame>=40) fameBoost += 0.6;
@@ -1216,6 +1479,27 @@ function ageUp(){
       if(c.greed>70 && Math.random()<0.1){ addCrimeEv(`${c.name} skimmed money.`, 'bad'); }
       if(c.loyalty<30 && Math.random()<0.05){ addCrimeEv(`${c.name} flipped to police.`, 'bad'); G.crime.heat=Math.min(100,G.crime.heat+10); }
     });
+  }
+
+  // ── Annual tax filing + post-tax credit drift ────────────────
+  if(G.age>=18){
+    processAnnualTaxes(yearLedger, moneyAtYearStart, totalsAtYearStart);
+  } else {
+    G.finance.tax.lastPaid = 0;
+    G.finance.tax.lastRefund = 0;
+    G.finance.tax.lastTaxableIncome = 0;
+    G.finance.tax.lastEffectiveRate = 0;
+    G.finance.tax.lastBracket = 'Dependent';
+    G.finance.tax.lastStateRate = 0;
+    G.finance.tax.lastYearSummary = null;
+  }
+
+  if(G.money < 0){
+    G.finance.credit = Math.max(300, G.finance.credit - rnd(15,40));
+  } else if(G.finance.debt>0){
+    G.finance.credit = Math.max(300, G.finance.credit - rnd(2,8));
+  } else {
+    G.finance.credit = Math.min(850, G.finance.credit + rnd(1,6));
   }
 
   updateHUD();
