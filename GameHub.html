@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LifeSim Game Hub</title>
+  <style>
+    :root{
+      --bg:#0b0d12;
+      --surface:#13161e;
+      --surface2:#1a1e2a;
+      --border:#2a3145;
+      --text:#e2e8f0;
+      --muted:#8b96ad;
+      --accent:#5eead4;
+      --accent2:#7c6ff7;
+      --danger:#f87171;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
+    .wrap{max-width:1080px;margin:0 auto;padding:18px}
+    .card{
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      margin-bottom:12px;
+    }
+    .title{
+      font-size:1.4rem;
+      font-weight:800;
+      margin:0 0 6px;
+    }
+    .sub{font-size:.9rem;color:var(--muted);margin-bottom:12px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column;gap:5px;min-width:220px;flex:1}
+    label{font-size:.75rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+    input,select{
+      width:100%;
+      background:var(--surface2);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px 11px;
+      font-size:.9rem;
+    }
+    input:focus,select:focus{outline:2px solid rgba(94,234,212,.25);border-color:var(--accent)}
+    .btn{
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:transparent;
+      color:var(--text);
+      padding:9px 13px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .btn:hover{border-color:var(--accent);color:var(--accent)}
+    .btn.primary{background:var(--accent);color:#0b1612;border-color:transparent}
+    .btn.primary:hover{filter:brightness(1.05);color:#0b1612}
+    .btn.warn{border-color:rgba(248,113,113,.45);color:var(--danger)}
+    .status{font-size:.82rem;color:var(--muted)}
+    .status strong{color:var(--accent)}
+    .frame-wrap{
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:#05070b;
+      min-height:75vh;
+    }
+    iframe{
+      border:0;
+      width:100%;
+      height:75vh;
+      background:#05070b;
+    }
+    .tiny{font-size:.78rem;color:var(--muted)}
+    code{background:var(--surface2);padding:2px 5px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1 class="title">LifeSim Permanent Hub</h1>
+      <div class="sub">Use this as your one permanent launch page. Save your preferred game build URL once, then just open this hub every time.</div>
+      <div class="row">
+        <div class="col" style="min-width:260px;flex:1.1">
+          <label for="channelSelect">Build Channel</label>
+          <select id="channelSelect">
+            <option value="branch_jsdelivr">Dev Branch (jsDelivr)</option>
+            <option value="branch_githack">Dev Branch (raw.githack)</option>
+            <option value="main_jsdelivr">Main Branch (jsDelivr)</option>
+            <option value="custom">Custom URL</option>
+          </select>
+        </div>
+        <div class="col" style="min-width:300px;flex:2">
+          <label for="gameUrl">Game URL (AltLife.html)</label>
+          <input id="gameUrl" type="url" placeholder="https://.../AltLife.html">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="btnLoad">Launch in Hub</button>
+        <button class="btn" id="btnReload">Reload Game</button>
+        <button class="btn" id="btnOpen">Open in New Tab</button>
+        <button class="btn" id="btnSave">Save as Default</button>
+        <button class="btn warn" id="btnReset">Reset Default</button>
+      </div>
+      <div class="status" id="hubStatus" style="margin-top:10px">Ready.</div>
+      <div class="tiny" style="margin-top:8px">
+        Tip: this hub supports <code>?game=https://.../AltLife.html</code> in the URL for quick override links.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="tiny">Current loaded URL: <span id="activeUrl">None loaded yet.</span></div>
+      </div>
+      <div class="frame-wrap" style="margin-top:10px">
+        <iframe id="gameFrame" title="LifeSim Game"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const OWNER = 'jf609656-svg';
+      const REPO = 'b';
+      const DEV_BRANCH = 'cursor/game-code-expansion-921c';
+      const DEV_BRANCH_ENC = encodeURIComponent(DEV_BRANCH);
+      const MAIN_BRANCH = 'main';
+      const HUB_KEY = 'lifesim_hub_default_game_url_v1';
+      const HUB_CH_KEY = 'lifesim_hub_channel_v1';
+
+      const CHANNELS = {
+        branch_jsdelivr: `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${DEV_BRANCH_ENC}/AltLife.html`,
+        branch_githack: `https://raw.githack.com/${OWNER}/${REPO}/${DEV_BRANCH}/AltLife.html`,
+        main_jsdelivr: `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${MAIN_BRANCH}/AltLife.html`,
+      };
+
+      const el = {
+        channel: document.getElementById('channelSelect'),
+        gameUrl: document.getElementById('gameUrl'),
+        status: document.getElementById('hubStatus'),
+        active: document.getElementById('activeUrl'),
+        frame: document.getElementById('gameFrame'),
+        load: document.getElementById('btnLoad'),
+        reload: document.getElementById('btnReload'),
+        open: document.getElementById('btnOpen'),
+        save: document.getElementById('btnSave'),
+        reset: document.getElementById('btnReset'),
+      };
+
+      function setStatus(msg, good){
+        el.status.innerHTML = good ? `<strong>${msg}</strong>` : msg;
+      }
+
+      function sanitizeUrl(url){
+        try{
+          const u = new URL(url);
+          if(!/^https?:$/i.test(u.protocol)) return '';
+          return u.toString();
+        }catch(_e){
+          return '';
+        }
+      }
+
+      function selectedBaseUrl(){
+        if(el.channel.value==='custom') return sanitizeUrl(el.gameUrl.value);
+        return CHANNELS[el.channel.value] || '';
+      }
+
+      function cacheBusted(url){
+        const u = new URL(url);
+        u.searchParams.set('hubts', String(Date.now()));
+        return u.toString();
+      }
+
+      function loadIntoFrame(withBust){
+        const base = selectedBaseUrl();
+        if(!base){
+          setStatus('Enter a valid game URL first.', false);
+          return;
+        }
+        const finalUrl = withBust ? cacheBusted(base) : base;
+        el.frame.src = finalUrl;
+        el.active.textContent = finalUrl;
+        setStatus('Game launched from hub.', true);
+      }
+
+      function applyChannelUrl(){
+        if(el.channel.value!=='custom'){
+          el.gameUrl.value = CHANNELS[el.channel.value];
+          el.gameUrl.readOnly = true;
+        } else {
+          el.gameUrl.readOnly = false;
+        }
+      }
+
+      function readQueryOverride(){
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('game');
+        return sanitizeUrl(q||'');
+      }
+
+      function init(){
+        const qGame = readQueryOverride();
+        const savedChannel = localStorage.getItem(HUB_CH_KEY) || 'branch_jsdelivr';
+        const channelValid = Object.prototype.hasOwnProperty.call(CHANNELS, savedChannel) || savedChannel==='custom';
+        el.channel.value = channelValid ? savedChannel : 'branch_jsdelivr';
+
+        if(qGame){
+          el.channel.value = 'custom';
+          el.gameUrl.value = qGame;
+          el.gameUrl.readOnly = false;
+          setStatus('Loaded custom game URL from query parameter.', true);
+          loadIntoFrame(false);
+          return;
+        }
+
+        const savedUrl = sanitizeUrl(localStorage.getItem(HUB_KEY) || '');
+        if(savedUrl){
+          const matching = Object.entries(CHANNELS).find(([,v])=>v===savedUrl);
+          if(matching){
+            el.channel.value = matching[0];
+          } else {
+            el.channel.value = 'custom';
+            el.gameUrl.value = savedUrl;
+          }
+        }
+        applyChannelUrl();
+      }
+
+      el.channel.addEventListener('change', ()=>{
+        applyChannelUrl();
+        localStorage.setItem(HUB_CH_KEY, el.channel.value);
+      });
+      el.load.addEventListener('click', ()=>loadIntoFrame(false));
+      el.reload.addEventListener('click', ()=>loadIntoFrame(true));
+      el.open.addEventListener('click', ()=>{
+        const base = selectedBaseUrl();
+        if(!base){
+          setStatus('Enter a valid game URL first.', false);
+          return;
+        }
+        window.open(cacheBusted(base), '_blank', 'noopener');
+      });
+      el.save.addEventListener('click', ()=>{
+        const base = selectedBaseUrl();
+        if(!base){
+          setStatus('Cannot save an invalid URL.', false);
+          return;
+        }
+        localStorage.setItem(HUB_KEY, base);
+        localStorage.setItem(HUB_CH_KEY, el.channel.value);
+        setStatus('Saved this game URL as your hub default.', true);
+      });
+      el.reset.addEventListener('click', ()=>{
+        localStorage.removeItem(HUB_KEY);
+        localStorage.removeItem(HUB_CH_KEY);
+        el.channel.value = 'branch_jsdelivr';
+        applyChannelUrl();
+        setStatus('Hub defaults reset.', true);
+      });
+
+      init();
+      loadIntoFrame(false);
+    })();
+  </script>
+</body>
+</html>
