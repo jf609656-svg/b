@@ -24,6 +24,55 @@ function ensureRelationshipDramaState(){
   if(typeof d.familyDrama!=='number') d.familyDrama = 0;
 }
 
+function ensurePersonRelationshipMemory(p){
+  if(!p || typeof p!=='object') return;
+  if(typeof p.relation!=='number') p.relation = 50;
+  if(!p.relMemory || typeof p.relMemory!=='object') p.relMemory = {};
+  const m = p.relMemory;
+  if(typeof m.trust!=='number') m.trust = clamp((p.relation||50) + (p.compat ? Math.floor((p.compat-50)/6) : 0));
+  if(typeof m.resentment!=='number') m.resentment = Math.max(0, Math.floor((50-(p.relation||50))/3));
+  if(typeof m.promisesKept!=='number') m.promisesKept = 0;
+  if(typeof m.promisesBroken!=='number') m.promisesBroken = 0;
+  if(typeof m.conflicts!=='number') m.conflicts = 0;
+  if(typeof m.supportMoments!=='number') m.supportMoments = 0;
+  if(typeof m.lastMeaningfulYear!=='number') m.lastMeaningfulYear = G.age||0;
+  if(!Array.isArray(m.history)) m.history = [];
+}
+
+function ensureRelationshipMemoryState(){
+  (G.family||[]).forEach(ensurePersonRelationshipMemory);
+  (G.friends||[]).forEach(ensurePersonRelationshipMemory);
+  (G.lovers||[]).forEach(ensurePersonRelationshipMemory);
+  (G.children||[]).forEach(ensurePersonRelationshipMemory);
+  if(G.spouse) ensurePersonRelationshipMemory(G.spouse);
+}
+
+function applyRelationshipMemory(p, opts={}){
+  ensurePersonRelationshipMemory(p);
+  const m = p.relMemory;
+  if(typeof opts.trust==='number') m.trust = clamp(m.trust + opts.trust);
+  if(typeof opts.resentment==='number') m.resentment = clamp(m.resentment + opts.resentment);
+  if(opts.keptPromise){ m.promisesKept += 1; m.trust = clamp(m.trust + 3); m.resentment = clamp(m.resentment - 2); }
+  if(opts.brokePromise){ m.promisesBroken += 1; m.trust = clamp(m.trust - 5); m.resentment = clamp(m.resentment + 6); }
+  if(opts.conflict){ m.conflicts += 1; m.resentment = clamp(m.resentment + 2); }
+  if(opts.support){ m.supportMoments += 1; m.trust = clamp(m.trust + 2); m.resentment = clamp(m.resentment - 1); }
+  if(typeof opts.relation==='number'){
+    const memoryBias = Math.floor((m.trust - m.resentment)/24);
+    p.relation = clamp((p.relation||50) + opts.relation + memoryBias);
+  }
+  m.lastMeaningfulYear = G.age||0;
+  if(opts.note){
+    m.history.push({ age:G.age, note:opts.note });
+    if(m.history.length>10) m.history.shift();
+  }
+}
+
+function relationshipMemoryRow(p){
+  ensurePersonRelationshipMemory(p);
+  const m = p.relMemory;
+  return `<div style="font-size:.66rem;color:var(--muted2);margin-top:2px">Trust ${m.trust} · Resent ${m.resentment} · Promises +${m.promisesKept}/-${m.promisesBroken}</div>`;
+}
+
 function relationshipPopup(title, body, actions){
   if(typeof showPopup==='function'){
     showPopup(title, body, actions, 'normal');
@@ -45,6 +94,7 @@ function applyCheatingScandal(otherName, label){
   flash('Cheating scandal exploded.','bad');
 
   if(G.spouse && G.spouse.alive){
+    ensurePersonRelationshipMemory(G.spouse);
     const spouseName = G.spouse.firstName;
     const divorceChance = Math.min(0.9, 0.34 + d.cheatingScandals*0.12 + ((G.spouse.relation||50)<45 ? 0.2 : 0));
     if(Math.random()<divorceChance){
@@ -64,6 +114,7 @@ function applyCheatingScandal(otherName, label){
       G.marriageYears = 0;
     } else {
       G.spouse.relation = clamp((G.spouse.relation||50) - rnd(18,34));
+      applyRelationshipMemory(G.spouse, { trust:-18, resentment:18, conflict:true, brokePromise:true, note:'Cheating scandal damaged marriage trust' });
       addEv(`${spouseName} stayed, but trust was badly damaged.`, 'warn');
     }
   }
@@ -91,6 +142,7 @@ function maybeExposeAffair(otherName, label, baseChance=0.24){
 
 function renderRelationships(){
   ensureRelationshipDramaState();
+  ensureRelationshipMemoryState();
   const tab = G.relTab || 'family';
   // Make sure correct tab is highlighted
   ['family','romance','friends','children','pets','tree'].forEach(t=>{
@@ -171,6 +223,7 @@ function famPersonCard(p){
         <div class="p-name">${p.name}</div>
         <div class="p-role">${p.role}${p.age?' · Age '+p.age:''}</div>
         <div style="font-size:.68rem;color:var(--muted2);margin-top:1px">${status}</div>
+        ${relationshipMemoryRow(p)}
         <div class="p-rel-wrap" style="margin-top:3px">
           <div class="p-rel-track" style="width:80px">
             <div class="p-rel-fill" style="width:${p.relation}%;background:${p.relation>=65?'var(--accent)':p.relation>=40?'var(--gold)':'var(--danger)'}"></div>
@@ -195,6 +248,7 @@ function famAct(name, type){
   ensureRelationshipDramaState();
   const p = G.family.find(x=>x.name===name);
   if(!p||!p.alive){ flash('They\'re no longer with us.','warn'); return; }
+  ensurePersonRelationshipMemory(p);
   const fn = p.firstName;
 
   if(type==='call'){
@@ -205,6 +259,7 @@ function famAct(name, type){
       `${fn} picked up on the first ring. Something about that hit different.`,
       `You and ${fn} talked for hours. Easier than expected.`,
     ]),'love');
+    applyRelationshipMemory(p, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, note:'Answered call and reconnected' });
     flash(`+Relationship with ${fn} 💚`);
   } else if(type==='visit'){
     G.happy = clamp(G.happy+rnd(7,13));
@@ -214,6 +269,7 @@ function famAct(name, type){
       `Spent the day with ${fn}. The house smells the same as it always has.`,
       `${fn} was surprised to see you. In the good way.`,
     ]),'love');
+    applyRelationshipMemory(p, { trust:rnd(3,6), resentment:-rnd(1,3), support:true, keptPromise:true, note:'In-person family visit' });
     flash(`+Happy +Relationship · visited ${fn}`);
   } else if(type==='moment'){
     relationshipPopup(
@@ -224,12 +280,14 @@ function famAct(name, type){
           p.relation = clamp(p.relation + rnd(8,16));
           G.happy = clamp(G.happy + rnd(4,9));
           addEv(`You listened to ${fn} without judgment. It brought you closer.`, 'love');
+          applyRelationshipMemory(p, { trust:rnd(5,9), resentment:-rnd(1,4), support:true, keptPromise:true, note:'Supported during vulnerable moment' });
           updateHUD(); renderRelationships();
         }},
         { label:'Set a hard boundary', cls:'btn-ghost', onClick:()=>{
           p.relation = clamp(p.relation - rnd(1,6));
           G.stress = clamp((G.stress||35) - rnd(0,3));
           addEv(`You set boundaries with ${fn}. It was tense, but healthier long-term.`, 'warn');
+          applyRelationshipMemory(p, { trust:rnd(1,3), resentment:rnd(0,2), note:'Set firm boundary in tough talk' });
           updateHUD(); renderRelationships();
         }},
         { label:'Turn it into gossip', cls:'btn-ghost', onClick:()=>{
@@ -237,6 +295,7 @@ function famAct(name, type){
           G.social.reputation = clamp((G.social.reputation||50) - rnd(2,6));
           G.social.dramaFlags.familyDrama = (G.social.dramaFlags.familyDrama||0) + 1;
           addEv(`Family gossip spread after your conversation with ${fn}. Trust dropped.`, 'bad');
+          applyRelationshipMemory(p, { trust:-rnd(6,12), resentment:rnd(6,12), brokePromise:true, conflict:true, note:'Betrayed private conversation' });
           updateHUD(); renderRelationships();
         }},
       ]
@@ -247,6 +306,7 @@ function famAct(name, type){
     p.relation = clamp(p.relation + rnd(6,13));
     G.happy    = clamp(G.happy    + rnd(6,11));
     addEv(`Dinner with ${fn}. Real conversations. (-$${cost})`,'love');
+    applyRelationshipMemory(p, { trust:rnd(2,4), resentment:-rnd(0,2), support:true, note:'Shared meal and conversation' });
     flash(`Meal with ${fn}! 🍽️`);
   } else if(type==='gift'){
     if(G.money<100){ flash('Need $100 for a gift','warn'); return; }
@@ -254,6 +314,7 @@ function famAct(name, type){
     p.relation = clamp(p.relation + rnd(8,18));
     G.happy    = clamp(G.happy    + 4);
     addEv(`You got ${fn} a gift. Their face lit up. (-$100)`);
+    applyRelationshipMemory(p, { trust:rnd(3,7), resentment:-rnd(0,2), keptPromise:true, note:'Gave meaningful gift' });
     flash(`${fn} loved it! 🎁`);
   } else if(type==='fight'){
     p.relation = clamp(p.relation - rnd(15,25)); G.happy = clamp(G.happy - rnd(8,14));
@@ -261,6 +322,7 @@ function famAct(name, type){
       `You picked a fight with ${fn} about something old. It got bigger fast.`,
       `You and ${fn} said things that can't be unsaid.`,
     ]),'bad');
+    applyRelationshipMemory(p, { trust:-rnd(4,9), resentment:rnd(6,12), conflict:true, brokePromise:true, note:'Escalated into family fight' });
     flash(`Fight with ${fn}`,'bad');
   } else if(type==='borrow'){
     if(p.relation<50){ flash(`${fn} doesn't trust you enough.`,'bad'); return; }
@@ -268,10 +330,12 @@ function famAct(name, type){
     if(Math.random()<p.relation/120){
       G.money += amt; p.relation = clamp(p.relation-12);
       addEv(`${fn} lent you ${fmt$(amt)}. They didn't look thrilled.`,'warn');
+      applyRelationshipMemory(p, { trust:-rnd(1,4), resentment:rnd(2,6), note:'Borrowed money from family member' });
       flash(`+${fmt$(amt)} from ${fn}`);
     } else {
       p.relation = clamp(p.relation-9);
       addEv(`You asked ${fn} for money. Long pause. "I can't right now." Awkward.`,'bad');
+      applyRelationshipMemory(p, { trust:-rnd(2,6), resentment:rnd(3,8), conflict:true, note:'Money ask denied' });
       flash(`${fn} said no`,'bad');
     }
   }
@@ -297,6 +361,7 @@ function renderRomanceTab(){
           <div class="p-name">${s.name}</div>
           <div class="p-role">Spouse · Age ${s.age} · Married ${G.marriageYears} yr${G.marriageYears!==1?'s':''} · Compat ${s.compat||'?'}%</div>
           <div style="font-size:.68rem;color:var(--muted2);margin-top:1px">${status}</div>
+          ${relationshipMemoryRow(s)}
           <div class="p-rel-wrap" style="margin-top:4px">
             <div class="p-rel-track" style="width:80px">
               <div class="p-rel-fill" style="width:${s.relation}%;background:${s.relation>=65?'var(--accent)':s.relation>=40?'var(--gold)':'var(--danger)'}"></div>
@@ -334,6 +399,7 @@ function renderRomanceTab(){
           <div class="p-name">${l.name} ${l.role==='Partner'?'<span style="font-size:.7rem;color:var(--gold)">💍 Engaged</span>':''}</div>
           <div class="p-role">${l.role==='Partner'?'Fiancé(e)':'Partner'} · Age ${l.age||'?'} · Compat ${l.compat||'?'}%</div>
           <div style="font-size:.68rem;color:var(--muted2)">${status}</div>
+          ${relationshipMemoryRow(l)}
           <div class="p-rel-wrap" style="margin-top:3px">
             <div class="p-rel-track" style="width:80px">
               <div class="p-rel-fill" style="width:${l.relation}%;background:${l.relation>=65?'var(--accent)':l.relation>=40?'var(--gold)':'var(--danger)'}"></div>
@@ -374,39 +440,47 @@ function spouseAct(type){
   ensureRelationshipDramaState();
   const s = G.spouse;
   if(!s||!s.alive){ flash('No spouse.','warn'); return; }
+  ensurePersonRelationshipMemory(s);
   const fn = s.firstName;
 
   if(type==='date'){
     const cost=rnd(40,150); G.money-=cost;
     s.relation=clamp(s.relation+rnd(7,15)); G.happy=clamp(G.happy+rnd(10,16));
     addEv(pick([`Date night with ${fn}. You forgot your phones existed.`,`You and ${fn} went out. Table for two. No interruptions. Perfect.`]),'love');
+    applyRelationshipMemory(s, { trust:rnd(3,7), resentment:-rnd(1,3), support:true, keptPromise:true, note:'Intentional spouse date night' });
     flash(`Date with ${fn}! 💘`);
   } else if(type==='movie'){
     s.relation=clamp(s.relation+rnd(4,9)); G.happy=clamp(G.happy+rnd(5,10));
     addEv(pick([`Movie night with ${fn}. You both picked something different and compromised badly. Loved every minute.`,`You and ${fn} watched something together. The comments section you provided was unnecessary but appreciated.`]),'love');
+    applyRelationshipMemory(s, { trust:rnd(1,4), resentment:-rnd(0,2), note:'Low-stakes quality time together' });
     flash(`Movie night with ${fn} 🎬`);
   } else if(type==='trip'){
     if(G.money<400){ flash('Need $400 for a trip','warn'); return; }
     G.money-=rnd(400,1200); s.relation=clamp(s.relation+rnd(12,22)); G.happy=clamp(G.happy+rnd(14,20));
     addEv(`Trip away with ${fn}. You remembered why you chose each other.`,'love');
+    applyRelationshipMemory(s, { trust:rnd(4,8), resentment:-rnd(1,4), keptPromise:true, support:true, note:'Shared getaway restored closeness' });
     flash(`+Relationship · trip with ${fn} ✈️`,'good');
   } else if(type==='convo'){
     const roll = Math.random();
     if(roll>0.25){
       s.relation=clamp(s.relation+rnd(6,12)); G.happy=clamp(G.happy+rnd(5,9));
       addEv(pick([`You and ${fn} had a real conversation. Not about logistics. About everything else.`,`2am conversation with ${fn}. Some things said that needed saying.`]),'love');
+      applyRelationshipMemory(s, { trust:rnd(3,7), resentment:-rnd(0,2), support:true, note:'Honest late-night spouse talk' });
     } else {
       s.relation=clamp(s.relation-rnd(3,8)); G.happy=clamp(G.happy-4);
       addEv(`The conversation with ${fn} surfaced something unresolved. Progress, technically.`,'warn');
+      applyRelationshipMemory(s, { trust:-rnd(1,4), resentment:rnd(1,4), conflict:true, note:'Conversation reopened unresolved issues' });
     }
     flash(`💬 Deep talk with ${fn}`);
   } else if(type==='makeout'){
     s.relation=clamp(s.relation+rnd(5,12)); G.happy=clamp(G.happy+rnd(6,11));
     addEv(pick([`You and ${fn} had a moment. The good kind.`,`Spontaneous moment with ${fn}. Marriage isn't dead.`]),'love');
+    applyRelationshipMemory(s, { trust:rnd(2,5), resentment:-rnd(0,2), note:'Affection without pressure' });
     flash(`😘`);
   } else if(type==='intimate'){
     s.relation=clamp(s.relation+rnd(8,16)); G.happy=clamp(G.happy+rnd(8,14));
     addEv(`Intimate time with ${fn}. The connection: real.`,'love');
+    applyRelationshipMemory(s, { trust:rnd(3,7), resentment:-rnd(1,2), support:true, note:'Intimacy strengthened attachment' });
     flash(`🔥`);
     // Baby chance
     if(G.age>=18 && G.age<=45 && Math.random()<0.12){
@@ -419,16 +493,19 @@ function spouseAct(type){
     const cost=rnd(100,500); G.money-=cost;
     s.relation=clamp(s.relation+rnd(10,20)); G.happy=clamp(G.happy+rnd(12,20));
     addEv(`Anniversary celebration with ${fn}. Year ${G.marriageYears}. You said things worth saying. (-$${cost})`,'love');
+    applyRelationshipMemory(s, { trust:rnd(4,9), resentment:-rnd(1,4), keptPromise:true, support:true, note:'Anniversary effort delivered' });
     flash(`🥂 Happy Anniversary!`,'good');
   } else if(type==='counselling'){
     if(G.money<200){ flash('Need $200','warn'); return; }
     G.money-=200;
     s.relation=clamp(s.relation+rnd(8,18)); G.happy=clamp(G.happy+rnd(3,8));
     addEv(`Marriage counselling with ${fn}. Awkward and necessary. The therapist was good. (-$200)`,'good');
+    applyRelationshipMemory(s, { trust:rnd(5,10), resentment:-rnd(2,5), keptPromise:true, support:true, note:'Attended marriage counselling' });
     flash(`+Relationship · counselling 🛋️`,'good');
   } else if(type==='fight'){
     s.relation=clamp(s.relation-rnd(12,22)); G.happy=clamp(G.happy-rnd(8,14));
     addEv(pick([`You and ${fn} had a real fight. Not the kind that passes easily.`,`Things got heated with ${fn}. Some of it was fair. Some of it wasn't.`]),'bad');
+    applyRelationshipMemory(s, { trust:-rnd(5,11), resentment:rnd(6,14), conflict:true, brokePromise:true, note:'Major spouse conflict' });
     flash(`Fight with ${fn}`,'bad');
   } else if(type==='cheat'){
     G.darkScore++;
@@ -455,6 +532,7 @@ function spouseAct(type){
       addEv('Custody was decided. Co‑parenting begins.', 'warn');
     }
     addEv(`You and ${fn} divorced after ${G.marriageYears} year${G.marriageYears!==1?'s':''}. Assets split. Lawyers expensive. Life: continuing.`,'bad');
+    applyRelationshipMemory(s, { trust:-20, resentment:20, conflict:true, brokePromise:true, note:'Divorce finalized' });
     flash(`Divorced from ${fn}. -${fmt$(split)}`,'warn');
     G.spouse = null; G.marriageYears = 0;
   }
@@ -463,6 +541,7 @@ function spouseAct(type){
 
 function runLoverEncounterPopup(l, type){
   const fn = l.firstName;
+  ensurePersonRelationshipMemory(l);
   const complete = ()=>{ updateHUD(); renderRelationships(); };
   if(type==='date'){
     relationshipPopup(`Date with ${fn}`, `How do you play tonight?`, [
@@ -472,6 +551,7 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(12,22));
         G.happy = clamp(G.happy + rnd(10,18));
         addEv(`Luxury date with ${fn}. Sparks everywhere. (-${fmt$(cost)})`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(4,8), resentment:-rnd(1,3), keptPromise:true, support:true, note:'High-effort luxury date' });
         if(G.spouse) maybeExposeAffair(fn, 'public date spotted online', 0.26);
         complete();
       }},
@@ -481,11 +561,13 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(7,13));
         G.happy = clamp(G.happy + rnd(6,11));
         addEv(`Simple date night with ${fn}. Calm and real. (-${fmt$(cost)})`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(2,5), resentment:-rnd(0,2), keptPromise:true, note:'Low-key reliable date' });
         complete();
       }},
       { label:'Cancel last minute', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(8,15));
         addEv(`You canceled on ${fn} late. They were hurt.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(4,8), resentment:rnd(4,9), brokePromise:true, note:'Last-minute cancellation' });
         complete();
       }},
     ]);
@@ -497,17 +579,20 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(6,14));
         G.happy = clamp(G.happy + rnd(4,9));
         addEv(`You were vulnerable with ${fn}. It deepened trust.`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(4,8), resentment:-rnd(1,3), support:true, note:'Mutual vulnerability in conversation' });
         complete();
       }},
       { label:'Deflect', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(3,9));
         addEv(`You avoided the hard conversation with ${fn}.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(2,5), resentment:rnd(2,5), note:'Avoided hard discussion' });
         complete();
       }},
       { label:'Start a fight', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(10,18));
         G.happy = clamp(G.happy - rnd(5,11));
         addEv(`The talk with ${fn} blew up into an argument.`, 'bad');
+        applyRelationshipMemory(l, { trust:-rnd(5,10), resentment:rnd(5,11), conflict:true, note:'Conversation escalated into fight' });
         complete();
       }},
     ]);
@@ -519,17 +604,20 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(5,11));
         G.happy = clamp(G.happy + rnd(4,9));
         addEv(`You watched ${fn}'s pick and made them feel seen.`, 'good');
+        applyRelationshipMemory(l, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, note:'Chose partner preference' });
         complete();
       }},
       { label:'Your pick', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation + rnd(2,7));
         G.happy = clamp(G.happy + rnd(3,7));
         addEv(`Movie night with ${fn}. You talked more than watched.`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(1,3), note:'Shared chill movie night' });
         complete();
       }},
       { label:'Argue about choices', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(3,8));
         addEv(`Movie debate turned into a petty argument with ${fn}.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(1,4), resentment:rnd(2,5), conflict:true, note:'Petty argument over plans' });
         complete();
       }},
     ]);
@@ -541,17 +629,20 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(7,13));
         G.happy = clamp(G.happy + rnd(6,12));
         addEv(`You and ${fn} shared a perfect spontaneous moment.`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(2,5), resentment:-rnd(0,2), note:'Spontaneous affection reinforced bond' });
         if(G.spouse) maybeExposeAffair(fn, 'public makeout sighting', 0.2);
         complete();
       }},
       { label:'Keep it subtle', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation + rnd(3,7));
         addEv(`You kept things subtle with ${fn}, but the connection grew.`, 'good');
+        applyRelationshipMemory(l, { trust:rnd(1,3), note:'Subtle but positive intimacy signal' });
         complete();
       }},
       { label:'Pull away', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(4,9));
         addEv(`${fn} felt rejected when you pulled away.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(2,5), resentment:rnd(2,5), brokePromise:true, note:'Pulled away during intimate moment' });
         complete();
       }},
     ]);
@@ -563,6 +654,7 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(9,16));
         G.happy = clamp(G.happy + rnd(8,14));
         addEv(`An intimate night with ${fn} brought you closer.`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(4,8), resentment:-rnd(1,3), support:true, note:'Private intimacy increased trust' });
         if(G.spouse) maybeExposeAffair(fn, 'private affair rumor', 0.24);
         complete();
       }},
@@ -570,12 +662,14 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(4,10));
         G.sm.totalFame = clamp((G.sm.totalFame||0) + rnd(1,4));
         addEv(`You posted suggestive clues about ${fn}. Attention surged.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(1,4), resentment:rnd(2,6), note:'Private moment used for public clout' });
         if(G.spouse || (G.lovers||[]).length>1) maybeExposeAffair(fn, 'social media leak', 0.42);
         complete();
       }},
       { label:'Back out', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(4,10));
         addEv(`You pulled back with ${fn}. Mixed feelings all around.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(2,5), resentment:rnd(2,5), brokePromise:true, note:'Backed out at vulnerable moment' });
         complete();
       }},
     ]);
@@ -590,6 +684,7 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(14,24));
         G.happy = clamp(G.happy + rnd(12,20));
         addEv(`You planned a huge romantic gesture for ${fn}. It landed perfectly. (-${fmt$(cost)})`, 'love');
+        applyRelationshipMemory(l, { trust:rnd(5,10), resentment:-rnd(1,4), keptPromise:true, support:true, note:'Grand gesture delivered' });
         complete();
       }},
       { label:'Thoughtful surprise', cls:'btn-ghost', onClick:()=>{
@@ -598,11 +693,13 @@ function runLoverEncounterPopup(l, type){
         l.relation = clamp(l.relation + rnd(8,14));
         G.happy = clamp(G.happy + rnd(7,12));
         addEv(`You surprised ${fn} with something meaningful. (-${fmt$(cost)})`, 'good');
+        applyRelationshipMemory(l, { trust:rnd(3,6), resentment:-rnd(1,2), keptPromise:true, note:'Thoughtful surprise strengthened bond' });
         complete();
       }},
       { label:'Do nothing', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(2,7));
         addEv(`${fn} expected effort and felt disappointed.`, 'warn');
+        applyRelationshipMemory(l, { trust:-rnd(2,5), resentment:rnd(2,6), brokePromise:true, note:'Missed expected special effort' });
         complete();
       }},
     ]);
@@ -615,6 +712,7 @@ function loveAct(name, type){
   ensureRelationshipDramaState();
   const l = G.lovers.find(x=>x.name===name);
   if(!l||!l.alive){ renderRelationships(); return; }
+  ensurePersonRelationshipMemory(l);
   const fn = l.firstName;
   if(['date','movie','convo','makeout','intimate','special'].includes(type)){
     if(runLoverEncounterPopup(l, type)) return;
@@ -626,35 +724,42 @@ function loveAct(name, type){
     l.milestones = l.milestones || {};
     if(!l.milestones.firstDate){ l.milestones.firstDate = true; addEv(`First real date with ${fn}. You were both nervous.`, 'love'); }
     addEv(pick([`Date with ${fn}. You forgot to check your phone for hours. Rare.`,`You and ${fn} went somewhere new. Both a little nervous. Worth it.`]),'love');
+    applyRelationshipMemory(l, { trust:rnd(3,7), resentment:-rnd(1,3), keptPromise:true, support:true, note:'Relationship date night' });
     flash(`Date with ${fn}! 💘`);
   } else if(type==='movie'){
     l.relation=clamp(l.relation+rnd(4,9)); G.happy=clamp(G.happy+rnd(5,9));
     addEv(`Movie night with ${fn}. Couch, snacks, the whole thing. Exactly right.`,'love');
+    applyRelationshipMemory(l, { trust:rnd(1,4), resentment:-rnd(0,2), note:'Shared movie downtime' });
     flash(`🎬 Movie night`);
   } else if(type==='convo'){
     l.relation=clamp(l.relation+rnd(5,12)); G.happy=clamp(G.happy+rnd(4,9));
     addEv(pick([`You and ${fn} had a 2am conversation about life. No answers. Best night in weeks.`,`Deep talk with ${fn}. The kind where time disappears.`]),'love');
+    applyRelationshipMemory(l, { trust:rnd(3,6), resentment:-rnd(0,2), support:true, note:'Late-night deep talk' });
     flash(`💬 Deep talk with ${fn}`);
   } else if(type==='makeout'){
     l.relation=clamp(l.relation+rnd(6,12)); G.happy=clamp(G.happy+rnd(7,12));
     l.milestones = l.milestones || {};
     if(!l.milestones.firstKiss){ l.milestones.firstKiss = true; addEv(`First kiss with ${fn}. Time paused.`, 'love'); }
     addEv(pick([`You and ${fn} had a moment. The kind you replay.`,`A completely unplanned moment with ${fn}. Perfect.`]),'love');
+    applyRelationshipMemory(l, { trust:rnd(2,5), resentment:-rnd(0,2), note:'Affection reinforced chemistry' });
     flash(`😘`);
   } else if(type==='intimate'){
     l.relation=clamp(l.relation+rnd(8,15)); G.happy=clamp(G.happy+rnd(8,14));
     l.milestones = l.milestones || {};
     if(!l.milestones.intimate){ l.milestones.intimate = true; addEv(`You and ${fn} crossed a new line together.`, 'love'); }
     addEv(`Intimate with ${fn}. Something deepened between you.`,'love');
+    applyRelationshipMemory(l, { trust:rnd(3,7), resentment:-rnd(1,2), support:true, note:'Intimate connection deepened trust' });
     flash(`🔥`);
   } else if(type==='special'){
     if(G.money<200){ flash('Need $200','warn'); return; }
     G.money-=rnd(200,600); l.relation=clamp(l.relation+rnd(14,22)); G.happy=clamp(G.happy+rnd(12,20));
     addEv(pick([`You planned something special for ${fn}. The look on their face was worth every cent.`,`Special evening with ${fn}. You put in the effort. It showed.`]),'love');
+    applyRelationshipMemory(l, { trust:rnd(4,8), resentment:-rnd(1,3), keptPromise:true, note:'Special date effort delivered' });
     flash(`✨ Special date! +Big relationship boost`,'good');
   } else if(type==='fight'){
     l.relation=clamp(l.relation-rnd(12,22)); G.happy=clamp(G.happy-rnd(7,13));
     addEv(`You and ${fn} had a bad fight. ${Math.random()>0.5?'Things were said.':'It got loud.'}`,'bad');
+    applyRelationshipMemory(l, { trust:-rnd(4,10), resentment:rnd(5,11), conflict:true, brokePromise:true, note:'Romantic conflict escalation' });
     flash(`Fight with ${fn}`,'bad');
   } else if(type==='propose'){
     if(G.age<18){ flash('Too young to propose.','warn'); return; }
@@ -663,11 +768,13 @@ function loveAct(name, type){
       l.milestones = l.milestones || {};
       l.milestones.engaged = true;
       addEv(`You proposed to ${fn}. They said YES! 💍 You both cried. It was perfect.`,'love');
+      applyRelationshipMemory(l, { trust:rnd(6,12), resentment:-rnd(1,4), keptPromise:true, support:true, note:'Proposal accepted' });
       flash(`Engaged to ${fn}! 💍`,'good');
     } else {
       G.lovers=G.lovers.filter(x=>x.name!==name);
       G.happy=clamp(G.happy-26);
       addEv(`You proposed to ${fn}. They said no. Then immediately blocked you.`,'bad');
+      applyRelationshipMemory(l, { trust:-15, resentment:15, conflict:true, brokePromise:true, note:'Proposal rejected' });
       flash('Rejected. Forever remembered.','bad');
     }
   } else if(type==='wedding'){
@@ -685,6 +792,7 @@ function loveAct(name, type){
     G.happy = clamp(G.happy+28);
     G.social.reputation = clamp(G.social.reputation+rnd(5,10));
     addEv(`You married ${fn}! 💒 ${fmt$(weddingCost)} wedding. ${pick(['It was perfect.','The speeches made people cry.','Everybody danced.','Best day of your life, and you\'ve had some good ones.'])} (-${fmt$(weddingCost)})`,'love');
+    applyRelationshipMemory(G.spouse, { trust:rnd(8,14), resentment:-rnd(2,5), keptPromise:true, support:true, note:'Wedding and commitment formalized' });
     flash(`💒 Married ${fn}!`,'good');
   } else if(type==='cheat'){
     G.darkScore++;
@@ -692,14 +800,17 @@ function loveAct(name, type){
       G.lovers=G.lovers.filter(x=>x.name!==name);
       G.happy=clamp(G.happy-22); G.social.reputation=clamp(G.social.reputation-14);
       addEv(`You cheated on ${fn}. They found out.`, 'bad');
+      applyRelationshipMemory(l, { trust:-15, resentment:15, conflict:true, brokePromise:true, note:'Cheating discovered by lover' });
       if(G.spouse) maybeExposeAffair(fn, 'cheating with lover exposed', 0.5);
       flash(`${fn} is gone.`,'bad');
     } else {
       G.happy=clamp(G.happy+4);
       addEv(`You cheated on ${fn} and hid it for now.`, 'warn');
+      applyRelationshipMemory(l, { trust:-rnd(2,6), resentment:rnd(2,6), brokePromise:true, note:'Cheating hidden for now' });
       if(G.spouse) maybeExposeAffair(fn, 'secret lover affair', 0.3);
     }
   } else if(type==='breakup'){
+    applyRelationshipMemory(l, { trust:-10, resentment:10, conflict:true, brokePromise:true, note:'Relationship ended by breakup' });
     G.lovers=G.lovers.filter(x=>x.name!==name);
     G.happy=clamp(G.happy-13);
     addEv(`You broke up with ${fn}. It wasn't right and you both knew it.`,'bad');
@@ -806,6 +917,7 @@ function renderFriendsTab(){
           <div class="p-name">${f.name}</div>
           <div class="p-role">Friend · Age ${f.age||'?'} · ${relLabel(f.relation)} · Compat ${f.compat||'?'}%</div>
           <div style="font-size:.68rem;color:var(--muted2)">${status}</div>
+          ${relationshipMemoryRow(f)}
           <div class="p-rel-wrap" style="margin-top:3px">
             <div class="p-rel-track" style="width:80px">
               <div class="p-rel-fill" style="width:${f.relation}%;background:${f.relation>=65?'var(--accent)':f.relation>=40?'var(--gold)':'var(--danger)'}"></div>
@@ -838,6 +950,7 @@ function friendAct(name, type){
   ensureRelationshipDramaState();
   const f = G.friends.find(x=>x.name===name);
   if(!f||!f.alive){ flash('Can\'t find them.','warn'); return; }
+  ensurePersonRelationshipMemory(f);
   const fn = f.firstName;
   const compBoost = f.compat>=70 ? 2 : f.compat<=40 ? -2 : 0;
 
@@ -849,10 +962,12 @@ function friendAct(name, type){
     G.smarts=clamp(G.smarts+ev.smartsD); G.money+=ev.moneyD;
     G.social.reputation=clamp(G.social.reputation+ev.repD);
     f.relation=clamp(f.relation+rnd(4,10)+compBoost);
+    applyRelationshipMemory(f, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, note:'General hangout' });
     addEv(msg, ev.type); flash(`Hung out with ${fn}!`);
   } else if(type==='meal'){
     const cost=rnd(20,60); G.money-=cost;
     f.relation=clamp(f.relation+rnd(5,12)+compBoost); G.happy=clamp(G.happy+rnd(5,9));
+    applyRelationshipMemory(f, { trust:rnd(1,4), resentment:-rnd(0,2), note:'Shared meal with friend' });
     addEv(`Grabbed food with ${fn}. (-$${cost}) Easy conversation.`,'love');
     flash(`🍽️ Food with ${fn}`);
   } else if(type==='story'){
@@ -865,6 +980,7 @@ function friendAct(name, type){
           G.happy = clamp(G.happy + rnd(6,12));
           G.stress = clamp((G.stress||35) - rnd(2,5));
           addEv(`You and ${fn} improvised an unforgettable night.`, 'love');
+          applyRelationshipMemory(f, { trust:rnd(3,7), resentment:-rnd(1,3), support:true, keptPromise:true, note:'Spontaneous adventure followed through' });
           updateHUD(); renderRelationships();
         }},
         { label:'Venting session', cls:'btn-ghost', onClick:()=>{
@@ -872,12 +988,14 @@ function friendAct(name, type){
           G.happy = clamp(G.happy + rnd(2,6));
           G.stress = clamp((G.stress||35) - rnd(1,4));
           addEv(`You and ${fn} vented about life and left lighter.`, 'good');
+          applyRelationshipMemory(f, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, note:'Mutual venting built trust' });
           updateHUD(); renderRelationships();
         }},
         { label:'Flake last minute', cls:'btn-ghost', onClick:()=>{
           f.relation = clamp(f.relation - rnd(4,11));
           G.social.dramaFlags.friendDrama = (G.social.dramaFlags.friendDrama||0) + 1;
           addEv(`You bailed on ${fn}. They took it personally.`, 'warn');
+          applyRelationshipMemory(f, { trust:-rnd(3,7), resentment:rnd(3,8), brokePromise:true, note:'Bailed last minute on plans' });
           updateHUD(); renderRelationships();
         }},
       ]
@@ -886,6 +1004,7 @@ function friendAct(name, type){
   } else if(type==='compliment'){
     if(Math.random()>.18){
       f.relation=clamp(f.relation+rnd(5,10)+compBoost); G.happy=clamp(G.happy+4);
+      applyRelationshipMemory(f, { trust:rnd(1,4), resentment:-rnd(0,2), support:true, note:'Delivered sincere compliment' });
       addEv(`You said something genuine to ${fn}. People don't do that enough.`);
       flash(`${fn} appreciated that 💚`);
     } else {
@@ -895,15 +1014,18 @@ function friendAct(name, type){
   } else if(type==='advice'){
     G.smarts=clamp(G.smarts+rnd(1,4)); G.happy=clamp(G.happy+rnd(3,7));
     f.relation=clamp(f.relation+rnd(3,8));
+    applyRelationshipMemory(f, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, note:'Sought and respected advice' });
     addEv(`You asked ${fn} for advice. They gave it straight. You needed to hear it.`,'good');
     flash(`+Smarts · advice from ${fn}`,'good');
   } else if(type==='compete'){
     if(Math.random()<.5){
       G.happy=clamp(G.happy+9); f.relation=clamp(f.relation-4);
+      applyRelationshipMemory(f, { trust:-rnd(0,3), resentment:rnd(1,4), note:'Won competition with minor ego friction' });
       addEv(`You beat ${fn}. You were gracious about it. (You weren't.)`);
       flash('You won. Friend slightly annoyed.');
     } else {
       G.happy=clamp(G.happy-4); f.relation=clamp(f.relation+5);
+      applyRelationshipMemory(f, { trust:rnd(1,4), resentment:-rnd(0,2), note:'Handled losing and respected friend' });
       addEv(`${fn} beat you. You congratulated them through gritted teeth.`,'warn');
     }
   } else if(type==='hookup'){
@@ -919,26 +1041,31 @@ function friendAct(name, type){
             addEv(`You hooked up with ${fn}. The friendship changed instantly.`, 'love');
             if(!G.lovers.some(x=>x.name===f.name) && Math.random()<0.72){
               const lover = { ...f, role:'Lover', relation:Math.max(55, f.relation), milestones:{ intimate:true } };
+              ensurePersonRelationshipMemory(lover);
               G.friends = G.friends.filter(x=>x.name!==f.name);
               G.lovers.push(lover);
               addEv(`${fn} is now more than a friend.`, 'love');
             }
+            applyRelationshipMemory(f, { trust:rnd(4,8), resentment:-rnd(1,3), note:'Hookup moved relationship forward' });
             if(G.spouse || G.lovers.length>1) maybeExposeAffair(fn, 'hookup with a friend', 0.28);
           } else {
             f.relation = clamp(f.relation - rnd(10,18));
             addEv(`You made a move on ${fn}. It landed badly and things got awkward.`, 'bad');
+            applyRelationshipMemory(f, { trust:-rnd(5,9), resentment:rnd(6,11), conflict:true, note:'Romantic move rejected by friend' });
           }
           updateHUD(); renderRelationships();
         }},
         { label:'Keep it platonic', cls:'btn-ghost', onClick:()=>{
           f.relation = clamp(f.relation + rnd(2,6));
           addEv(`You chose to keep things platonic with ${fn}.`, 'good');
+          applyRelationshipMemory(f, { trust:rnd(1,3), resentment:-rnd(0,1), note:'Set platonic boundary clearly' });
           updateHUD(); renderRelationships();
         }},
         { label:'Start a secret affair', cls:'btn-ghost', onClick:()=>{
           f.relation = clamp(f.relation + rnd(6,12));
           G.darkScore++;
           addEv(`You and ${fn} started something secret.`, 'warn');
+          applyRelationshipMemory(f, { trust:-rnd(1,4), resentment:rnd(1,4), brokePromise:true, note:'Secret affair started with friend' });
           maybeExposeAffair(fn, 'secret affair with a friend', 0.36);
           updateHUD(); renderRelationships();
         }},
@@ -950,15 +1077,19 @@ function friendAct(name, type){
     if(G.money<amt){ flash(`You don't have $${amt} to lend`,'warn'); return; }
     G.money-=amt;
     f.relation=clamp(f.relation+rnd(8,16));
+    applyRelationshipMemory(f, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, note:'Loaned money to friend' });
     const repaid = Math.random()<0.6;
     if(repaid){
       addEv(`You lent ${fn} $${amt}. They paid it back. Every cent. You thought about this more than you'd admit.`,'good');
       G.money+=amt;
+      applyRelationshipMemory(f, { trust:rnd(2,4), resentment:-rnd(0,2), keptPromise:true, note:'Friend repaid loan' });
     } else {
       addEv(`You lent ${fn} $${amt}. It's been a while. The money: gone. The friendship: complicated.`,'warn');
+      applyRelationshipMemory(f, { trust:-rnd(2,5), resentment:rnd(2,6), brokePromise:true, note:'Friend did not repay loan' });
     }
     flash(repaid?`${fn} paid back $${amt}!`:`Lent ${fn} $${amt}`,'warn');
   } else if(type==='ditch'){
+    applyRelationshipMemory(f, { trust:-10, resentment:10, conflict:true, brokePromise:true, note:'Friendship severed' });
     G.friends=G.friends.filter(x=>x.name!==name);
     G.happy=clamp(G.happy+rnd(-5,2));
     addEv(`You cut ${fn} out. Clean break. Whether it was right is another question.`,'warn');
@@ -969,34 +1100,55 @@ function friendAct(name, type){
 
 function relationshipYearPulse(){
   ensureRelationshipDramaState();
+  ensureRelationshipMemoryState();
   const d = G.social.dramaFlags;
   const aliveFriends = (G.friends||[]).filter(f=>f && f.alive!==false);
   const aliveFamily = (G.family||[]).filter(f=>f && f.alive!==false);
   const aliveLovers = (G.lovers||[]).filter(l=>l && l.alive!==false);
 
+  const allTracked = aliveFriends.concat(aliveFamily).concat(aliveLovers).concat(G.spouse?[G.spouse]:[]);
+  allTracked.forEach(p=>{
+    ensurePersonRelationshipMemory(p);
+    const m = p.relMemory;
+    if((G.age - (m.lastMeaningfulYear||G.age))>=2){
+      m.trust = clamp(m.trust - rnd(1,3));
+      if(Math.random()<0.45) m.resentment = clamp(m.resentment + rnd(0,2));
+    } else if(Math.random()<0.35){
+      m.resentment = clamp(m.resentment - rnd(0,1));
+    }
+  });
+
   if(aliveFriends.length && Math.random()<0.18){
     const f = pick(aliveFriends);
-    if(Math.random()<0.56){
-      f.relation = clamp((f.relation||50) + rnd(2,7));
+    const fm = f.relMemory||{};
+    const positiveChance = Math.max(0.2, Math.min(0.85, 0.46 + (fm.trust||50)/260 - (fm.resentment||0)/280));
+    if(Math.random()<positiveChance){
+      f.relation = clamp((f.relation||50) + rnd(2,7) + Math.floor(((fm.trust||50)-(fm.resentment||0))/35));
+      applyRelationshipMemory(f, { trust:rnd(1,4), resentment:-rnd(0,2), support:true, note:'Yearly check-in strengthened friendship' });
       addEv(`${f.firstName} checked in during a rough week. Real friend energy.`, 'good');
     } else {
       f.relation = clamp((f.relation||50) - rnd(3,9));
       d.friendDrama = (d.friendDrama||0) + 1;
+      applyRelationshipMemory(f, { trust:-rnd(1,4), resentment:rnd(2,6), conflict:true, note:'Yearly misunderstanding' });
       addEv(`A misunderstanding with ${f.firstName} cooled the friendship this year.`, 'warn');
     }
   }
 
   if(aliveFamily.length && Math.random()<0.16){
     const m = pick(aliveFamily);
+    const mm = m.relMemory||{};
     if(Math.random()<0.45 && G.age>=18){
       const ask = rnd(300,3000);
-      if(G.money>=ask && Math.random()<0.62){
+      const helpChance = Math.max(0.2, Math.min(0.9, 0.45 + (mm.trust||50)/250 - (mm.resentment||0)/260));
+      if(G.money>=ask && Math.random()<helpChance){
         G.money -= ask;
         m.relation = clamp((m.relation||50) + rnd(4,9));
+        applyRelationshipMemory(m, { trust:rnd(2,5), resentment:-rnd(0,2), support:true, keptPromise:true, note:'Provided requested family support' });
         addEv(`${m.firstName} needed support. You covered ${fmt$(ask)}.`, 'good');
       } else {
         m.relation = clamp((m.relation||50) - rnd(4,10));
         d.familyDrama = (d.familyDrama||0) + 1;
+        applyRelationshipMemory(m, { trust:-rnd(1,4), resentment:rnd(2,6), conflict:true, note:'Support request created tension' });
         addEv(`Family tension rose with ${m.firstName} over money and boundaries.`, 'warn');
       }
     }
@@ -1004,13 +1156,19 @@ function relationshipYearPulse(){
 
   if(aliveLovers.length>1 && Math.random()<0.22){
     const l = pick(aliveLovers);
-    l.relation = clamp((l.relation||50) - rnd(8,16));
+    const lm = l.relMemory||{};
+    const jealousyHit = rnd(6,12) + Math.floor((lm.resentment||0)/18) - Math.floor((lm.trust||50)/35);
+    l.relation = clamp((l.relation||50) - Math.max(3, jealousyHit));
+    applyRelationshipMemory(l, { trust:-rnd(2,6), resentment:rnd(4,9), conflict:true, note:'Jealousy triggered by multiple partners' });
     addEv(`${l.firstName} suspects you're seeing someone else. Trust dropped.`, 'bad');
     maybeExposeAffair(l.firstName, 'lover jealousy spiral', 0.22);
   }
 
   if(G.spouse && aliveLovers.length && Math.random()<0.14){
-    maybeExposeAffair(pick(aliveLovers).firstName, 'a leaked message thread', 0.32);
+    ensurePersonRelationshipMemory(G.spouse);
+    const spm = G.spouse.relMemory||{};
+    const leakChance = Math.max(0.16, Math.min(0.58, 0.3 + (spm.resentment||0)/220 - (spm.trust||50)/350));
+    maybeExposeAffair(pick(aliveLovers).firstName, 'a leaked message thread', leakChance);
   }
 }
 
@@ -1037,6 +1195,7 @@ function renderChildrenTab(){
           <div class="p-name">${c.name} <span style="font-size:.7rem;color:var(--muted2)">· your child</span></div>
           <div class="p-role">Age ${c.age} · ${relLabel(c.relation)}${c.custody?` · Custody: ${c.custody}`:''}</div>
           <div style="font-size:.68rem;color:var(--muted2)">${status}</div>
+          ${relationshipMemoryRow(c)}
           <div class="p-rel-wrap" style="margin-top:3px">
             <div class="p-rel-track" style="width:80px">
               <div class="p-rel-fill" style="width:${c.relation}%;background:${c.relation>=65?'var(--accent)':c.relation>=40?'var(--gold)':'var(--danger)'}"></div>
@@ -1157,8 +1316,19 @@ function haveChild(otherParent){
     uniYear: 0,
     adopted: false,
     custody: 'you',
+    relMemory:{
+      trust:rnd(62,88),
+      resentment:rnd(0,8),
+      promisesKept:0,
+      promisesBroken:0,
+      conflicts:0,
+      supportMoments:0,
+      lastMeaningfulYear:G.age||0,
+      history:[],
+    },
   };
   G.children.push(child);
+  ensurePersonRelationshipMemory(child);
   return child;
 }
 
@@ -1191,8 +1361,19 @@ function tryAdopt(){
     relation:rnd(55,80), alive:true, age:childAge,
     career:null, uniEnrolled:false, uniCourse:'', uniYear:0, adopted:true,
     custody: 'you',
+    relMemory:{
+      trust:rnd(55,84),
+      resentment:rnd(0,12),
+      promisesKept:0,
+      promisesBroken:0,
+      conflicts:0,
+      supportMoments:0,
+      lastMeaningfulYear:G.age||0,
+      history:[],
+    },
   };
   G.children.push(child);
+  ensurePersonRelationshipMemory(child);
   G.happy=clamp(G.happy+rnd(14,22));
   addEv(`You adopted ${fn}, age ${childAge}. They looked at you and your entire world reoriented. (-${fmt$(cost)})`,'love');
   flash(`💗 Adopted ${fn}!`,'good');

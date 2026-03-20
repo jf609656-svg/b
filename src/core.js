@@ -1360,12 +1360,14 @@ function assignAdultCareer(p){
 function makePerson(role, gender){
   const g  = gender || pick(['male','female']);
   const fn = g==='male' ? pick(NM) : pick(NF);
+  const relation = rnd(40,80);
+  const compat = rnd(30,90);
   return {
     name: `${fn} ${pick(NS)}`,
     firstName: fn,
     gender: g,
     role,
-    relation: rnd(40,80),
+    relation,
     alive: true,
     age: 0,
     career: null,
@@ -1373,7 +1375,17 @@ function makePerson(role, gender){
     uniCourse: '',
     anniversaryYear: null,   // for spouse
     traits: [],
-    compat: rnd(30,90),
+    compat,
+    relMemory:{
+      trust: clamp(relation + Math.floor((compat-50)/6)),
+      resentment: Math.max(0, Math.floor((50-relation)/3)),
+      promisesKept:0,
+      promisesBroken:0,
+      conflicts:0,
+      supportMoments:0,
+      lastMeaningfulYear:0,
+      history:[],
+    },
   };
 }
 
