@@ -85,6 +85,178 @@ const POL_CRISIS_TYPES = [
   { id:'war', label:'War Escalation', icon:'⚔️' },
 ];
 
+function politicsCanShowPopup(){
+  return typeof showPopup==='function' &&
+    typeof document!=='undefined' &&
+    !!document &&
+    typeof document.createElement==='function';
+}
+
+function politicsFlavorPopup(title, body, tone='normal'){
+  if(!politicsCanShowPopup()) return;
+  showPopup(title, body, [
+    { label:'Continue', cls:'btn-primary', onClick:()=>{} }
+  ], tone);
+}
+
+function politicsSyncCampaignMirrors(){
+  const g = G.gov;
+  const c = g.campaign;
+  g.popularity = c.popularity;
+  g.funding = c.funding;
+  g.trust = c.trust;
+  g.scandalRisk = c.scandalRisk;
+}
+
+function politicsElectionEventPopup(force=false){
+  ensurePoliticsState();
+  const g = G.gov;
+  const c = g.campaign;
+  if(!c.active) return;
+  if(!force && Math.random()>=0.42) return;
+
+  const events = [
+    {
+      title:'🎥 Leaked Backroom Clip',
+      body:'A private donor dinner clip leaked. You were caught saying strategy lines that sound out of touch.',
+      choices:[
+        {
+          label:'Apologize and publish full tape',
+          cls:'btn-primary',
+          onClick:()=>{
+            c.trust = clamp(c.trust + rnd(4,8));
+            c.popularity = clamp(c.popularity + rnd(1,4));
+            c.scandalRisk = clamp(c.scandalRisk - rnd(2,5));
+            c.funding = Math.max(0, c.funding - rnd(5000,18000));
+            addEv('You took the transparency route. The story cooled down.', 'good');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+        {
+          label:'Counterattack the media',
+          cls:'btn-ghost',
+          onClick:()=>{
+            c.popularity = clamp(c.popularity + rnd(2,7));
+            c.trust = clamp(c.trust - rnd(2,6));
+            c.scandalRisk = clamp(c.scandalRisk + rnd(2,6));
+            addEv('You attacked the press. Base support rose, moderates flinched.', 'warn');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+        {
+          label:'Quietly bury the story',
+          cls:'btn-ghost',
+          onClick:()=>{
+            c.funding = Math.max(0, c.funding - rnd(12000,32000));
+            c.scandalRisk = clamp(c.scandalRisk - rnd(1,4));
+            c.trust = clamp(c.trust - rnd(0,3));
+            if(Math.random()<0.25){
+              g.ethics.investigations = (g.ethics.investigations||0) + 1;
+              g.ethics.impeachmentRisk = clamp((g.ethics.impeachmentRisk||4) + rnd(2,5));
+              addEv('The cover-up whispers triggered a small investigation thread.', 'bad');
+            } else {
+              addEv('Operatives buried the story before it reached prime time.', 'good');
+            }
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+      ]
+    },
+    {
+      title:'📱 Viral Moment Opportunity',
+      body:'A debate cut is trending. You can steer the narrative while everyone is watching.',
+      choices:[
+        {
+          label:'Lean into meme energy',
+          cls:'btn-primary',
+          onClick:()=>{
+            c.popularity = clamp(c.popularity + rnd(4,10));
+            c.trust = clamp(c.trust + rnd(-2,2));
+            c.scandalRisk = clamp(c.scandalRisk + rnd(1,4));
+            c.momentum += rnd(2,5);
+            addEv('You rode the meme wave. Youth turnout projections jumped.', 'love');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+        {
+          label:'Release policy explainer',
+          cls:'btn-ghost',
+          onClick:()=>{
+            c.trust = clamp(c.trust + rnd(4,9));
+            c.popularity = clamp(c.popularity + rnd(1,5));
+            c.scandalRisk = clamp(c.scandalRisk - rnd(1,3));
+            c.momentum += rnd(1,3);
+            addEv('Your team reframed the clip into policy credibility.', 'good');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+        {
+          label:'Ignore and stay on schedule',
+          cls:'btn-ghost',
+          onClick:()=>{
+            c.momentum -= rnd(1,3);
+            c.popularity = clamp(c.popularity - rnd(0,3));
+            addEv('The moment faded. You avoided risk and missed upside.', 'warn');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+      ]
+    },
+    {
+      title:'🧪 Debate Prep Crisis',
+      body:'Your prep team says opponent oppo research is stronger than expected.',
+      choices:[
+        {
+          label:'Over-prepare all night',
+          cls:'btn-primary',
+          onClick:()=>{
+            c.trust = clamp(c.trust + rnd(3,7));
+            c.popularity = clamp(c.popularity + rnd(2,5));
+            G.stress = clamp((G.stress||35) + rnd(2,6));
+            addEv('Intense prep paid off in command of facts.', 'good');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+        {
+          label:'Improvise and go bold',
+          cls:'btn-ghost',
+          onClick:()=>{
+            if(Math.random()<0.55){
+              c.popularity = clamp(c.popularity + rnd(4,9));
+              c.momentum += rnd(2,4);
+              addEv('Your bold improvisation landed. Clips dominated the cycle.', 'love');
+            } else {
+              c.popularity = clamp(c.popularity - rnd(4,9));
+              c.scandalRisk = clamp(c.scandalRisk + rnd(2,5));
+              addEv('Improvised lines backfired under fact-check scrutiny.', 'bad');
+            }
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+        {
+          label:'Skip debate, do giant rally',
+          cls:'btn-ghost',
+          onClick:()=>{
+            c.popularity = clamp(c.popularity + rnd(2,6));
+            c.trust = clamp(c.trust - rnd(2,6));
+            c.scandalRisk = clamp(c.scandalRisk + rnd(1,4));
+            c.funding = Math.max(0, c.funding - rnd(4000,12000));
+            addEv('Rally turnout was huge, but pundits questioned your dodge.', 'warn');
+            politicsSyncCampaignMirrors(); renderPolitics();
+          }
+        },
+      ]
+    }
+  ];
+
+  const ev = pick(events);
+  if(!politicsCanShowPopup()){
+    politicsCampaignEvent();
+    return;
+  }
+  showPopup(ev.title, ev.body, ev.choices, 'normal');
+}
+
 function ensurePoliticsState(){
   if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   if(!G.gov) G.gov = {};
@@ -151,6 +323,7 @@ function ensurePoliticsState(){
   if(typeof c.ads!=='number') c.ads = 0;
   if(typeof c.debates!=='number') c.debates = 0;
   if(typeof c.travel!=='number') c.travel = 0;
+  if(typeof c.nextRunAge!=='number') c.nextRunAge = 0;
   if(!Array.isArray(c.events)) c.events = [];
   if(!c.regions) c.regions = {};
   if(typeof c.regions.urban!=='number') c.regions.urban = 50;
@@ -246,6 +419,10 @@ function politicsStartCampaign(officeId){
   if(!office){ flash('Office not found.','warn'); return; }
   if(G.age < office.minAge){ flash(`Need age ${office.minAge}+ for ${office.label}.`,'warn'); return; }
   if(g.campaign.active){ flash('You already have an active campaign.','warn'); return; }
+  if((g.campaign.nextRunAge||0) > G.age){
+    flash(`You must wait ${g.campaign.nextRunAge - G.age} more years before running again.`, 'warn');
+    return;
+  }
   if(g.office.inOffice && g.office.level===office.id && g.office.termsWon>=g.office.termLimit){
     flash(`Term limit reached for ${office.label}.`,'warn');
     return;
@@ -281,6 +458,7 @@ function politicsStartCampaign(officeId){
   g.campaign.ads = 0;
   g.campaign.debates = 0;
   g.campaign.travel = 0;
+  g.campaign.nextRunAge = g.campaign.nextRunAge||0;
   g.campaign.events = [];
   g.campaign.regions = { urban:50, suburban:50, rural:50 };
   g.popularity = g.campaign.popularity;
@@ -290,6 +468,7 @@ function politicsStartCampaign(officeId){
   g.campaigningSkill = clamp((g.campaigningSkill||20) + rnd(2,6));
   addEv(`You launched a ${office.label} campaign via the ${path} path.`, 'love');
   flash(`🗳️ Campaign started: ${office.label}`,'good');
+  politicsFlavorPopup('Campaign HQ Opened', `War room is live. Staff says your ${path} entry path gives you real momentum.`, 'normal');
   renderPolitics();
 }
 
@@ -300,6 +479,7 @@ function politicsSetCampaignFocus(focusId){
   c.focus = focusId;
   c.momentum += rnd(0,2);
   addEv(`Campaign messaging now emphasizes ${focusId}.`, 'good');
+  politicsFlavorPopup('Message Pivot', `Your campaign now centers ${focusId}. Advisors are already reframing talking points.`, 'normal');
   renderPolitics();
 }
 
@@ -309,6 +489,7 @@ function politicsSetCampaignDemo(demoId){
   if(!c.active){ flash('No active campaign.','warn'); return; }
   c.demographic = demoId;
   addEv(`Campaign targeting shifted toward ${demoId}.`, 'good');
+  politicsFlavorPopup('Targeting Updated', `${demoId} voters are now your top persuasion target this week.`, 'normal');
   renderPolitics();
 }
 
@@ -319,6 +500,7 @@ function politicsSetCampaignTone(toneId){
   c.tone = toneId;
   c.scandalRisk = clamp(c.scandalRisk + (toneId==='hardline'?3:toneId==='populist'?2:0) - (toneId==='policy'?1:0));
   addEv(`Speech tone changed to ${toneId}.`, 'warn');
+  politicsFlavorPopup('Tone Shift', `You switched to a ${toneId} tone. Comms team is drafting rapid-response lines.`, 'normal');
   renderPolitics();
 }
 
@@ -350,6 +532,7 @@ function politicsCampaignAction(kind, arg=''){
       c.scandalRisk = clamp(c.scandalRisk + rnd(3,7));
     }
     addEv(`You delivered a ${tone} campaign speech.`, 'good');
+    politicsFlavorPopup('🎤 Rally Crowd Reaction', `The ${tone} speech landed and your staff is clipping highlights for social media.`, 'normal');
   } else if(kind==='ads'){
     const adType = arg || 'positive';
     const spend = rnd(12000,70000);
@@ -363,11 +546,13 @@ function politicsCampaignAction(kind, arg=''){
       c.trust = clamp(c.trust + rnd(1,5));
       c.scandalRisk = clamp(c.scandalRisk + rnd(0,2));
       addEv(`Positive ad campaign aired statewide for ${fmt$(spend)}.`, 'good');
+      politicsFlavorPopup('📺 Ad Buy Complete', `Your positive spots ran in heavy rotation. Poll trackers moved overnight.`, 'normal');
     } else {
       c.popularity = clamp(c.popularity + rnd(2,7));
       c.trust = clamp(c.trust - rnd(1,5));
       c.scandalRisk = clamp(c.scandalRisk + rnd(3,7));
       addEv(`Attack ads launched for ${fmt$(spend)}. They hit hard and polarized voters.`, 'warn');
+      politicsFlavorPopup('🧨 Attack Ad Fallout', 'Your attack ad dominated the cycle. Supporters cheer, undecideds look uneasy.', 'normal');
     }
   } else if(kind==='debate'){
     c.debates++;
@@ -378,12 +563,14 @@ function politicsCampaignAction(kind, arg=''){
       c.trust = clamp(c.trust + rnd(3,7));
       c.momentum += rnd(2,5);
       addEv('Debate win. Your clips spread all week.', 'love');
+      politicsFlavorPopup('🏆 Debate Night', 'Commentators called it your strongest performance yet.', 'normal');
     } else {
       c.popularity = clamp(c.popularity - rnd(4,10));
       c.trust = clamp(c.trust - rnd(2,7));
       c.scandalRisk = clamp(c.scandalRisk + rnd(2,6));
       c.momentum -= rnd(1,4);
       addEv('Debate stumble. Opponents controlled the post-debate narrative.', 'bad');
+      politicsFlavorPopup('😬 Debate Damage', 'Your spin room is in emergency mode trying to contain the clip cycle.', 'dark');
     }
   } else if(kind==='travel'){
     const region = arg || pick(['urban','suburban','rural']);
@@ -395,6 +582,7 @@ function politicsCampaignAction(kind, arg=''){
     c.popularity = clamp(c.popularity + rnd(1,4));
     c.funding = Math.max(0, c.funding - Math.floor(travelCost*0.55));
     addEv(`Campaign travel to ${region} region improved support.`, 'good');
+    politicsFlavorPopup('✈️ Campaign Trail', `You packed ${region} stops into one blitz day. Local press gave full coverage.`, 'normal');
   } else if(kind==='endorsement'){
     const chance = 0.26 + (c.trust/260) + ((G.sm?.totalFame||0)/500) + ((G.career?.reputation||50)/320);
     if(Math.random()<chance){
@@ -404,9 +592,11 @@ function politicsCampaignAction(kind, arg=''){
       c.trust = clamp(c.trust + rnd(2,5));
       c.events.push('endorsement');
       addEv(`A high-profile endorsement landed. Donors added ${fmt$(cash)}.`, 'love');
+      politicsFlavorPopup('🤝 Endorsement Secured', `Power brokers aligned behind you. Finance team logged ${fmt$(cash)} in fresh support.`, 'normal');
     } else {
       c.trust = clamp(c.trust - rnd(1,4));
       addEv('Major endorsement effort failed to convert this week.', 'warn');
+      politicsFlavorPopup('📵 Endorsement Miss', 'Your outreach landed on voicemail. You will need to create your own momentum.', 'dark');
     }
   } else if(kind==='grassroots'){
     const spend = rnd(2000,10000);
@@ -417,12 +607,13 @@ function politicsCampaignAction(kind, arg=''){
     c.popularity = clamp(c.popularity + rnd(1,4));
     c.scandalRisk = clamp(c.scandalRisk - rnd(1,3));
     addEv('Grassroots canvassing expanded volunteer momentum.', 'good');
+    politicsFlavorPopup('✊ Volunteer Surge', 'Neighborhood captains reported higher door-knock conversion than expected.', 'normal');
+  } else if(kind==='event'){
+    politicsElectionEventPopup(true);
+    return;
   }
 
-  g.popularity = c.popularity;
-  g.funding = c.funding;
-  g.trust = c.trust;
-  g.scandalRisk = c.scandalRisk;
+  politicsSyncCampaignMirrors();
   renderPolitics();
 }
 
@@ -496,11 +687,14 @@ function politicsResolveCampaign(){
     }
     addEv(`Election victory: you became ${office.label}.`, 'love');
     flash(`🏛️ Elected ${office.label}`,'good');
+    politicsFlavorPopup('Victory Night', `Confetti cannons, victory speech, and a packed ballroom. You are now ${office.label}.`, 'normal');
   } else {
     g.approval = clamp((g.approval||50) - rnd(1,4));
     g.politicalCapital = clamp((g.politicalCapital||38) + rnd(0,2));
+    g.campaign.nextRunAge = Math.max(g.campaign.nextRunAge||0, G.age + 4);
     addEv(`Election loss for ${office.label}. You remained out of office.`, 'warn');
-    flash('Election lost.','warn');
+    flash('Election lost. 4-year cooldown applied.','warn');
+    politicsFlavorPopup('Election Night Loss', `You lost this race. Campaign laws and donor fatigue force a 4-year wait before running again.`, 'dark');
   }
 
   c.active = false;
@@ -559,6 +753,7 @@ function politicsPassPolicy(policyId){
   if(result==='blocked'){
     g.approval = clamp((g.approval||50) - rnd(2,5));
     addEv(`${p.label} was blocked in the legislature.`, 'warn');
+    politicsFlavorPopup('🏛️ Bill Blocked', `${p.label} never made it through both chambers. Leadership wants concessions.`, 'dark');
     renderPolitics();
     return;
   }
@@ -587,6 +782,7 @@ function politicsPassPolicy(policyId){
   });
 
   addEv(`${p.label} ${result==='pass'?'passed':'passed as a compromise'} in ${g.office.label} office.`, result==='pass'?'good':'warn');
+  politicsFlavorPopup('📜 Policy Outcome', `${p.label} ${result==='pass'?'passed cleanly':'passed as a compromise package'} after hard floor negotiations.`, 'normal');
   renderPolitics();
 }
 
@@ -605,10 +801,12 @@ function politicsDiplomacyAction(kind){
       g.economy = clamp((g.economy||52) + rnd(2,6));
       g.approval = clamp((g.approval||50) + rnd(1,4));
       addEv('Trade deal signed. Markets responded positively.', 'good');
+      politicsFlavorPopup('🌍 Trade Breakthrough', 'A late-night handshake produced a market-moving trade accord.', 'normal');
     } else {
       w.tension = clamp(w.tension + rnd(2,6));
       g.approval = clamp((g.approval||50) - rnd(1,4));
       addEv('Trade talks collapsed publicly.', 'warn');
+      politicsFlavorPopup('📉 Trade Talks Failed', 'Delegations walked away from the table. Currency desks are jittery.', 'dark');
     }
   } else if(kind==='sanction'){
     w.sanctions++;
@@ -617,6 +815,7 @@ function politicsDiplomacyAction(kind){
     g.stability = clamp((g.stability||55) - rnd(1,4));
     g.approval = clamp((g.approval||50) + rnd(-2,2));
     addEv('You imposed sanctions on a rival state.', 'warn');
+    politicsFlavorPopup('⛔ Sanctions Announced', 'Your sanctions package hit headlines before sunrise.', 'normal');
   } else if(kind==='summit'){
     const chance = 0.4 + (g.trust||50)/250 + ((g.campaigningSkill||20)/300);
     if(Math.random()<chance){
@@ -626,9 +825,11 @@ function politicsDiplomacyAction(kind){
       g.stability = clamp((g.stability||55) + rnd(2,6));
       g.approval = clamp((g.approval||50) + rnd(1,4));
       addEv('Diplomatic summit succeeded. Alliance confidence improved.', 'love');
+      politicsFlavorPopup('🕊️ Summit Success', 'Joint statement signed. Allies publicly backed your framework.', 'normal');
     } else {
       w.tension = clamp(w.tension + rnd(2,6));
       addEv('Diplomatic summit ended without agreement.', 'warn');
+      politicsFlavorPopup('🧊 Summit Stalemate', 'No communique, no handshake photo-op. Tensions remain elevated.', 'dark');
     }
   } else if(kind==='military'){
     w.wars += (Math.random()<0.35?1:0);
@@ -636,6 +837,7 @@ function politicsDiplomacyAction(kind){
     g.stability = clamp((g.stability||55) - rnd(2,6));
     g.approval = clamp((g.approval||50) + rnd(-3,4));
     addEv('Military posture escalated regional tensions.', 'warn');
+    politicsFlavorPopup('🪖 Force Posture Raised', 'Generals briefed cameras while diplomats scrambled behind the scenes.', 'dark');
   }
   renderPolitics();
 }
@@ -655,6 +857,7 @@ function politicsSpawnCrisis(){
     age: G.age,
   };
   addEv(`Crisis: ${crisis.label}. National pressure is rising.`, 'bad');
+  politicsFlavorPopup(`🚨 ${crisis.label}`, 'Situation room is activated. The country expects immediate decisions.', 'dark');
 }
 
 function politicsHandleCrisis(response){
@@ -685,6 +888,7 @@ function politicsHandleCrisis(response){
     g.stability = clamp((g.stability||55) + rnd(4,9));
     g.survivalSkill = clamp((g.survivalSkill||20) + rnd(2,6));
     addEv(`Crisis managed successfully with a ${response} response.`, 'love');
+    politicsFlavorPopup('✅ Crisis Contained', `Your ${response} strategy stabilized the situation for now.`, 'normal');
   } else {
     g.crisis.mishandled++;
     g.crisis.lastOutcome = 'mishandled';
@@ -692,6 +896,7 @@ function politicsHandleCrisis(response){
     g.stability = clamp((g.stability||55) - rnd(6,14));
     g.ethics.impeachmentRisk = clamp((g.ethics.impeachmentRisk||4) + rnd(2,7));
     addEv(`Crisis response backfired. Approval and stability dropped.`, 'bad');
+    politicsFlavorPopup('❌ Crisis Mismanaged', `The ${response} plan backfired. Media and opposition are piling on.`, 'dark');
   }
   g.crisis.active = null;
   renderPolitics();
@@ -706,6 +911,7 @@ function politicsEthicsAction(kind){
     e.impeachmentRisk = clamp((e.impeachmentRisk||4) - rnd(2,5));
     g.trust = clamp((g.trust||50) + rnd(2,5));
     addEv('You rejected shady channels and stayed transparent.', 'good');
+    politicsFlavorPopup('🧼 Ethics Call', 'You stayed clean. Short-term costs, long-term credibility.', 'normal');
   } else if(kind==='donation'){
     const boost = rnd(20000,120000);
     e.dirtyMoney += boost;
@@ -717,18 +923,21 @@ function politicsEthicsAction(kind){
       g.politicalCapital = clamp((g.politicalCapital||38) + rnd(2,6));
     }
     addEv(`You accepted questionable donations (+${fmt$(boost)} support).`, 'warn');
+    politicsFlavorPopup('💼 Quiet Donor Dinner', `Support arrived fast. So did questions about who expects favors.`, 'dark');
   } else if(kind==='abuse'){
     e.corruption = clamp((e.corruption||8) + rnd(6,13));
     e.impeachmentRisk = clamp((e.impeachmentRisk||4) + rnd(4,10));
     g.control = clamp((g.control||44) + rnd(2,6));
     g.trust = clamp((g.trust||50) - rnd(4,10));
     addEv('You abused executive power for short-term gains.', 'bad');
+    politicsFlavorPopup('🧩 Power Grab', 'It worked this week. Institutions now watch you far more closely.', 'dark');
   } else if(kind==='coverup'){
     e.coverups = (e.coverups||0) + 1;
     e.corruption = clamp((e.corruption||8) + rnd(4,9));
     e.impeachmentRisk = clamp((e.impeachmentRisk||4) + rnd(5,12));
     g.scandalRisk = clamp((g.scandalRisk||12) - rnd(1,4));
     addEv('You attempted a cover-up. It may buy time, not safety.', 'warn');
+    politicsFlavorPopup('🕳️ Cover-Up Attempt', 'Narrative was contained, but the paper trail is now dangerous.', 'dark');
   }
   renderPolitics();
 }
@@ -744,6 +953,7 @@ function politicsCheckInvestigations(){
     g.trust = clamp((g.trust||50) - rnd(3,8));
     g.approval = clamp((g.approval||50) - rnd(2,7));
     addEv('Investigation opened into your administration.', 'bad');
+    politicsFlavorPopup('🔎 Investigation Opened', 'Prosecutors subpoenaed campaign and office records.', 'dark');
   }
 }
 
@@ -756,6 +966,7 @@ function politicsTryImpeachment(){
   if(trigger < 155 || Math.random()>0.28) return;
 
   addEv('Impeachment proceedings started against your office.', 'bad');
+  politicsFlavorPopup('⚖️ Impeachment Filed', 'The chamber opened proceedings. Every vote now matters.', 'dark');
   const surviveChance = Math.max(0.08, Math.min(0.82,
     0.22 + (g.control||44)/220 + (g.approval||50)/260 - (e.corruption||8)/260 - (e.investigations||0)*0.05
   ));
@@ -764,6 +975,7 @@ function politicsTryImpeachment(){
     g.politicalCapital = clamp((g.politicalCapital||38) - rnd(8,16));
     e.impeachmentRisk = clamp((e.impeachmentRisk||4) - rnd(6,12));
     addEv('You survived impeachment, but support was damaged.', 'warn');
+    politicsFlavorPopup('🛡️ Impeachment Survived', 'You survived removal, but the coalition is bruised.', 'dark');
   } else {
     e.removedByImpeachment = true;
     g.office.inOffice = false;
@@ -779,6 +991,7 @@ function politicsTryImpeachment(){
     }
     addEv('You were removed from office after impeachment.', 'bad');
     flash('Removed from office.','bad');
+    politicsFlavorPopup('⛓️ Removed from Office', 'Your term ended in forced removal. Legal fallout begins immediately.', 'dark');
     politicsFinalizeLegacy('removed');
   }
 }
@@ -821,6 +1034,7 @@ function politicsResolveIncumbentElection(){
     g.approval = clamp((g.approval||50) + rnd(1,5));
     g.politicalCapital = clamp((g.politicalCapital||38) + rnd(3,8));
     addEv(`Reelection victory! You secured another term as ${office.label}.`, 'love');
+    politicsFlavorPopup('🎉 Reelection Win', `Voters returned you to office for another ${office.termYears}-year term.`, 'normal');
   } else {
     addEv(`You lost reelection as ${office.label}.`, 'bad');
     o.inOffice = false;
@@ -828,7 +1042,9 @@ function politicsResolveIncumbentElection(){
     o.label = 'Citizen';
     o.termYear = 0;
     o.nextElectionIn = 0;
+    g.campaign.nextRunAge = Math.max(g.campaign.nextRunAge||0, G.age + 4);
     if(G.legal?.lawyer) G.legal.lawyer.electedOffice = null;
+    politicsFlavorPopup('🗳️ Incumbency Defeated', 'You lost reelection and must wait 4 years before another run.', 'dark');
     politicsFinalizeLegacy('defeated');
   }
 }
@@ -878,7 +1094,8 @@ function processGovernmentYear(){
   }
 
   if(g.campaign.active){
-    if(Math.random()<0.55) politicsCampaignEvent();
+    if(Math.random()<0.45) politicsElectionEventPopup();
+    else if(Math.random()<0.55) politicsCampaignEvent();
     g.campaign.funding = Math.max(0, g.campaign.funding - rnd(8000,26000));
     if(g.campaign.funding<=0){
       g.campaign.trust = clamp(g.campaign.trust - rnd(1,4));
@@ -987,12 +1204,19 @@ function renderPolitics(){
 
   html += `<div class="card">
     <div class="card-title">Run for Office</div>
+    ${(g.campaign.nextRunAge||0)>G.age
+      ? `<div class="notif warn" style="margin-bottom:10px">Election cooldown active: you can run again at age ${g.campaign.nextRunAge}.</div>`
+      : ''
+    }
     <div class="choice-grid">
-      ${POL_OFFICES.map(off=>`<div class="choice" onclick="politicsStartCampaign('${off.id}')">
+      ${POL_OFFICES.map(off=>{
+        const blocked = (g.campaign.nextRunAge||0)>G.age;
+        return `<div class="choice${blocked?' disabled':''}" ${blocked?'':`onclick="politicsStartCampaign('${off.id}')"`}>
         <div class="choice-icon">🗳️</div>
         <div class="choice-name">${off.label}</div>
-        <div class="choice-desc">Age ${off.minAge}+ · launch ~${fmt$(off.launchCost)}</div>
-      </div>`).join('')}
+        <div class="choice-desc">Age ${off.minAge}+ · launch ~${fmt$(off.launchCost)}${blocked?' · cooldown active':''}</div>
+      </div>`;
+      }).join('')}
     </div>
   </div>`;
 
@@ -1018,6 +1242,7 @@ function renderPolitics(){
         <button class="btn btn-ghost btn-sm" onclick="politicsCampaignAction('debate')">🥊 Debate Opponent</button>
         <button class="btn btn-ghost btn-sm" onclick="politicsCampaignAction('travel', pick(['urban','suburban','rural']))">✈️ Campaign Travel</button>
         <button class="btn btn-ghost btn-sm" onclick="politicsCampaignAction('endorsement')">🤝 Seek Endorsement</button>
+        <button class="btn btn-ghost btn-sm" onclick="politicsCampaignAction('event')">🎲 Simulate Election Event</button>
       </div>
       <div style="margin-top:10px">
         <button class="btn btn-primary btn-sm" onclick="politicsResolveCampaign()">🧮 Resolve Election Now</button>

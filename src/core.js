@@ -437,7 +437,7 @@ const G = {
     campaign:{
       active:false, office:'', entryPath:'', focus:'economy', demographic:'working', tone:'unity',
       popularity:35, funding:0, trust:50, scandalRisk:12, momentum:0,
-      speeches:0, ads:0, debates:0, travel:0, events:[],
+      speeches:0, ads:0, debates:0, travel:0, nextRunAge:0, events:[],
       regions:{ urban:50, suburban:50, rural:50 },
     },
     legislature:{ upper:48, lower:49, opposition:52, gridlock:40 },
