@@ -286,6 +286,58 @@ const G = {
     g_league:false,           // sent down to G-League
     twoWay:false,             // two-way contract
   },
+  // mma career
+  mma:{
+    active:false,
+    gymTier:0,
+    discipline:{ bjj:0, wrestling:0, muaythai:0, judo:0, boxing:0 },
+    mmaSkill:0,
+    conditioning:45,
+    fightIQ:40,
+    confidence:50,
+    injuries:[],
+    injured:false,
+    recoveryWeeks:0,
+    trainingSessionsThisYear:0,
+    sparsThisYear:0,
+    compsThisYear:0,
+    officialFightsThisYear:0,
+    amateur:{
+      wins:0, losses:0, draws:0,
+      byKO:0, bySub:0, byDec:0,
+      titleWins:0,
+      log:[],
+    },
+    pro:{
+      isPro:false, org:'regional',
+      wins:0, losses:0, draws:0,
+      byKO:0, bySub:0, byDec:0,
+      streak:0,
+      ranking:0,
+      popularity:18,
+      marketability:25,
+      controversies:0,
+      rivals:[],
+      callouts:0,
+      hype:0,
+      recordLog:[],
+      ufc:{
+        inUFC:false,
+        rank:0,
+        wins:0, losses:0, draws:0,
+        titleShots:0, titleWins:0, titleDefenses:0,
+        interimTitleWins:0,
+        champ:false,
+        interimChamp:false,
+        champWeight:'',
+        champWeight2:'',
+        doubleChampAttempt:false,
+      },
+      weightClass:'Lightweight',
+      purse:12000,
+    },
+    totalEarned:0,
+  },
   // meta
   darkScore:0,
   totalYears:0,
@@ -388,7 +440,11 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
 
   const creatorIncome = Math.max(0, (G.sm.totalRevenue||0) - (totalsAtYearStart.smRevenue||0));
   const actingIncome  = Math.max(0, (G.acting.totalEarned||0) - (totalsAtYearStart.actingEarned||0));
-  const sportsIncome  = Math.max(0, ((G.nfl.totalEarned||0) - (totalsAtYearStart.nflEarned||0)) + ((G.nba.totalEarned||0) - (totalsAtYearStart.nbaEarned||0)));
+  const sportsIncome  = Math.max(0,
+    ((G.nfl.totalEarned||0) - (totalsAtYearStart.nflEarned||0)) +
+    ((G.nba.totalEarned||0) - (totalsAtYearStart.nbaEarned||0)) +
+    ((G.mma?.totalEarned||0) - (totalsAtYearStart.mmaEarned||0))
+  );
   ledger.creatorIncome += creatorIncome;
   ledger.actingIncome  += actingIncome;
   ledger.sportsIncome  += sportsIncome;
@@ -768,6 +824,7 @@ function genFamily(){
 // ── AGE UP ENGINE ────────────────────────────────────────────────
 function ageUp(){
   ensureFinanceShape();
+  if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];
   G.totalYears++;
@@ -778,6 +835,7 @@ function ageUp(){
     actingEarned: G.acting.totalEarned||0,
     nflEarned: G.nfl.totalEarned||0,
     nbaEarned: G.nba.totalEarned||0,
+    mmaEarned: G.mma?.totalEarned||0,
   };
   const yearLedger = {
     wages:0, bonuses:0,
@@ -1299,6 +1357,9 @@ function ageUp(){
   if(G.nba.active && !G.nba.retired){
     nbaSeasonPassive();
   }
+  if(G.mma && (G.mma.active || G.mma.pro?.isPro)){
+    mmaSeasonPassive();
+  }
 
   // ── Fame -> Social Media growth ──────────────────────────────
   const activePlatforms = Object.keys(G.sm.platforms).filter(k=>G.sm.platforms[k].active);
@@ -1306,6 +1367,7 @@ function ageUp(){
     let fameBoost = 0;
     if(G.nfl.active || G.nfl.retired) fameBoost += 1.8;
     if(G.nba.active || G.nba.retired) fameBoost += 1.8;
+    if(G.mma && (G.mma.pro.isPro || G.mma.pro.ufc.inUFC)) fameBoost += 1.5;
     if(G.acting.active) fameBoost += 0.9;
     if(G.sm.music && G.sm.music.active) fameBoost += 1.2;
     if(G.sm.totalFame>=40) fameBoost += 0.6;

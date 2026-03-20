@@ -171,6 +171,33 @@ function beginLife(){
     sneakerDeal:null, sneakerRevenue:0, socialMediaPresence:50, locker_drama:0,
     tradeDemand:false, totalEarned:0, injuryHistory:[], seasonHistory:[], g_league:false, twoWay:false,
   };
+  G.mma = {
+    active:false,
+    gymTier:0,
+    discipline:{ bjj:0, wrestling:0, muaythai:0, judo:0, boxing:0 },
+    mmaSkill:0,
+    conditioning:45,
+    fightIQ:40,
+    confidence:50,
+    injuries:[],
+    injured:false,
+    recoveryWeeks:0,
+    trainingSessionsThisYear:0,
+    sparsThisYear:0,
+    compsThisYear:0,
+    officialFightsThisYear:0,
+    amateur:{ wins:0, losses:0, draws:0, byKO:0, bySub:0, byDec:0, titleWins:0, log:[] },
+    pro:{
+      isPro:false, org:'regional',
+      wins:0, losses:0, draws:0,
+      byKO:0, bySub:0, byDec:0,
+      streak:0, ranking:0, popularity:18, marketability:25, controversies:0,
+      rivals:[], callouts:0, hype:0, recordLog:[],
+      ufc:{ inUFC:false, rank:0, wins:0, losses:0, draws:0, titleShots:0, titleWins:0, titleDefenses:0, interimTitleWins:0, champ:false, interimChamp:false, champWeight:'', champWeight2:'', doubleChampAttempt:false },
+      weightClass:'Lightweight', purse:12000,
+    },
+    totalEarned:0,
+  };
   G.children    = [];
   G.spouse      = null;
   G.marriageYears = 0;
