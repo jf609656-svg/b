@@ -145,7 +145,7 @@ function ensureMMAState(){
 }
 
 function mmaFightCount(){
-  ensureMMAState();
+  if(!G.mma || !G.mma.amateur || !G.mma.pro) return 0;
   const m = G.mma;
   return m.amateur.wins + m.amateur.losses + m.amateur.draws + m.pro.wins + m.pro.losses + m.pro.draws;
 }
@@ -155,7 +155,7 @@ function mmaRecordLine(rec){
 }
 
 function mmaRecalcSkill(){
-  ensureMMAState();
+  if(!G.mma || !G.mma.discipline) return;
   const m = G.mma;
   const d = m.discipline;
   const base = d.bjj*0.2 + d.wrestling*0.24 + d.muaythai*0.2 + d.judo*0.14 + d.boxing*0.22;
