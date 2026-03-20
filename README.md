@@ -8,10 +8,10 @@ Use this standalone hub page to always launch the game from one place and swap/u
 
 ### Live links
 
-- Dev branch hub (this branch):
-  - `https://cdn.jsdelivr.net/gh/jf609656-svg/b@cursor%2Fgame-code-expansion-921c/GameHub.html`
-- Main hub (after merge to main):
-  - `https://cdn.jsdelivr.net/gh/jf609656-svg/b@main/GameHub.html`
+- Dev branch hub (works now):
+  - `https://raw.githack.com/jf609656-svg/b/cursor/game-code-expansion-921c/GameHub.html`
+- Main hub (use after merge to main):
+  - `https://raw.githack.com/jf609656-svg/b/main/GameHub.html`
 
 ### How to use
 
