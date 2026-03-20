@@ -93,6 +93,7 @@ function ensureCrimeShape(){
   if(typeof h.betrayalRisk!=='number') h.betrayalRisk = 0;
   if(typeof h.cooldown!=='number') h.cooldown = 0;
   if(typeof h.totalTake!=='number') h.totalTake = 0;
+  if(!Array.isArray(h.setupPopupSeen)) h.setupPopupSeen = [];
   if(typeof G.crime.currentHeist!=='string' && G.crime.currentHeist!==null) G.crime.currentHeist = null;
 }
 
@@ -338,15 +339,35 @@ const HEIST_BLUEPRINTS = [
         { label:'Forged VIP convoy docking', success:8, risk:8, payout:0.04, casualty:3, heat:4, speed:5, betrayal:3 },
         { label:'Direct armed insertion', success:5, risk:18, payout:0.17, casualty:14, heat:15, speed:17, betrayal:0 },
       ]},
+      { id:'outer_perimeter', title:'Outer perimeter corridor', prompt:'Thermal drones and sniper nests overlap every 40 seconds around the estate ring road.', options:[
+        { label:'Hacker loops thermal feed', success:10, risk:7, payout:0.02, casualty:2, heat:3, speed:3, betrayal:1 },
+        { label:'Driver rushes blind corners', success:7, risk:13, payout:0.05, casualty:7, heat:8, speed:12, betrayal:2 },
+        { label:'Enforcer clears perimeter hard', success:6, risk:16, payout:0.08, casualty:11, heat:12, speed:10, betrayal:0 },
+      ]},
       { id:'estate_core', title:'Estate core', prompt:'Panic vault route forks into trophy room, crypto cold-room, and art wing.', options:[
         { label:'Hit vault and leave art', success:9, risk:9, payout:0.11, casualty:4, heat:7, speed:7, betrayal:0 },
         { label:'Split crew across all wings', success:6, risk:14, payout:0.2, casualty:9, heat:12, speed:11, betrayal:6 },
         { label:'Trigger blackout and ghost path', success:8, risk:7, payout:0.06, casualty:3, heat:5, speed:4, betrayal:2 },
       ]},
+      { id:'data_spine', title:'Data spine raid', prompt:'The island data spine controls off-ledger wallets, art provenance, and shell-company ledgers.', options:[
+        { label:'Clone data and keep moving', success:8, risk:8, payout:0.09, casualty:3, heat:6, speed:6, betrayal:1 },
+        { label:'Ransom the ledgers live', success:6, risk:13, payout:0.16, casualty:6, heat:10, speed:4, betrayal:5 },
+        { label:'Wipe evidence trails only', success:9, risk:6, payout:-0.08, casualty:2, heat:2, speed:5, betrayal:0 },
+      ]},
+      { id:'host_network', title:'Host and guard network', prompt:'Estate hosts are panicking while private militia reorganizes around your last known position.', options:[
+        { label:'Negotiator stabilizes civilians', success:9, risk:7, payout:-0.03, casualty:1, heat:3, speed:-2, betrayal:1 },
+        { label:'Use host panic as smoke', success:6, risk:15, payout:0.11, casualty:10, heat:13, speed:9, betrayal:4 },
+        { label:'Seal corridors and isolate militia', success:8, risk:10, payout:0.04, casualty:5, heat:7, speed:6, betrayal:2 },
+      ]},
       { id:'collapse_window', title:'Collapse window', prompt:'Island lockdown starts in 90 seconds and sea lanes are blocked.', options:[
         { label:'Hold formation and force one lane', success:7, risk:13, payout:0.03, casualty:8, heat:10, speed:10, betrayal:1 },
         { label:'Break into micro-teams', success:8, risk:9, payout:-0.06, casualty:5, heat:6, speed:8, betrayal:7 },
         { label:'Burn decoy yacht extraction', success:6, risk:11, payout:-0.1, casualty:4, heat:5, speed:12, betrayal:0 },
+      ]},
+      { id:'deepwater_exit', title:'Deepwater exfiltration', prompt:'Air patrols lock the north channel while your offshore extraction chain starts collapsing.', options:[
+        { label:'Subsea tunnels to outer reef', success:9, risk:10, payout:0.02, casualty:4, heat:6, speed:7, betrayal:1 },
+        { label:'Hijack coastguard corridor', success:6, risk:16, payout:0.07, casualty:9, heat:12, speed:13, betrayal:3 },
+        { label:'Dump heavy loot for clean exit', success:10, risk:6, payout:-0.14, casualty:2, heat:3, speed:11, betrayal:0 },
       ]},
     ],
   },
@@ -364,6 +385,260 @@ const HEIST_ROLE_NAMES = {
   Demolitions:['Rex Blaster','Tova Fuse','Gage Flint','Milo Charge'],
   'Infiltration Architect':['Lyra Ghost','Cass Ward','Evren Shade','Nina Prism'],
 };
+
+const HEIST_SETUP_POPUPS = [
+  { id:'command_van_rehearsal', icon:'📡', title:'Command Van Rehearsal',
+    text:'Your recon van intercepts a live police dispatch rehearsal that maps likely response routes.',
+    options:[
+      { id:'spoof_dispatch', label:'Inject spoofed dispatch chatter', desc:'Raise confusion but risk forensic traces.', effects:{ planning:5, success:3, risk:1, wanted:2, money:-12000 } },
+      { id:'record_only', label:'Record and study only', desc:'Safer intel extraction, smaller edge.', effects:{ planning:3, success:1, risk:-1 } },
+      { id:'sell_fragment', label:'Sell fragments to another crew', desc:'Quick cash, but leaks your activity.', effects:{ money:26000, wanted:4, betrayal:2 } },
+      { id:'burn_van', label:'Burn the van and reset kit', desc:'Expensive reset that lowers future exposure.', effects:{ money:-24000, risk:-4, wanted:-2 } },
+    ] },
+  { id:'forged_passports', icon:'🛂', title:'Forged Identity Batch',
+    text:'A document broker offers premium passports for setup movement and post-job exits.',
+    options:[
+      { id:'buy_premium', label:'Buy premium identities', desc:'Big expense, cleaner cross-border exits.', effects:{ planning:4, success:2, risk:-3, money:-30000 } },
+      { id:'buy_basic', label:'Buy basic papers', desc:'Affordable but easier to flag.', effects:{ planning:2, risk:1, money:-12000 } },
+      { id:'forge_inhouse', label:'Forge in-house overnight', desc:'Risky speed play with no broker trail.', effects:{ speed:5, risk:3, success:1 } },
+      { id:'skip_docs', label:'Skip documents', desc:'No cost now, harder extraction later.', effects:{ money:0, risk:4, planning:-2 } },
+    ] },
+  { id:'drone_blind_spot', icon:'🛸', title:'Drone Blind Spot Discovered',
+    text:'A mapper finds a 42-second blind spot in aerial surveillance but only at a narrow angle.',
+    options:[
+      { id:'train_window', label:'Train entire crew on the 42s window', desc:'Consistent timing advantage.', effects:{ planning:6, success:2, speed:2, money:-15000 } },
+      { id:'use_once', label:'Use it once for entry only', desc:'Moderate edge with less prep time.', effects:{ planning:3, success:1, speed:4 } },
+      { id:'sell_to_rival', label:'Sell location to a rival buyer', desc:'Take money, lose future stealth edge.', effects:{ money:38000, planning:-3, betrayal:3 } },
+      { id:'ignore_signal', label:'Ignore as unreliable', desc:'No prep spend, no tactical gain.', effects:{ risk:1 } },
+    ] },
+  { id:'bribed_harbormaster', icon:'⚓', title:'Harbormaster Reach-Out',
+    text:'A harbormaster asks for payment to bury docking logs tied to your setup transports.',
+    options:[
+      { id:'pay_full', label:'Pay full hush fee', desc:'Clean records and safer extraction lanes.', effects:{ money:-45000, risk:-4, wanted:-1, planning:2 } },
+      { id:'partial_pay', label:'Pay half and pressure compliance', desc:'Cheaper but unstable loyalty.', effects:{ money:-20000, risk:-1, betrayal:2 } },
+      { id:'blackmail_him', label:'Blackmail instead of paying', desc:'No fee now, exposure if he flips.', effects:{ money:0, risk:3, betrayal:4, closeness:3 } },
+      { id:'walk_away', label:'Walk away', desc:'No cost, logs remain available to investigators.', effects:{ risk:3, closeness:4 } },
+    ] },
+  { id:'signal_jammer', icon:'📶', title:'Signal Jammer Tuning',
+    text:'Your jammer can either blanket comms or run precision bursts around key checkpoints.',
+    options:[
+      { id:'blanket_jam', label:'Blanket jam all channels', desc:'Fast disruption, spikes law-enforcement attention.', effects:{ success:3, speed:4, wanted:4, risk:2 } },
+      { id:'precision_jam', label:'Precision burst protocol', desc:'Lower profile, requires cleaner timing.', effects:{ planning:4, risk:-2, speed:1 } },
+      { id:'dual_stack', label:'Install dual-mode rig', desc:'Strong flexibility with expensive hardware.', effects:{ planning:3, success:2, money:-28000 } },
+      { id:'no_jammer', label:'Save money and skip jammer', desc:'Lower setup spend but weaker control.', effects:{ money:0, risk:3, success:-1 } },
+    ] },
+  { id:'safehouse_leak', icon:'🏚️', title:'Safehouse Leak Rumor',
+    text:'A whisper claims one fallback safehouse is compromised by a surveillance team.',
+    options:[
+      { id:'relocate_all', label:'Relocate all safehouses tonight', desc:'Costly reset that cuts exposure.', effects:{ money:-52000, planning:3, risk:-4, closeness:-2 } },
+      { id:'relocate_one', label:'Move only the flagged house', desc:'Balanced response.', effects:{ money:-18000, risk:-2 } },
+      { id:'plant_decoy', label:'Plant decoy activity', desc:'Can misdirect pressure if executed cleanly.', effects:{ planning:2, success:1, wanted:-1, risk:1 } },
+      { id:'do_nothing', label:'Do nothing', desc:'Save cash, assume rumor is fake.', effects:{ risk:4, betrayal:1 } },
+    ] },
+  { id:'decoy_convoy', icon:'🚚', title:'Decoy Convoy Opportunity',
+    text:'A logistics contact can stage a decoy convoy to split response during setup movement.',
+    options:[
+      { id:'full_convoy', label:'Fund full convoy operation', desc:'Strong misdirection with visible spend.', effects:{ money:-60000, success:3, risk:-3, wanted:1 } },
+      { id:'mini_convoy', label:'Stage a mini convoy', desc:'Partial split, lower cost.', effects:{ money:-22000, success:1, risk:-1 } },
+      { id:'fake_radio_only', label:'Use radio chatter only', desc:'Cheap deception with weaker confidence.', effects:{ money:-6000, planning:1, risk:1 } },
+      { id:'scrap_plan', label:'Scrap convoy plan', desc:'No spend, no response split.', effects:{ speed:1, risk:2 } },
+    ] },
+  { id:'thermic_calibration', icon:'🔥', title:'Thermic Tool Calibration',
+    text:'Your thermic cutter can be tuned for speed or reduced thermal signature.',
+    options:[
+      { id:'fast_cut', label:'Tune for fast breach', desc:'Great tempo, higher heat signature.', effects:{ speed:6, success:2, wanted:3, risk:2 } },
+      { id:'cold_cut', label:'Tune for low signature', desc:'Safer profile, slower operation.', effects:{ risk:-3, speed:-2, planning:2 } },
+      { id:'balanced_cut', label:'Balanced calibration', desc:'Steady performance with moderate cost.', effects:{ speed:2, risk:-1, money:-9000 } },
+      { id:'outsource_cut', label:'Outsource to specialist lab', desc:'High cost, reliable engineering gains.', effects:{ money:-26000, planning:3, success:2, risk:-1 } },
+    ] },
+  { id:'social_engineering', icon:'🎭', title:'Social Engineering Window',
+    text:'A staff social event opens a chance to seed fake credentials and role-play access.',
+    options:[
+      { id:'deep_cover', label:'Run deep-cover operation', desc:'Strong setup edge with burnout pressure.', effects:{ planning:5, success:3, stress:4, money:-14000 } },
+      { id:'quick_hit', label:'Quick credential grab', desc:'Small gains, lower exposure.', effects:{ planning:2, success:1, risk:-1 } },
+      { id:'honey_trap', label:'Use romance leverage', desc:'High upside with betrayal fallout.', effects:{ success:3, betrayal:4, notoriety:2 } },
+      { id:'decline_window', label:'Decline the social play', desc:'Stay clean and keep pace.', effects:{ happy:1, risk:1 } },
+    ] },
+  { id:'encryption_key_auction', icon:'🔐', title:'Encryption Key Auction',
+    text:'An underground auction is selling access keys compatible with your target systems.',
+    options:[
+      { id:'win_auction', label:'Outbid everyone and secure keys', desc:'Reliable access at major cost.', effects:{ money:-90000, success:4, planning:4, risk:-2 } },
+      { id:'snipe_fragments', label:'Buy partial key fragments', desc:'Cheaper but uncertain integration.', effects:{ money:-34000, success:2, planning:2, risk:1 } },
+      { id:'steal_keys', label:'Steal keys from bidders', desc:'No auction cost, high detection chance.', effects:{ money:-5000, success:3, wanted:4, risk:3 } },
+      { id:'walk_auction', label:'Skip auction entirely', desc:'Rely on existing tools only.', effects:{ planning:-1, risk:2 } },
+    ] },
+  { id:'rogue_crew_contact', icon:'🧨', title:'Rogue Crew Contact',
+    text:'A known rogue operator offers insider data in exchange for a guaranteed post-heist cut.',
+    options:[
+      { id:'take_deal', label:'Take deal and promise a cut', desc:'Useful intel with betrayal tax.', effects:{ success:4, planning:2, betrayal:5 } },
+      { id:'pay_cash', label:'Pay cash up front instead', desc:'Lower betrayal, higher burn.', effects:{ money:-48000, success:3, betrayal:1 } },
+      { id:'double_cross', label:'Take intel and plan to stiff them', desc:'Short-term gain, long-term heat.', effects:{ success:2, betrayal:6, wanted:3, notoriety:3 } },
+      { id:'decline_contact', label:'Decline contact', desc:'No volatility, no extra edge.', effects:{ happy:1, planning:0 } },
+    ] },
+  { id:'weather_window', icon:'🌧️', title:'Weather Window Shift',
+    text:'Forecast flips from clear skies to hard rain during your expected setup movement.',
+    options:[
+      { id:'delay_ops', label:'Delay setup movement', desc:'Safer passage but slower momentum.', effects:{ risk:-3, speed:-4, planning:2 } },
+      { id:'push_through', label:'Push through storm anyway', desc:'Maintains pace, raises mishap risk.', effects:{ speed:5, risk:3, health:-2 } },
+      { id:'buy_weather_cover', label:'Buy weather-rated gear and transport', desc:'Expensive but controlled.', effects:{ money:-36000, risk:-2, success:2 } },
+      { id:'split_routes', label:'Split setup routes by weather cell', desc:'Reduces single-point failure, coordination strain.', effects:{ planning:3, betrayal:2, risk:-1 } },
+    ] },
+  { id:'blackout_drill', icon:'💡', title:'Blackout Drill',
+    text:'A utility engineer can trigger a test blackout matching your setup infiltration window.',
+    options:[
+      { id:'full_blackout', label:'Trigger full district blackout', desc:'Large tactical edge, massive attention.', effects:{ success:4, speed:3, wanted:5, closeness:4 } },
+      { id:'micro_blackout', label:'Trigger micro-grid dip only', desc:'Lower profile but narrower timing.', effects:{ planning:3, risk:-1, money:-14000 } },
+      { id:'simulate_fault', label:'Simulate random fault', desc:'Moderate gain with technical uncertainty.', effects:{ success:2, risk:1, planning:1 } },
+      { id:'cancel_blackout', label:'Cancel blackout option', desc:'No utility leverage.', effects:{ risk:1 } },
+    ] },
+  { id:'counterfeit_badges', icon:'🪪', title:'Counterfeit Badge Shipment',
+    text:'A batch of counterfeit security badges arrives with mixed quality and traceability.',
+    options:[
+      { id:'use_best_badges', label:'Use only top-grade badges', desc:'Reduced risk, leave quantity on table.', effects:{ risk:-3, planning:2, money:-11000 } },
+      { id:'use_all_badges', label:'Use the whole shipment', desc:'More access points, higher detection tail.', effects:{ success:3, risk:2, wanted:2 } },
+      { id:'reprint_batch', label:'Reprint the full badge set', desc:'Strong consistency with print cost.', effects:{ money:-25000, planning:3, success:2 } },
+      { id:'ditch_badges', label:'Ditch badges and use force route', desc:'No disguise dependency.', effects:{ speed:3, risk:3, casualty:2 } },
+    ] },
+  { id:'insider_double_agent', icon:'🕵️', title:'Insider Loyalty Shock',
+    text:'Your inside asset may be feeding both sides. You can test loyalty or proceed fast.',
+    options:[
+      { id:'run_loyalty_test', label:'Run a loyalty test operation', desc:'Slower but reduces betrayal variance.', effects:{ planning:4, betrayal:-3, speed:-2, money:-17000 } },
+      { id:'pay_retainer', label:'Pay retainer to lock loyalty', desc:'Bribe to stabilize the insider.', effects:{ money:-42000, betrayal:-4, success:2 } },
+      { id:'threaten_asset', label:'Threaten asset into compliance', desc:'Immediate control, volatile trust.', effects:{ success:2, betrayal:4, risk:2 } },
+      { id:'cut_asset_out', label:'Cut insider out entirely', desc:'Less betrayal path, weaker targeting.', effects:{ betrayal:-1, success:-2, risk:1 } },
+    ] },
+];
+
+function heistPopupById(id){
+  return HEIST_SETUP_POPUPS.find(p=>p.id===id) || null;
+}
+
+function heistSetupPopupImpactText(effects){
+  const out = [];
+  if(typeof effects.planning==='number' && effects.planning!==0) out.push(`Plan ${effects.planning>0?'+':''}${effects.planning}`);
+  if(typeof effects.success==='number' && effects.success!==0) out.push(`Exec ${effects.success>0?'+':''}${effects.success}`);
+  if(typeof effects.risk==='number' && effects.risk!==0) out.push(`Risk ${effects.risk>0?'+':''}${effects.risk}`);
+  if(typeof effects.speed==='number' && effects.speed!==0) out.push(`Speed ${effects.speed>0?'+':''}${effects.speed}`);
+  if(typeof effects.betrayal==='number' && effects.betrayal!==0) out.push(`Betrayal ${effects.betrayal>0?'+':''}${effects.betrayal}`);
+  if(typeof effects.wanted==='number' && effects.wanted!==0) out.push(`Heat ${effects.wanted>0?'+':''}${effects.wanted}`);
+  if(typeof effects.closeness==='number' && effects.closeness!==0) out.push(`Police ${effects.closeness>0?'+':''}${effects.closeness}`);
+  if(typeof effects.money==='number' && effects.money!==0) out.push(`${effects.money>=0?'Cash +':'Cost '}${fmt$(Math.abs(effects.money))}`);
+  if(typeof effects.notoriety==='number' && effects.notoriety!==0) out.push(`Notoriety ${effects.notoriety>0?'+':''}${effects.notoriety}`);
+  return out.join(' · ') || 'Minor flavor outcome';
+}
+
+function heistMaybeOpenSetupPopup(bp, setup, setupSucceeded){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active || active.stage!=='setup') return false;
+  const seen = G.crime.heists.setupPopupSeen || [];
+  const unseen = HEIST_SETUP_POPUPS.filter(p=>!seen.includes(p.id));
+  const mustShow = unseen.length>0;
+  const triggerChance = setupSucceeded ? 0.96 : 0.72;
+  if(!mustShow && Math.random() > triggerChance) return false;
+  if(mustShow && Math.random() > triggerChance) return false;
+
+  const popup = pick(unseen.length ? unseen : HEIST_SETUP_POPUPS);
+  if(!popup) return false;
+  if(!seen.includes(popup.id)) seen.push(popup.id);
+  G.crime.heists.setupPopupSeen = seen.slice(-30);
+  active.pendingSetupPopup = { popupId:popup.id, setupId:setup.id, heistId:bp.id };
+
+  const optionsHtml = popup.options.map((opt, idx)=>`
+    <button class="heist-popup-option" onclick="heistResolveSetupPopupChoice('${popup.id}','${opt.id}')">
+      <div class="heist-popup-option-top">
+        <span class="heist-popup-option-index">${idx+1}</span>
+        <span class="heist-popup-option-label">${opt.label}</span>
+      </div>
+      <div class="heist-popup-option-desc">${opt.desc}</div>
+      <div class="heist-popup-impact">${heistSetupPopupImpactText(opt.effects||{})}</div>
+    </button>
+  `).join('');
+  const html = `
+    <div class="heist-popup-shell">
+      <div class="heist-popup-head">
+        <div class="heist-popup-icon">${popup.icon}</div>
+        <div>
+          <div class="heist-popup-kicker">SETUP EVENT · ${bp.label}</div>
+          <div class="heist-popup-title">${popup.title}</div>
+        </div>
+      </div>
+      <div class="heist-popup-copy">${popup.text}</div>
+      <div class="heist-popup-meta">
+        Triggered by setup: <strong>${setup.label}</strong> · ${setupSucceeded?'Setup succeeded':'Setup failed'} · Scroll options below
+      </div>
+      <div class="heist-popup-scroll">
+        ${optionsHtml}
+      </div>
+    </div>
+  `;
+  showPopupHTML(
+    `${popup.icon} Heist Setup Event`,
+    html,
+    [{ label:'Ignore Event', cls:'btn-ghost', onClick:()=>heistResolveSetupPopupChoice(popup.id, '__ignore') }],
+    'dark'
+  );
+  return true;
+}
+
+function heistResolveSetupPopupChoice(popupId, optionId){
+  ensureCrimeShape();
+  const overlay = document.getElementById('popup-overlay');
+  const active = G.crime.heists.active;
+  if(!active){
+    if(overlay) overlay.style.display = 'none';
+    return;
+  }
+  const pending = active.pendingSetupPopup || null;
+  const popup = heistPopupById(popupId);
+  if(!popup || !pending || pending.popupId!==popupId){
+    if(overlay) overlay.style.display = 'none';
+    return;
+  }
+  if(optionId==='__ignore'){
+    active.pendingSetupPopup = null;
+    active.setupEffects.risk = (active.setupEffects.risk||0) + 1;
+    addCrimeEv(`Ignored setup event: ${popup.title}.`, 'warn');
+    addEv(`You ignored a setup opportunity (${popup.title}).`, 'warn');
+    if(overlay) overlay.style.display = 'none';
+    heistRecalcScores();
+    updateHUD();
+    renderCrime();
+    return;
+  }
+
+  const choice = popup.options.find(o=>o.id===optionId);
+  if(!choice){
+    if(overlay) overlay.style.display = 'none';
+    return;
+  }
+  const fx = choice.effects || {};
+  if(typeof fx.money==='number' && fx.money<0 && G.money < Math.abs(fx.money)){
+    flash(`Need ${fmt$(Math.abs(fx.money))} for this setup response.`, 'warn');
+    return;
+  }
+
+  ['planning','success','risk','payout','heat','casualty','betrayal','speed'].forEach(k=>{
+    if(typeof fx[k]==='number'){
+      active.setupEffects[k] = (active.setupEffects[k]||0) + fx[k];
+    }
+  });
+  if(typeof fx.money==='number') G.money = Math.max(0, G.money + fx.money);
+  if(typeof fx.wanted==='number') G.crime.heat = Math.max(0, Math.min(100, G.crime.heat + fx.wanted));
+  if(typeof fx.closeness==='number') G.crime.police.closeness = Math.max(0, Math.min(100, G.crime.police.closeness + fx.closeness));
+  if(typeof fx.notoriety==='number') G.crime.notoriety = clamp((G.crime.notoriety||0) + fx.notoriety);
+  if(typeof fx.stress==='number') G.stress = clamp((G.stress||35) + fx.stress);
+  if(typeof fx.happy==='number') G.happy = clamp((G.happy||50) + fx.happy);
+  if(typeof fx.health==='number') G.health = clamp((G.health||50) + fx.health);
+
+  active.pendingSetupPopup = null;
+  addCrimeEv(`Setup event resolved: ${popup.title} -> ${choice.label}.`, fx.risk>0 || fx.wanted>0 ? 'warn' : 'good');
+  addEv(`${popup.title}: ${choice.label}.`, fx.risk>0 || fx.wanted>0 ? 'warn' : 'good');
+  if(overlay) overlay.style.display = 'none';
+  heistRecalcScores();
+  updateHUD();
+  renderCrime();
+}
 
 function renderCrime(){
   ensureCrimeShape();
@@ -1119,6 +1394,7 @@ function heistDoSetup(setupId){
   heistRecalcScores();
   updateHUD();
   renderCrime();
+  heistMaybeOpenSetupPopup(bp, setup, success);
 }
 
 function heistOpenHire(role){
