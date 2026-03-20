@@ -206,6 +206,13 @@ const G = {
     stockValue:0,
     benefits:{ healthPlan:false, retirement:false },
     milestones:[],
+    track:'specialist',
+    influence:45,
+    burnout:12,
+    layoffShield:20,
+    certifications:[],
+    careerActionsUsed:0,
+    trackCooldown:0,
     medSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false },
     lawSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false },
     licenses:{ medical:false, law:false },
@@ -583,6 +590,42 @@ function ensureSimShape(){
   if(!Array.isArray(d.history)) d.history = [];
 }
 
+function ensureCareerShape(){
+  if(!G.career) G.career = {};
+  if(typeof G.career.employed!=='boolean') G.career.employed = false;
+  if(typeof G.career.jobId!=='string') G.career.jobId = null;
+  if(typeof G.career.title!=='string') G.career.title = '';
+  if(typeof G.career.company!=='string') G.career.company = '';
+  if(typeof G.career.salary!=='number') G.career.salary = 0;
+  if(typeof G.career.level!=='number') G.career.level = 0;
+  if(typeof G.career.years!=='number') G.career.years = 0;
+  if(typeof G.career.performance!=='number') G.career.performance = 50;
+  if(typeof G.career.reputation!=='number') G.career.reputation = 50;
+  if(typeof G.career.hrRisk!=='number') G.career.hrRisk = 0;
+  if(typeof G.career.fired!=='boolean') G.career.fired = false;
+  if(typeof G.career.bonusRate!=='number') G.career.bonusRate = 0;
+  if(typeof G.career.stockUnits!=='number') G.career.stockUnits = 0;
+  if(typeof G.career.stockValue!=='number') G.career.stockValue = 0;
+  if(!G.career.benefits) G.career.benefits = { healthPlan:false, retirement:false };
+  if(typeof G.career.benefits.healthPlan!=='boolean') G.career.benefits.healthPlan = false;
+  if(typeof G.career.benefits.retirement!=='boolean') G.career.benefits.retirement = false;
+  if(!Array.isArray(G.career.milestones)) G.career.milestones = [];
+  if(typeof G.career.track!=='string') G.career.track = 'specialist';
+  if(typeof G.career.influence!=='number') G.career.influence = 45;
+  if(typeof G.career.burnout!=='number') G.career.burnout = 12;
+  if(typeof G.career.layoffShield!=='number') G.career.layoffShield = 20;
+  if(!Array.isArray(G.career.certifications)) G.career.certifications = [];
+  if(typeof G.career.careerActionsUsed!=='number') G.career.careerActionsUsed = 0;
+  if(typeof G.career.trackCooldown!=='number') G.career.trackCooldown = 0;
+  if(!Array.isArray(G.career.coworkers)) G.career.coworkers = [];
+  if(!G.career.medSchool) G.career.medSchool = { enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false };
+  if(!G.career.lawSchool) G.career.lawSchool = { enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false };
+  if(!G.career.licenses) G.career.licenses = { medical:false, law:false };
+  G.career.influence = clamp(G.career.influence);
+  G.career.burnout = clamp(G.career.burnout);
+  G.career.layoffShield = clamp(G.career.layoffShield);
+}
+
 function runDirectorYearPass(){
   ensureSimShape();
   const d = G.sim.director;
@@ -657,6 +700,7 @@ function replaceGameState(state){
   ensureFinanceShape();
   ensureGovLegalShape();
   ensureSimShape();
+  ensureCareerShape();
   if(typeof ensureMMAState==='function') ensureMMAState();
   if(typeof ensurePetState==='function') ensurePetState();
   if(!Array.isArray(G.pets)) G.pets = [];
@@ -1461,6 +1505,7 @@ function ageUp(){
   ensureFinanceShape();
   ensureGovLegalShape();
   ensureSimShape();
+  ensureCareerShape();
   if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];
@@ -1480,6 +1525,7 @@ function ageUp(){
     rentPaid:0, mortgagePaid:0, utilitiesPaid:0, upkeepPaid:0, debtInterest:0, propertyTax:0,
     retirementContrib:0,
   };
+  if((G.career.trackCooldown||0)>0) G.career.trackCooldown = Math.max(0, G.career.trackCooldown-1);
 
   // ── Passive stat drift ───────────────────────────────────────
   if(a>40) G.health = clamp(G.health - rnd(0,2));
@@ -1780,30 +1826,74 @@ function ageUp(){
     c.years++;
     c.performance = clamp(c.performance + rnd(-4,6));
     c.reputation = clamp(c.reputation + rnd(-2,3));
+    c.influence = clamp((c.influence||45) + rnd(-3,5));
+    c.burnout = clamp((c.burnout||12) + rnd(2,7));
+    c.careerActionsUsed = 0;
     if(c.salary>0) addEv(`Annual salary received: ${fmt$(c.salary)} from ${c.company}.`, 'good');
-    G.stress = clamp(G.stress + rnd(1,4) + (c.hrRisk>=60?2:0) - (c.performance>=78?1:0));
+    G.stress = clamp(G.stress + rnd(1,4) + (c.hrRisk>=60?2:0) + ((c.burnout||12)>=70?2:0) - (c.performance>=78?1:0));
 
     // coworker drift
     c.coworkers.forEach(w=>{ w.relation = clamp(w.relation + rnd(-2,4)); });
+    const avgCoworkerRel = c.coworkers.length ? c.coworkers.reduce((acc,w)=>acc + (w.relation||50),0)/c.coworkers.length : 50;
+    c.influence = clamp(c.influence + Math.floor((avgCoworkerRel-50)/20));
+    c.layoffShield = clamp(
+      (c.layoffShield||20)
+      + (c.performance>=75 ? rnd(1,3) : c.performance<45 ? -rnd(1,3) : 0)
+      + (c.certifications?.length||0)
+    );
+
+    // Layoff waves are separate from HR issues.
+    const layoffWave = Math.random()<0.18 ? rnd(55,95) : rnd(6,48);
+    const layoffRiskScore = clamp(
+      layoffWave
+      + Math.floor((c.burnout||12)/4)
+      + Math.floor(c.hrRisk/2)
+      - Math.floor(c.performance/2)
+      - Math.floor((c.influence||45)/2.2)
+      - Math.floor((c.layoffShield||20)/1.7)
+    );
+    if(layoffWave>=70 && Math.random()<0.35){
+      addEv(`Layoff wave hit ${c.company}. Teams were cut aggressively.`, 'warn');
+    }
+    if(layoffRiskScore>=65 && Math.random()<Math.min(0.45, layoffRiskScore/180)){
+      addEv(`Restructuring at ${c.company} eliminated your role. You were laid off.`, 'bad');
+      flash('Laid off in restructuring.','bad');
+      c.employed = false; c.fired = true; c.jobId=null; c.title=''; c.company=''; c.salary=0; c.level=0; c.years=0;
+      c.coworkers=[]; c.boss=null; c.hrRisk=18; c.burnout = clamp((c.burnout||12) - rnd(6,14));
+    }
 
     // Promotion chance
-    const nextLevel = JOB_LEVELS[c.level+1];
-    if(nextLevel && c.years >= nextLevel.minYears && c.performance>=70 && Math.random()<0.35){
-      c.level++;
-      const old = c.salary;
-      c.salary = Math.floor(c.salary * (nextLevel.payMult/JOB_LEVELS[c.level-1].payMult));
-      c.milestones.push({ year:G.age, text:`Promoted to ${JOB_LEVELS[c.level].label}` });
-      addEv(`Promotion! You advanced to ${JOB_LEVELS[c.level].label} level. Salary: ${fmt$(c.salary)}/yr.`, 'good');
-      flash('📈 Promoted!','good');
+    const nextLevel = c.employed ? JOB_LEVELS[c.level+1] : null;
+    if(nextLevel){
+      const certBonus = Math.min(3, (c.certifications?.length||0));
+      const requiredYears = Math.max(1, nextLevel.minYears - certBonus - (c.track==='managerial'?1:0));
+      let promoChance = 0.16
+        + (c.performance-65)/220
+        + (c.reputation-50)/280
+        + (c.influence-45)/240
+        + certBonus*0.02;
+      if(c.track==='managerial') promoChance += 0.05;
+      if(c.track==='specialist' && ['senior','lead'].includes(nextLevel.id)) promoChance += 0.05;
+      if(c.track==='executive' && nextLevel.id==='exec') promoChance += 0.08;
+      promoChance = Math.max(0.05, Math.min(0.62, promoChance));
+      if(c.years >= requiredYears && c.performance>=68 && Math.random()<promoChance){
+        c.level++;
+        c.salary = Math.floor(c.salary * (nextLevel.payMult/JOB_LEVELS[c.level-1].payMult));
+        c.milestones.push({ year:G.age, text:`Promoted to ${JOB_LEVELS[c.level].label}` });
+        c.influence = clamp((c.influence||45) + rnd(4,10));
+        c.layoffShield = clamp((c.layoffShield||20) + rnd(2,6));
+        addEv(`Promotion! You advanced to ${JOB_LEVELS[c.level].label} level. Salary: ${fmt$(c.salary)}/yr.`, 'good');
+        flash('📈 Promoted!','good');
+      }
     }
 
     // HR risk consequences
-    if(c.hrRisk>75 && Math.random()<0.35){
+    if(c.employed && c.hrRisk>75 && Math.random()<0.35){
       addEv(`HR opened an investigation at ${c.company}. It did not go well. You were fired.`, 'bad');
       flash('Fired. HR investigation.','bad');
       c.employed = false; c.fired = true; c.jobId=null; c.title=''; c.company=''; c.salary=0; c.level=0; c.years=0;
-      c.coworkers=[]; c.boss=null; c.hrRisk=30;
-    } else if(c.hrRisk>55 && Math.random()<0.25){
+      c.coworkers=[]; c.boss=null; c.hrRisk=30; c.burnout = clamp((c.burnout||12) - rnd(6,14));
+    } else if(c.employed && c.hrRisk>55 && Math.random()<0.25){
       c.hrRisk = clamp(c.hrRisk - rnd(8,16));
       addEv('HR gave you a formal warning. You toed the line. For now.', 'warn');
     }

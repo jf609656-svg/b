@@ -621,6 +621,10 @@ const JOBS = [
   { id:'marketing',  title:'Marketing Assistant',tier:'entry', minAge:18, minEdu:'college', basePay:42000, degrees:['Business','Journalism','Film & Media'] },
   { id:'jdev',       title:'Junior Developer',   tier:'entry', minAge:18, minEdu:'college', basePay:60000, degrees:['Computer Science','Engineering','Mathematics'] },
   { id:'analyst',    title:'Business Analyst',   tier:'entry', minAge:18, minEdu:'college', basePay:52000, degrees:['Business','Economics','Finance'] },
+  { id:'data_analyst',title:'Data Analyst',       tier:'entry', minAge:21, minEdu:'college', basePay:61000, degrees:['Computer Science','Mathematics','Economics','Physics'], certsPreferred:['data'] },
+  { id:'ux_researcher',title:'UX Researcher',     tier:'entry', minAge:21, minEdu:'college', basePay:64000, degrees:['Psychology','Arts','Film & Media','Computer Science'] },
+  { id:'policy_aide', title:'Policy Aide',        tier:'entry', minAge:21, minEdu:'college', basePay:50000, degrees:['Political Science','Economics','Law','Public Health'] },
+  { id:'lab_tech',    title:'Lab Technician',     tier:'entry', minAge:21, minEdu:'college', basePay:54000, degrees:['Biology','Medicine','Public Health'] },
   { id:'teacher',    title:'Teacher',            tier:'entry', minAge:22, minEdu:'college', basePay:43000, degrees:['Education','Psychology','Arts'] },
   { id:'nurse',      title:'Registered Nurse',   tier:'entry', minAge:22, minEdu:'college', basePay:62000, degrees:['Nursing'] },
 
@@ -630,16 +634,29 @@ const JOBS = [
   { id:'accountant', title:'Accountant',         tier:'mid',   minAge:22, minEdu:'college', basePay:68000, degrees:['Business','Finance','Economics'] },
   { id:'manager',    title:'HR Manager',         tier:'mid',   minAge:24, minEdu:'college', basePay:74000, degrees:['Business','Psychology','Education'] },
   { id:'architect',  title:'Architect',          tier:'mid',   minAge:24, minEdu:'college', basePay:82000, degrees:['Architecture'] },
+  { id:'data_engineer',title:'Data Engineer',    tier:'mid',   minAge:24, minEdu:'college', basePay:112000,degrees:['Computer Science','Engineering','Mathematics','Physics'], certsPreferred:['cloud','data'], track:'specialist' },
+  { id:'cyber_analyst',title:'Cybersecurity Analyst', tier:'mid', minAge:23, minEdu:'college', basePay:106000,degrees:['Computer Science','Engineering','Mathematics'], certsPreferred:['cloud'], track:'specialist' },
+  { id:'biotech_engineer',title:'Biotech Engineer', tier:'mid', minAge:24, minEdu:'college', basePay:98000,degrees:['Biology','Engineering','Medicine','Public Health'], track:'specialist' },
+  { id:'supply_manager',title:'Supply Chain Manager', tier:'mid', minAge:24, minEdu:'college', basePay:92000,degrees:['Business','Economics','Engineering'], certsPreferred:['pmp'], track:'managerial' },
+  { id:'renewable_analyst',title:'Renewable Energy Analyst', tier:'mid', minAge:23, minEdu:'college', basePay:94000,degrees:['Engineering','Physics','Economics'], certsPreferred:['data'], track:'specialist' },
+  { id:'game_designer',title:'Game Designer',    tier:'mid',   minAge:22, minEdu:'college', basePay:88000,degrees:['Computer Science','Arts','Film & Media'], track:'specialist' },
 
   // senior
   { id:'swe_s',      title:'Senior Engineer',    tier:'senior',minAge:26, minEdu:'college', basePay:120000,degrees:['Computer Science','Engineering','Mathematics','Physics'] },
   { id:'pm',         title:'Product Manager',    tier:'senior',minAge:26, minEdu:'college', basePay:130000,degrees:['Business','Computer Science','Engineering'] },
   { id:'fin_mgr',    title:'Finance Manager',    tier:'senior',minAge:26, minEdu:'college', basePay:115000,degrees:['Finance','Economics','Business'] },
   { id:'principal',  title:'School Principal',   tier:'senior',minAge:30, minEdu:'college', basePay:98000, degrees:['Education','Psychology'] },
+  { id:'ai_engineer',title:'AI/ML Engineer',     tier:'senior',minAge:26, minEdu:'college', basePay:158000,degrees:['Computer Science','Mathematics','Physics','Engineering'], certsPreferred:['cloud','data'], track:'specialist' },
+  { id:'product_mkt_mgr',title:'Product Marketing Manager', tier:'senior', minAge:27, minEdu:'college', basePay:128000,degrees:['Business','Journalism','Film & Media','Economics'], certsPreferred:['pmp'], track:'managerial' },
+  { id:'risk_analyst',title:'Risk Analyst',      tier:'senior',minAge:27, minEdu:'college', basePay:142000,degrees:['Finance','Economics','Mathematics','Physics'], certsPreferred:['finance','data'], track:'specialist' },
+  { id:'strategy_consultant',title:'Strategy Consultant', tier:'senior', minAge:27, minEdu:'college', basePay:150000,degrees:['Business','Economics','Engineering','Political Science'], certsPreferred:['pmp','finance'], track:'managerial' },
+  { id:'clinical_psych',title:'Clinical Psychologist', tier:'senior', minAge:27, minEdu:'college', basePay:118000,degrees:['Psychology','Public Health','Biology'], track:'specialist' },
 
   // executive / elite
   { id:'director',   title:'Director',           tier:'exec',  minAge:32, minEdu:'college', basePay:170000,degrees:[] },
   { id:'vp',         title:'VP / Executive',     tier:'exec',  minAge:35, minEdu:'college', basePay:230000,degrees:[] },
+  { id:'chief_staff',title:'Chief of Staff',     tier:'exec',  minAge:32, minEdu:'college', basePay:215000,degrees:['Business','Political Science','Economics','Law'], certsPreferred:['pmp'], track:'executive' },
+  { id:'ops_exec',   title:'Operations Executive',tier:'exec', minAge:34, minEdu:'college', basePay:245000,degrees:['Business','Engineering','Economics'], certsPreferred:['pmp','finance'], track:'executive' },
   { id:'ib',         title:'Investment Banker',  tier:'elite', minAge:24, minEdu:'college', basePay:160000,degrees:['Finance','Economics','Business','Mathematics'] },
   { id:'quant',      title:'Quant Analyst',      tier:'elite', minAge:24, minEdu:'college', basePay:190000,degrees:['Mathematics','Physics','Computer Science'] },
 
