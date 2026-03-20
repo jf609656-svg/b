@@ -244,6 +244,8 @@ function jobAction(targetName, action){
 }
 
 function jobSpecial(action){
+  ensureAdvancedFinanceState();
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   const c = G.career;
   if(!c.employed){ flash('No job right now.','warn'); return; }
   const job = JOBS.find(j=>j.id===c.jobId) || {};
@@ -254,11 +256,24 @@ function jobSpecial(action){
     c.reputation = clamp(c.reputation + rnd(6,12));
     G.happy = clamp(G.happy + rnd(4,8));
     G.stress = clamp((G.stress||35) + rnd(1,4));
+    if(G.legal && G.legal.lawyer){
+      G.legal.lawyer.casesWon++;
+      G.legal.lawyer.profile = clamp(G.legal.lawyer.profile + rnd(3,7));
+      // Occasionally resolve an open legal issue if you're a strong lawyer.
+      if(G.legal.lawsuits.length && Math.random()<0.3){
+        const s = G.legal.lawsuits.shift();
+        addEv(`Your legal expertise helped clear a pending ${s.kind}.`, 'good');
+      }
+    }
     addEv('You won a major case. Your name carried weight afterward.','love');
   } else if(action==='settlement'){
     const bonus = Math.floor(c.salary * 0.06);
     G.money += bonus;
     c.performance = clamp(c.performance + rnd(4,8));
+    if(G.legal && G.legal.lawyer){
+      G.legal.lawyer.settlements++;
+      G.legal.lawyer.profile = clamp(G.legal.lawyer.profile + rnd(2,5));
+    }
     addEv(`You negotiated a settlement. Bonus: ${fmt$(bonus)}.`, 'good');
   } else if(action==='surgery'){
     c.performance = clamp(c.performance + rnd(8,14));
@@ -293,6 +308,19 @@ function jobSpecial(action){
   } else if(action==='press'){
     G.sm.totalFame = clamp(G.sm.totalFame + rnd(1,4));
     addEv('You got featured in a trade publication. Small fame boost.','good');
+  } else if(action==='constitutional'){
+    c.performance = clamp(c.performance + rnd(6,12));
+    c.reputation = clamp(c.reputation + rnd(6,11));
+    G.legal.lawyer.profile = clamp((G.legal.lawyer.profile||20) + rnd(5,10));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    addEv('You argued a constitutional challenge. It raised your legal profile nationally.', 'love');
+  } else if(action==='public_defense'){
+    c.performance = clamp(c.performance + rnd(4,9));
+    c.reputation = clamp(c.reputation + rnd(3,8));
+    G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) + rnd(3,8));
+    G.legal.lawyer.profile = clamp((G.legal.lawyer.profile||20) + rnd(2,6));
+    addEv('You took a demanding public defense case. Heavy work, meaningful impact.', 'good');
   }
 
   updateHUD(); renderJobs();
@@ -583,6 +611,84 @@ function businessAction(action){
   renderJobs();
 }
 
+function legalGovAction(action){
+  ensureAdvancedFinanceState();
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
+  const L = G.legal;
+  const gov = G.gov;
+  const lw = L.lawyer;
+  const isLawPro = !!(G.career.licenses?.law || ['attorney','in_house','partner','judge'].includes(G.career.jobId));
+
+  if(action==='pay_fine'){
+    if(L.finesDue<=0){ flash('No legal fines due.','warn'); return; }
+    const amt = Math.min(L.finesDue, Math.max(500, Math.floor(G.money*0.4)));
+    if(G.money<amt){ flash('Not enough cash to pay fine.','warn'); return; }
+    G.money -= amt;
+    L.finesDue -= amt;
+    G.stress = clamp((G.stress||35) - rnd(2,6));
+    addEv(`Paid legal fines: ${fmt$(amt)}. Remaining: ${fmt$(L.finesDue)}.`, 'good');
+  } else if(action==='defend_self'){
+    if(!L.lawsuits.length){ flash('No active lawsuits to defend.','warn'); return; }
+    const caseItem = L.lawsuits[0];
+    const prepCost = rnd(2000,15000);
+    if(G.money<prepCost){ flash(`Need ${fmt$(prepCost)} for legal prep.`,'warn'); return; }
+    G.money -= prepCost;
+    const chance = 0.32 + (isLawPro?0.18:0) + (lw.profile/260) + (G.smarts/320);
+    if(Math.random()<chance){
+      L.lawsuits.shift();
+      G.stress = clamp((G.stress||35) - rnd(3,7));
+      addEv(`You successfully beat a ${caseItem.kind} after spending ${fmt$(prepCost)} on defense.`, 'good');
+    } else {
+      const penalty = Math.floor(caseItem.amount * rnd(55,105)/100);
+      L.finesDue += penalty;
+      G.stress = clamp((G.stress||35) + rnd(4,9));
+      addEv(`Defense failed. Court imposed ${fmt$(penalty)} in penalties.`, 'bad');
+    }
+  } else if(action==='campaign'){
+    if(!isLawPro){ flash('Campaigning requires a law background or license.','warn'); return; }
+    if(G.age<30){ flash('Need age 30+ to run for office.','warn'); return; }
+    const spend = rnd(10000,80000);
+    if(G.money<spend){ flash(`Need ${fmt$(spend)} campaign funds.`,'warn'); return; }
+    G.money -= spend;
+    const profile = lw.profile||20;
+    const chance = 0.22 + profile/240 + (G.career.reputation/220) + (G.smarts/300) + (G.sm.totalFame/600);
+    if(Math.random()<chance){
+      const office = profile>=75 ? pick(['Attorney General','Governor']) : 'District Attorney';
+      lw.electedOffice = office;
+      lw.campaignWins++;
+      gov.approval = clamp(gov.approval + rnd(8,16));
+      G.stress = clamp((G.stress||35) + rnd(3,8));
+      addEv(`You won a ${office} election campaign. Public office begins now.`, 'love');
+      flash(`🗳️ Elected ${office}`,'good');
+    } else {
+      gov.approval = clamp(gov.approval - rnd(2,8));
+      G.stress = clamp((G.stress||35) + rnd(4,9));
+      addEv('You lost the election campaign. Valuable network gained, result denied.', 'warn');
+    }
+  } else if(action==='policy_business'){
+    if(!lw.electedOffice){ flash('You need elected office to influence policy directly.','warn'); return; }
+    gov.policy.businessClimate = clamp(gov.policy.businessClimate + rnd(5,12));
+    gov.policy.taxShift = Math.max(-25, Math.min(25, gov.policy.taxShift - rnd(1,4)));
+    gov.activeLaw = 'Business Incentive Ordinance';
+    addEv('You passed a business-friendly policy package.', 'good');
+  } else if(action==='policy_justice'){
+    if(!lw.electedOffice){ flash('You need elected office to influence policy directly.','warn'); return; }
+    gov.policy.justice = clamp(gov.policy.justice + rnd(5,12));
+    gov.policy.policing = clamp(gov.policy.policing - rnd(1,7));
+    gov.activeLaw = 'Sentencing & Justice Reform';
+    addEv('You advanced justice reform and sentencing updates.', 'good');
+  } else if(action==='policy_policing'){
+    if(!lw.electedOffice){ flash('You need elected office to influence policy directly.','warn'); return; }
+    gov.policy.policing = clamp(gov.policy.policing + rnd(5,12));
+    gov.policy.justice = clamp(gov.policy.justice - rnd(1,5));
+    gov.activeLaw = 'Public Safety Enforcement Act';
+    addEv('You pushed stricter policing policy statewide.', 'warn');
+  }
+
+  updateHUD();
+  renderJobs();
+}
+
 function payDebt(amount){
   if(G.finance.debt<=0){ flash('No debt to pay.','warn'); return; }
   if(G.money < amount){ flash('Not enough cash.','warn'); return; }
@@ -596,6 +702,7 @@ function payDebt(amount){
 
 function renderJobs(){
   ensureAdvancedFinanceState();
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   const jc = document.getElementById('jobs-content');
   if(G.age < 16){
     jc.innerHTML = `<div class="notif warn">Jobs unlock at age 16.</div>`; return;
@@ -654,7 +761,9 @@ function renderJobs(){
     html += `<div class="card"><div class="card-title">Special Actions</div>
       <div class="choice-grid">
         ${isLegal?`<div class="choice" onclick="jobSpecial('case_win')"><div class="choice-icon">⚖️</div><div class="choice-name">Win a Case</div><div class="choice-desc">+Reputation +Performance</div></div>
-        <div class="choice" onclick="jobSpecial('settlement')"><div class="choice-icon">🤝</div><div class="choice-name">Negotiate Settlement</div><div class="choice-desc">+Bonus</div></div>`:''}
+        <div class="choice" onclick="jobSpecial('settlement')"><div class="choice-icon">🤝</div><div class="choice-name">Negotiate Settlement</div><div class="choice-desc">+Bonus</div></div>
+        <div class="choice" onclick="jobSpecial('constitutional')"><div class="choice-icon">🏛️</div><div class="choice-name">Constitutional Challenge</div><div class="choice-desc">+Legal profile +Rep</div></div>
+        <div class="choice" onclick="jobSpecial('public_defense')"><div class="choice-icon">🧑‍⚖️</div><div class="choice-name">Public Defense</div><div class="choice-desc">Impactful, stressful work</div></div>`:''}
         ${isMedical?`<div class="choice" onclick="jobSpecial('surgery')"><div class="choice-icon">🩺</div><div class="choice-name">Successful Surgery</div><div class="choice-desc">+Performance</div></div>
         <div class="choice" onclick="jobSpecial('night_shift')"><div class="choice-icon">🌙</div><div class="choice-name">Night Shift</div><div class="choice-desc">+Performance -Health</div></div>`:''}
         ${isTech?`<div class="choice" onclick="jobSpecial('launch')"><div class="choice-icon">🚀</div><div class="choice-name">Ship Launch</div><div class="choice-desc">+Performance +Rep</div></div>`:''}
@@ -810,6 +919,26 @@ function renderJobs(){
            <div class="choice" onclick="businessAction('exit')"><div class="choice-icon">🏁</div><div class="choice-name">Exit Business</div><div class="choice-desc">Cash out if valuation is ready</div></div>
          </div>`
     }
+  </div>`;
+
+  const lawsuits = G.legal.lawsuits || [];
+  const lw = G.legal.lawyer || {};
+  const gov = G.gov || { policy:{} };
+  const isLawTrack = !!(G.career.licenses?.law || ['attorney','in_house','partner','judge'].includes(G.career.jobId));
+  html += `<div class="card">
+    <div class="card-title">Legal & Government</div>
+    <p style="font-size:.78rem;color:var(--muted2)">Open lawsuits: ${lawsuits.length} · Fines due: ${fmt$(G.legal.finesDue||0)} · Probation: ${G.legal.probationYears||0} year(s)</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Law profile: ${lw.profile||20} · Cases won: ${lw.casesWon||0} · Settlements: ${lw.settlements||0}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Gov: ${gov.party||'Centrist'} · Approval ${gov.approval||50}% · Active law: ${gov.activeLaw||'Status Quo'}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Policy → Tax shift ${gov.policy?.taxShift||0} · Policing ${gov.policy?.policing||50} · Justice ${gov.policy?.justice||50} · Business climate ${gov.policy?.businessClimate||50}</p>
+    <div class="choice-grid" style="margin-top:10px">
+      <div class="choice" onclick="legalGovAction('pay_fine')"><div class="choice-icon">💸</div><div class="choice-name">Pay Fines</div><div class="choice-desc">Reduce legal pressure</div></div>
+      <div class="choice" onclick="legalGovAction('defend_self')"><div class="choice-icon">🛡️</div><div class="choice-name">Defend Lawsuit</div><div class="choice-desc">Spend cash to fight claims</div></div>
+      <div class="choice${isLawTrack?'':' disabled'}" onclick="legalGovAction('campaign')"><div class="choice-icon">🗳️</div><div class="choice-name">Run for Office</div><div class="choice-desc">${isLawTrack?'Law track route to elected office':'Requires law track'}</div></div>
+      <div class="choice${lw.electedOffice?'':' disabled'}" onclick="legalGovAction('policy_business')"><div class="choice-icon">🏢</div><div class="choice-name">Business Policy</div><div class="choice-desc">${lw.electedOffice?'Pro-growth package':'Requires elected office'}</div></div>
+      <div class="choice${lw.electedOffice?'':' disabled'}" onclick="legalGovAction('policy_justice')"><div class="choice-icon">⚖️</div><div class="choice-name">Justice Reform</div><div class="choice-desc">${lw.electedOffice?'Adjust sentencing/justice':'Requires elected office'}</div></div>
+      <div class="choice${lw.electedOffice?'':' disabled'}" onclick="legalGovAction('policy_policing')"><div class="choice-icon">🚓</div><div class="choice-name">Policing Push</div><div class="choice-desc">${lw.electedOffice?'Stricter enforcement focus':'Requires elected office'}</div></div>
+    </div>
   </div>`;
 
   // Home & Living

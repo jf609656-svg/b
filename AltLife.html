@@ -28,7 +28,9 @@
   <div class="logo">LifeSim</div>
   <div class="logo-sub">every choice · every consequence · one life</div>
   <div class="title-btns">
+    <button class="btn btn-ghost btn-lg" id="btn-continue" onclick="loadGame()">▶ Continue Life</button>
     <button class="btn btn-primary btn-lg" onclick="goTo('screen-create-gender')">✨ New Life</button>
+    <button class="btn btn-ghost btn-lg" id="btn-delete-save" onclick="deleteGameSave()">🗑 Delete Save</button>
   </div>
   <div class="version-tag">v1.0 · American Edition</div>
 </div>
@@ -107,6 +109,10 @@
   <div class="stats-grid" id="hud-bars"></div>
   <div style="margin-top:8px">
     <span class="money-tag" id="hud-money">💵 $0</span>
+  </div>
+  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+    <button class="btn btn-ghost btn-sm" onclick="saveGame()">💾 Save</button>
+    <button class="btn btn-ghost btn-sm" onclick="loadGame()">↩ Load</button>
   </div>
 </div>
 

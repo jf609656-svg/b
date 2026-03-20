@@ -368,12 +368,42 @@ const G = {
     mafia:{ joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0,
       rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 }
   },
+  legal:{
+    lawsuits:[],                 // { id, title, amount, severity, yearsOpen, kind }
+    finesDue:0,
+    probationYears:0,
+    criminalStrikes:0,
+    lawyer:{
+      casesWon:0,
+      settlements:0,
+      profile:20,
+      campaignWins:0,
+      electedOffice:null,        // 'District Attorney' | 'Attorney General' | 'Governor'
+      officeYears:0,
+    },
+  },
+  gov:{
+    approval:50,
+    party:'Centrist',
+    cycleYear:0,
+    policy:{
+      taxShift:0,                // basis points-ish in local model
+      policing:50,
+      justice:50,
+      businessClimate:50,
+      healthcare:50,
+      education:50,
+    },
+    activeLaw:'Status Quo',
+  },
 };
 
 // ── UTILS ───────────────────────────────────────────────────────
 const rnd   = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
 const pick  = a => a[Math.floor(Math.random()*a.length)];
 const clamp = v => Math.min(100, Math.max(0, Math.round(v)));
+const SAVE_KEY = 'lifesim_save_v2';
+const SAVE_VERSION = 2;
 const fmt$  = n => {
   if(n<0)      return `-$${Math.abs(n).toLocaleString()}`;
   if(n>=1e6)   return `$${(n/1e6).toFixed(2)}M`;
@@ -451,6 +481,34 @@ function ensureFinanceShape(){
   if(typeof G.stress!=='number') G.stress = 35;
 }
 
+function ensureGovLegalShape(){
+  if(!G.legal) G.legal = {};
+  if(!Array.isArray(G.legal.lawsuits)) G.legal.lawsuits = [];
+  if(typeof G.legal.finesDue!=='number') G.legal.finesDue = 0;
+  if(typeof G.legal.probationYears!=='number') G.legal.probationYears = 0;
+  if(typeof G.legal.criminalStrikes!=='number') G.legal.criminalStrikes = 0;
+  if(!G.legal.lawyer) G.legal.lawyer = {};
+  if(typeof G.legal.lawyer.casesWon!=='number') G.legal.lawyer.casesWon = 0;
+  if(typeof G.legal.lawyer.settlements!=='number') G.legal.lawyer.settlements = 0;
+  if(typeof G.legal.lawyer.profile!=='number') G.legal.lawyer.profile = 20;
+  if(typeof G.legal.lawyer.campaignWins!=='number') G.legal.lawyer.campaignWins = 0;
+  if(typeof G.legal.lawyer.electedOffice!=='string') G.legal.lawyer.electedOffice = null;
+  if(typeof G.legal.lawyer.officeYears!=='number') G.legal.lawyer.officeYears = 0;
+
+  if(!G.gov) G.gov = {};
+  if(typeof G.gov.approval!=='number') G.gov.approval = 50;
+  if(typeof G.gov.party!=='string') G.gov.party = 'Centrist';
+  if(typeof G.gov.cycleYear!=='number') G.gov.cycleYear = 0;
+  if(!G.gov.policy) G.gov.policy = {};
+  if(typeof G.gov.policy.taxShift!=='number') G.gov.policy.taxShift = 0;
+  if(typeof G.gov.policy.policing!=='number') G.gov.policy.policing = 50;
+  if(typeof G.gov.policy.justice!=='number') G.gov.policy.justice = 50;
+  if(typeof G.gov.policy.businessClimate!=='number') G.gov.policy.businessClimate = 50;
+  if(typeof G.gov.policy.healthcare!=='number') G.gov.policy.healthcare = 50;
+  if(typeof G.gov.policy.education!=='number') G.gov.policy.education = 50;
+  if(typeof G.gov.activeLaw!=='string') G.gov.activeLaw = 'Status Quo';
+}
+
 function runYearStepSafe(label, fn){
   try{
     return fn();
@@ -460,6 +518,113 @@ function runYearStepSafe(label, fn){
       addEv(`A ${label} system hiccup occurred this year. The simulation recovered.`, 'warn');
     }catch(_e){}
     return null;
+  }
+}
+
+function hasLocalStorage(){
+  try{
+    return typeof localStorage !== 'undefined';
+  }catch(_e){
+    return false;
+  }
+}
+
+function snapshotGameState(){
+  return JSON.parse(JSON.stringify(G));
+}
+
+function replaceGameState(state){
+  if(!state || typeof state!=='object') return false;
+  Object.keys(G).forEach(k=>delete G[k]);
+  Object.assign(G, state);
+  ensureFinanceShape();
+  ensureGovLegalShape();
+  if(typeof ensureMMAState==='function') ensureMMAState();
+  if(typeof ensurePetState==='function') ensurePetState();
+  if(!Array.isArray(G.pets)) G.pets = [];
+  if(!G.relTab) G.relTab = 'family';
+  if(typeof G.stress!=='number') G.stress = 35;
+  return true;
+}
+
+function refreshSaveUI(){
+  if(!hasLocalStorage()) return;
+  let hasSave = false;
+  try{
+    hasSave = !!localStorage.getItem(SAVE_KEY);
+  }catch(_e){}
+  const cont = document.getElementById('btn-continue');
+  const del = document.getElementById('btn-delete-save');
+  if(cont){
+    cont.style.display = hasSave ? 'inline-flex' : 'none';
+  }
+  if(del){
+    del.style.display = hasSave ? 'inline-flex' : 'none';
+  }
+}
+
+function saveGame(quiet=false){
+  if(!hasLocalStorage()) return false;
+  if(!G.firstname || !G.lastname) return false;
+  const payload = {
+    version: SAVE_VERSION,
+    savedAt: Date.now(),
+    name: `${G.firstname} ${G.lastname}`,
+    age: G.age||0,
+    state: snapshotGameState(),
+  };
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    refreshSaveUI();
+    if(!quiet) flash('Game saved 💾','good');
+    return true;
+  }catch(err){
+    console.error('Save failed', err);
+    if(!quiet) flash('Save failed (storage issue).','bad');
+    return false;
+  }
+}
+
+function loadGame(){
+  if(!hasLocalStorage()){ flash('Local storage unavailable.','bad'); return false; }
+  let raw = null;
+  try{
+    raw = localStorage.getItem(SAVE_KEY);
+  }catch(_e){}
+  if(!raw){ flash('No saved game found.','warn'); return false; }
+  let payload = null;
+  try{
+    payload = JSON.parse(raw);
+  }catch(err){
+    console.error('Bad save JSON', err);
+    flash('Save file is corrupted.','bad');
+    return false;
+  }
+  if(!payload || !payload.state){
+    flash('Invalid save data.','bad');
+    return false;
+  }
+  const ok = replaceGameState(payload.state);
+  if(!ok){
+    flash('Could not load save.','bad');
+    return false;
+  }
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'flex';
+  updateHUD();
+  switchTab('life');
+  flash(`Loaded ${payload.name||'save'} (age ${payload.age??G.age})`,'good');
+  return true;
+}
+
+function deleteGameSave(){
+  if(!hasLocalStorage()){ flash('Local storage unavailable.','bad'); return; }
+  try{
+    localStorage.removeItem(SAVE_KEY);
+    refreshSaveUI();
+    flash('Saved game deleted.','warn');
+  }catch(_e){
+    flash('Could not delete save.','bad');
   }
 }
 
@@ -527,9 +692,11 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
   const fedBrackets = married ? FEDERAL_BRACKETS_MARRIED : FEDERAL_BRACKETS_SINGLE;
   const federalTax = calcProgressiveTax(taxableOrdinary, fedBrackets);
   const stateRate = estimateStateIncomeTaxRate();
+  const govTaxAdj = (G.gov?.policy?.taxShift||0) / 1000;
   const stateTax = Math.floor(taxableOrdinary * stateRate);
-  const payrollTax = Math.floor(Math.min(SOCIAL_SECURITY_WAGE_CAP, ledger.wages + ledger.bonuses) * 0.0765);
+  const payrollTax = Math.floor(Math.min(SOCIAL_SECURITY_WAGE_CAP, ledger.wages + ledger.bonuses) * (0.0765 + Math.max(-0.01, Math.min(0.01, govTaxAdj/3))));
   const capitalGainsTax = Math.floor(Math.max(0, ledger.investmentGains) * 0.15);
+  const surtax = Math.floor(Math.max(0, taxableOrdinary) * Math.max(-0.02, Math.min(0.03, govTaxAdj)));
 
   const dependents = (G.children||[]).filter(ch=>ch && ch.alive!==false && ch.age<17).length;
   const childCredit = dependents * 1200;
@@ -537,7 +704,7 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
   const lowIncomeCredit = grossIncome>0 && grossIncome<26000 ? 450 : 0;
   const totalCredits = childCredit + educationCredit + lowIncomeCredit;
 
-  const totalBeforeCredits = federalTax + stateTax + payrollTax + capitalGainsTax;
+  const totalBeforeCredits = federalTax + stateTax + payrollTax + capitalGainsTax + surtax;
   const totalTax = Math.max(0, totalBeforeCredits - totalCredits);
   let refund = 0;
   let taxDebtLoaded = 0;
@@ -581,6 +748,7 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
     stateTax,
     payrollTax,
     capitalGainsTax,
+    surtax,
     propertyTax:ledger.propertyTax,
     credits:totalCredits,
     paid:totalTax,
@@ -711,6 +879,150 @@ function processBusinessYear(ledger){
     b.cashReserve = 0;
     b.employees = 0;
     addEv(`${b.name||'Your company'} ran out of runway. It shut down and left ${fmt$(bailout)} in debt obligations.`, 'bad');
+  }
+}
+
+function processGovernmentYear(){
+  ensureGovLegalShape();
+  const g = G.gov;
+  const p = g.policy;
+  const L = G.legal;
+  g.cycleYear++;
+
+  // Sitting office bonuses/risks
+  if(L.lawyer.electedOffice){
+    L.lawyer.officeYears++;
+    const officePay =
+      L.lawyer.electedOffice==='Governor' ? rnd(140000,230000) :
+      L.lawyer.electedOffice==='Attorney General' ? rnd(120000,190000) :
+      rnd(90000,160000);
+    G.money += officePay;
+    if(Math.random()<0.14){
+      g.approval = clamp(g.approval - rnd(6,14));
+      G.stress = clamp((G.stress||35) + rnd(3,8));
+      addEv(`A political controversy hit your office. Approval dropped sharply.`, 'warn');
+    } else {
+      g.approval = clamp(g.approval + rnd(1,5));
+    }
+  }
+
+  // Election cycle every 4 years
+  if(g.cycleYear%4===0){
+    const parties = ['Centrist','Progressive','Conservative'];
+    const winRoll = Math.random();
+    if(winRoll<0.35) g.party = 'Progressive';
+    else if(winRoll<0.7) g.party = 'Centrist';
+    else g.party = 'Conservative';
+
+    if(g.party==='Progressive'){
+      p.taxShift = Math.max(-25, Math.min(25, p.taxShift + rnd(2,8)));
+      p.policing = clamp(p.policing - rnd(2,6));
+      p.justice = clamp(p.justice + rnd(3,8));
+      p.businessClimate = clamp(p.businessClimate - rnd(1,4));
+      p.healthcare = clamp(p.healthcare + rnd(4,9));
+      p.education = clamp(p.education + rnd(3,8));
+      g.activeLaw = pick(['Justice Reform Act','Consumer Protection Expansion','Public Healthcare Boost']);
+    } else if(g.party==='Conservative'){
+      p.taxShift = Math.max(-25, Math.min(25, p.taxShift - rnd(2,8)));
+      p.policing = clamp(p.policing + rnd(3,9));
+      p.justice = clamp(p.justice - rnd(2,7));
+      p.businessClimate = clamp(p.businessClimate + rnd(3,8));
+      p.healthcare = clamp(p.healthcare - rnd(2,6));
+      p.education = clamp(p.education - rnd(1,5));
+      g.activeLaw = pick(['Business Incentive Package','Mandatory Minimum Expansion','Tax Relief Bill']);
+    } else {
+      p.taxShift = Math.max(-25, Math.min(25, p.taxShift + rnd(-3,3)));
+      p.policing = clamp(p.policing + rnd(-3,3));
+      p.justice = clamp(p.justice + rnd(-3,3));
+      p.businessClimate = clamp(p.businessClimate + rnd(-3,3));
+      p.healthcare = clamp(p.healthcare + rnd(-3,3));
+      p.education = clamp(p.education + rnd(-3,3));
+      g.activeLaw = pick(['Bipartisan Budget Deal','Infrastructure & Services Act','Administrative Reform Bill']);
+    }
+
+    addEv(`Election year: ${g.party} coalition took power. New law passed: ${g.activeLaw}.`, 'warn');
+    if(g.party==='Conservative' && L.lawyer.electedOffice && Math.random()<0.22){
+      g.approval = clamp(g.approval - rnd(5,11));
+    }
+  }
+}
+
+function processLegalYear(){
+  ensureGovLegalShape();
+  const L = G.legal;
+  const p = G.gov.policy;
+
+  // Build legal risk from crime/business/controversy
+  let legalRisk = 0;
+  legalRisk += (G.crime.heat||0) / 120;
+  legalRisk += (G.finance.business?.active ? 0.08 : 0);
+  legalRisk += Math.min(0.18, (G.sm.controversies||0) * 0.02);
+  legalRisk += (p.policing-50) / 420;
+  legalRisk = Math.max(0, legalRisk);
+
+  if(Math.random() < legalRisk){
+    const demand = rnd(5000, 120000);
+    const sev = rnd(1,5);
+    const kind = pick(['Civil suit','Contract dispute','Regulatory action','Defamation claim']);
+    L.lawsuits.push({
+      id:`lawsuit_${G.age}_${Math.random().toString(36).slice(2,7)}`,
+      title:kind,
+      amount:demand,
+      severity:sev,
+      yearsOpen:0,
+      kind,
+    });
+    addEv(`Legal trouble: ${kind} filed against you (${fmt$(demand)} exposure).`, 'warn');
+  }
+
+  // Process open lawsuits
+  L.lawsuits = (L.lawsuits||[]).filter(s=>s && s.amount>0);
+  const stillOpen = [];
+  L.lawsuits.forEach(s=>{
+    s.yearsOpen = (s.yearsOpen||0)+1;
+    const lawyerBoost = (G.career.licenses?.law ? 0.1 : 0) + Math.min(0.18, (L.lawyer.casesWon||0)*0.01);
+    const settleChance = Math.max(0.14, 0.3 + lawyerBoost - s.severity*0.03);
+    if(Math.random()<settleChance){
+      const payout = Math.floor(s.amount * rnd(45,95)/100);
+      if(G.money>=payout){
+        G.money -= payout;
+      } else {
+        const short = payout - Math.max(0,G.money);
+        G.money = 0;
+        G.finance.debt += Math.floor(short * 1.12);
+      }
+      addEv(`Resolved ${s.kind} for ${fmt$(payout)}.`, payout>50000?'bad':'warn');
+      G.stress = clamp((G.stress||35) + rnd(2,7));
+    } else if(s.yearsOpen>=3){
+      const fine = Math.floor(s.amount * rnd(70,120)/100);
+      L.finesDue += fine;
+      addEv(`${s.kind} escalated to judgment. Fine imposed: ${fmt$(fine)}.`, 'bad');
+      G.stress = clamp((G.stress||35) + rnd(6,12));
+    } else {
+      stillOpen.push(s);
+    }
+  });
+  L.lawsuits = stillOpen;
+
+  // Fines/probation mechanics
+  if(L.finesDue>0){
+    const payment = Math.min(L.finesDue, Math.max(0, Math.floor(G.money*0.35)));
+    if(payment>0){
+      G.money -= payment;
+      L.finesDue -= payment;
+      addEv(`Court-ordered fine payment: ${fmt$(payment)}. Remaining: ${fmt$(L.finesDue)}.`, 'warn');
+    } else {
+      L.probationYears += 1;
+      addEv('Unpaid legal fines triggered an added year of probation.', 'bad');
+    }
+  }
+  if(L.probationYears>0){
+    L.probationYears = Math.max(0, L.probationYears-1);
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    if(Math.random()<0.2){
+      G.happy = clamp(G.happy - rnd(2,6));
+      addEv('Probation restrictions made this year harder.', 'warn');
+    }
   }
 }
 
@@ -1009,6 +1321,7 @@ function genFamily(){
 // ── AGE UP ENGINE ────────────────────────────────────────────────
 function ageUp(){
   ensureFinanceShape();
+  ensureGovLegalShape();
   if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];
@@ -1453,6 +1766,8 @@ function ageUp(){
   }
   runYearStepSafe('investments', ()=>processInvestmentAndCryptoYear(yearLedger));
   runYearStepSafe('business', ()=>processBusinessYear(yearLedger));
+  runYearStepSafe('government', ()=>processGovernmentYear());
+  runYearStepSafe('legal', ()=>processLegalYear());
 
   // ── HS sport passive bonus ───────────────────────────────────
   if(G.age>=14 && G.age<=17 && G.school.sport){
@@ -1773,6 +2088,7 @@ function ageUp(){
   updateHUD();
   switchTab('life');
   renderLife();
+  saveGame(true);
 }
 
 // Safety wrapper: never let one runtime error permanently block Age Up.
@@ -1791,6 +2107,9 @@ ageUp = function(){
     }catch(_e){}
   }
 };
+
+// Refresh title-screen continue button once scripts are loaded.
+setTimeout(()=>{ try{ refreshSaveUI(); }catch(_e){} }, 0);
 
 // ── LIFE TAB ────────────────────────────────────────────────────
 function renderLife(){

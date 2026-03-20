@@ -235,6 +235,20 @@ function beginLife(){
     mafia:{ joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0,
       rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 },
   };
+  G.legal = {
+    lawsuits:[],
+    finesDue:0,
+    probationYears:0,
+    criminalStrikes:0,
+    lawyer:{ casesWon:0, settlements:0, profile:20, campaignWins:0, electedOffice:null, officeYears:0 },
+  };
+  G.gov = {
+    approval:50,
+    party:'Centrist',
+    cycleYear:0,
+    policy:{ taxShift:0, policing:50, justice:50, businessClimate:50, healthcare:50, education:50 },
+    activeLaw:'Status Quo',
+  };
   G.career = {
     employed:false,
     jobId:null,
@@ -261,7 +275,9 @@ function beginLife(){
 
   document.getElementById('hud').style.display    = 'block';
   document.getElementById('tab-bar').style.display = 'flex';
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   updateHUD();
   switchTab('life');
+  if(typeof saveGame==='function') saveGame(true);
 }
 
