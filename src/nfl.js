@@ -377,7 +377,7 @@ function nflEnterLeague(team, position, round, salary){
   n.jerseyNumber=rnd(1,99);
   n.age_entered=G.age;
   n.depth=round===1?'starter':round<=3?'rotation':'bench';
-  n.skill=clamp(45+rnd(0,12)+(round===1?10:round<=3?6:0));
+  n.skill=clamp(45+rnd(0,12)+(round===1?10:round<=3?6:0)+sportsBoostFlat(10));
   n.chemistry=clamp(45+rnd(0,15));
   const years=round<=2?4:round<=5?3:2;
   n.contract={years, totalValue:salary*years, guaranteed:Math.floor(salary*years*0.6), perYear:salary};
@@ -514,11 +514,11 @@ function nflAct(type){
     showPopup('🏈 Training Camp Focus',
       'Pick what you want camp to prioritize. The staff takes notes.',
       [
-        { label:'Speed & agility', action:()=>{ G.health=clamp(G.health+rnd(3,7)); n.skill=clamp(n.skill+rnd(4,8));
+        { label:'Speed & agility', action:()=>{ G.health=clamp(G.health+rnd(3,7)); n.skill=clamp(n.skill+rnd(4,8)+sportsBoostFlat(3));
           addEv('Training camp focused on speed and agility. Your cuts look sharper.','good'); renderNFL(); } },
         { label:'Strength & power', action:()=>{ G.health=clamp(G.health+rnd(5,10)); n.durability=clamp(n.durability+rnd(3,7));
           addEv('Power-focused camp. You feel sturdier through contact.','good'); renderNFL(); } },
-        { label:'Playbook & timing', action:()=>{ G.smarts=clamp(G.smarts+rnd(2,5)); n.skill=clamp(n.skill+rnd(2,6)); n.chemistry=clamp(n.chemistry+rnd(4,8));
+        { label:'Playbook & timing', action:()=>{ G.smarts=clamp(G.smarts+rnd(2,5)); n.skill=clamp(n.skill+rnd(2,6)+sportsBoostFlat(2)); n.chemistry=clamp(n.chemistry+rnd(4,8));
           addEv('Playbook mastery and timing. The unit moves as one.','good'); renderNFL(); } },
         { label:'Leadership reps', action:()=>{ n.publicImage=Math.min(100,n.publicImage+rnd(3,7)); n.chemistry=clamp(n.chemistry+rnd(5,10));
           addEv('You led the locker room all camp. Coaches took notice.','good'); renderNFL(); } },
@@ -528,7 +528,7 @@ function nflAct(type){
     return;
   } else if(type==='film'){
     G.smarts=clamp(G.smarts+rnd(2,5)); n.publicImage=Math.min(100,n.publicImage+2);
-    n.skill=clamp(n.skill+rnd(1,4)); n.chemistry=clamp(n.chemistry+rnd(2,4));
+    n.skill=clamp(n.skill+rnd(1,4)+sportsBoostFlat(2)); n.chemistry=clamp(n.chemistry+rnd(2,4));
     addEv(`Film room. You saw things in the defense nobody else caught. It'll show.`,'good');
     flash(`+Smarts · film session`,'good');
   } else if(type==='skill_focus'){
@@ -536,11 +536,11 @@ function nflAct(type){
     showPopup(`🎯 ${pos.label} Focus`,
       `Choose a focus this offseason. It boosts your position skill and slightly changes your role outlook.`,
       [
-        { label:'Technique work', action:()=>{ n.skill=clamp(n.skill+rnd(4,8)); n.chemistry=clamp(n.chemistry+rnd(1,3));
+        { label:'Technique work', action:()=>{ n.skill=clamp(n.skill+rnd(4,8)+sportsBoostFlat(2)); n.chemistry=clamp(n.chemistry+rnd(1,3));
           addEv('Refined technique. You look smoother, faster, more efficient. Coaches noticed.','good'); renderNFL(); } },
-        { label:'Strength & burst', action:()=>{ G.health=clamp(G.health+rnd(3,7)); n.skill=clamp(n.skill+rnd(2,6));
+        { label:'Strength & burst', action:()=>{ G.health=clamp(G.health+rnd(3,7)); n.skill=clamp(n.skill+rnd(2,6)+sportsBoostFlat(2));
           addEv('Focused on power and burst. The film looks violent in a good way.','good'); renderNFL(); } },
-        { label:'Playbook mastery', action:()=>{ G.smarts=clamp(G.smarts+rnd(3,6)); n.skill=clamp(n.skill+rnd(2,5)); n.chemistry=clamp(n.chemistry+rnd(2,5));
+        { label:'Playbook mastery', action:()=>{ G.smarts=clamp(G.smarts+rnd(3,6)); n.skill=clamp(n.skill+rnd(2,5)+sportsBoostFlat(2)); n.chemistry=clamp(n.chemistry+rnd(2,5));
           addEv('Mastered the playbook. Everyone trusts you to make the right adjustment.','good'); renderNFL(); } },
       ],
       'dark'

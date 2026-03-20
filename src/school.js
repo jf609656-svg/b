@@ -201,6 +201,7 @@ function getRecruitingStars(S){
   if(al==='All-State') stars = Math.min(5, stars+1);
   if(sport==='football' && S.football.heisman) stars = 5;
   if(sport==='basketball' && S.basketball.allState) stars = Math.min(5, stars+1);
+  if(G.sportsBoost) stars = Math.min(5, stars+1);
   return Math.min(5, stars);
 }
 
@@ -638,7 +639,7 @@ function hsDo(type){
 // ── HS TRYOUT ────────────────────────────────────────────────────
 function hsTryout(sportId){
   const s    = HS_SPORTS.find(x=>x.id===sportId);
-  const odds = 0.38 + (G.health/300) + (G.looks/380);
+  const odds = Math.min(0.95, 0.38 + (G.health/300) + (G.looks/380) + (G.sportsBoost?0.1:0));
   if(Math.random()<odds){
     G.school.sport = sportId; G.school.sportYears = 1;
     // Assign position
@@ -674,8 +675,8 @@ function hsSport(action){
     G.health=clamp(G.health+rnd(s.healthBonus-2,s.healthBonus+2));
     G.looks=clamp(G.looks+rnd(1,s.looksBonus||3));
     G.social.reputation=clamp(G.social.reputation+rnd(2,5));
-    if(isFB){ S.football.stats.yds+=rnd(50,200); S.football.stats.td+=rnd(0,2); }
-    if(isBB){ S.basketball.stats.pts+=rnd(2,8); S.basketball.stats.reb+=rnd(1,4); }
+    if(isFB){ S.football.stats.yds+=rnd(50,200)+sportsBoostFlat(60); S.football.stats.td+=rnd(0,2)+(G.sportsBoost&&Math.random()<0.28?1:0); }
+    if(isBB){ S.basketball.stats.pts+=rnd(2,8)+sportsBoostFlat(3); S.basketball.stats.reb+=rnd(1,4)+(G.sportsBoost&&Math.random()<0.35?1:0); }
     addEv(`Extra ${s.label} practice. The work shows. ${s.icon}`);
     flash(`+Health +Rep · ${s.icon}`,'good');
     hsCheckRecruitingUpdate();
@@ -704,13 +705,13 @@ function hsSport(action){
       flash(`+Recruiting visibility`,'good');
     }
   } else if(action==='bigGame'){
-    const win = Math.random() < (0.32 + (G.health/220) + (S.sportYears*0.04));
+    const win = Math.random() < Math.min(0.94, (0.32 + (G.health/220) + (S.sportYears*0.04) + (G.sportsBoost?0.09:0)));
     if(win){
       S.bigGameWins++;
       G.happy=clamp(G.happy+rnd(13,21));
       G.social.reputation=clamp(G.social.reputation+rnd(11,19));
-      if(isFB){ S.football.stats.td+=rnd(2,5); S.football.stats.yds+=rnd(100,350); }
-      if(isBB){ S.basketball.stats.pts+=rnd(15,35); S.basketball.stats.reb+=rnd(4,12); }
+      if(isFB){ S.football.stats.td+=rnd(2,5)+(G.sportsBoost&&Math.random()<0.35?1:0); S.football.stats.yds+=rnd(100,350)+sportsBoostFlat(80); }
+      if(isBB){ S.basketball.stats.pts+=rnd(15,35)+sportsBoostFlat(5); S.basketball.stats.reb+=rnd(4,12)+(G.sportsBoost&&Math.random()<0.35?1:0); }
       // MVP / All-State check
       const mvp = !S.sportMVP && Math.random()<(0.14+S.sportYears*0.04);
       if(mvp){ S.sportMVP=true; }
@@ -1337,8 +1338,8 @@ function collegeAthlete(action){
 
   if(action==='train'){
     G.health=clamp(G.health+rnd(3,8));
-    if(isFB){ st.td+=rnd(1,4); st.yds+=rnd(80,300); st.tackles+=rnd(2,8); }
-    if(isBB){ st.pts+=rnd(3,10); st.reb+=rnd(2,6); st.ast+=rnd(1,4); }
+    if(isFB){ st.td+=rnd(1,4)+(G.sportsBoost&&Math.random()<0.32?1:0); st.yds+=rnd(80,300)+sportsBoostFlat(90); st.tackles+=rnd(2,8)+sportsBoostFlat(3); }
+    if(isBB){ st.pts+=rnd(3,10)+sportsBoostFlat(4); st.reb+=rnd(2,6)+(G.sportsBoost&&Math.random()<0.34?1:0); st.ast+=rnd(1,4)+(G.sportsBoost&&Math.random()<0.3?1:0); }
     collegeAthleteStatusCheck(u, td);
     addEv(isFB
       ? pick(COLLEGE_FB_EVENTS).replace('{stat}', st.yds)
@@ -1351,9 +1352,9 @@ function collegeAthlete(action){
     addEv(`Film breakdown. You\'re seeing the game differently now. Scouts notice players who think.`,'good');
     flash(`+Smarts +IQ · film`,'good');
   } else if(action==='game'){
-    const win=Math.random()<(0.38+(G.health/280)+u.sportYears*0.04);
-    if(isFB){ st.td+=rnd(2,6); st.yds+=rnd(150,400); }
-    if(isBB){ st.pts+=rnd(15,40); st.reb+=rnd(5,15); }
+    const win=Math.random()<Math.min(0.95, (0.38+(G.health/280)+u.sportYears*0.04+(G.sportsBoost?0.1:0)));
+    if(isFB){ st.td+=rnd(2,6)+(G.sportsBoost&&Math.random()<0.35?1:0); st.yds+=rnd(150,400)+sportsBoostFlat(120); }
+    if(isBB){ st.pts+=rnd(15,40)+sportsBoostFlat(6); st.reb+=rnd(5,15)+(G.sportsBoost&&Math.random()<0.35?1:0); }
     if(win){
       G.happy=clamp(G.happy+rnd(14,22));
       G.social.reputation=clamp(G.social.reputation+rnd(10,20));
@@ -1402,7 +1403,7 @@ function collegeAthlete(action){
     if(u.year<3){ flash('Need at least 3 seasons first','warn'); return; }
     u.draftDeclared=true; u.draftEligible=true;
     // Estimate draft round
-    const baseChance = (G.health/100)*0.4 + (u.allAmerican?0.3:0) + (u.nationalChamp?0.1:0) + td.draftBoost;
+    const baseChance = (G.health/100)*0.4 + (u.allAmerican?0.3:0) + (u.nationalChamp?0.1:0) + td.draftBoost + (G.sportsBoost?0.08:0);
     const round = baseChance>0.8?1 : baseChance>0.6?2 : baseChance>0.4?3 : baseChance>0.25?4 : baseChance>0.15?5 : baseChance>0.08?6 : 7;
     const pick_ = rnd(1,32);
     u.draftRound=round; u.draftPick=pick_;
@@ -1417,7 +1418,7 @@ function collegeAthlete(action){
     addEv(`Declared for the ${isFB?'NFL':'NBA'} Draft. Projected: Round ${round}, Pick ${pick_}. ${round===1?'First round money. Life-changing.':round<=3?'Solid projection. Roster spot likely.':'Fighting for a roster spot.'}`,'love');
     flash(`Declared for draft! Rd ${round} Pk ${pick_} · ${u.draftTeam}`,'good');
   } else if(action==='combine'){
-    const perf=Math.random();
+    const perf=Math.random() + (G.sportsBoost?0.12:0);
     if(perf>0.6){
       const improvement=rnd(1,2);
       u.draftRound=Math.max(1,u.draftRound-improvement);

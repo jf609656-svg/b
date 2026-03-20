@@ -195,6 +195,7 @@ html, body {
 .choice:hover { border-color: var(--accent); background: var(--surface3); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.3); }
 .choice:hover::after { opacity:1; }
 .choice:active { transform: translateY(0) scale(.98); box-shadow: none; border-color: var(--accent2); }
+.choice.selected { border-color: var(--accent2); background: rgba(94,234,212,.08); box-shadow: 0 0 0 1px rgba(94,234,212,.2) inset; }
 .choice.disabled { opacity: .38; cursor: default; pointer-events: none; }
 .choice-icon { font-size: 1.6rem; margin-bottom: 6px; display: block; line-height: 1; }
 .choice-name { font-family: var(--fh); font-weight: 700; font-size: .83rem; color: var(--text); }

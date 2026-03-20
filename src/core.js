@@ -7,6 +7,10 @@
 const G = {
   // identity
   gender:'', firstname:'', lastname:'', state:'', age:0,
+  sportsBoostChoice:'none',
+  sportsBoost:0,
+  fertilityBase:null,
+  repro:{ pregnant:false, dueAge:0, partnerName:'', source:'' },
   // stats (0-100)
   health:80, happy:70, smarts:50, looks:50, stress:35,
   // money (raw dollars)
@@ -471,6 +475,132 @@ const fmt$  = n => {
 };
 const relLabel = r => r>=85?'Inseparable':r>=70?'Very Close':r>=55?'Good':r>=40?'Decent':r>=25?'Distant':'Strained';
 const relColor = r => r>=65?'rel-color-good':r>=40?'rel-color-ok':'rel-color-bad';
+const sportsBoostMult = () => 1 + ((G.sportsBoost||0) * 0.12);
+const sportsBoostFlat = (max=8) => (G.sportsBoost ? rnd(1, max) : 0);
+
+function randomFertilityBase(){
+  let base = rnd(90,99);
+  if(Math.random()<0.22) base = rnd(78,92);
+  if(Math.random()<0.08) base = rnd(52,77);
+  return base;
+}
+function isMainCharacterPerson(person){
+  return !person || person===G;
+}
+function personAge(person){
+  return isMainCharacterPerson(person) ? (G.age||0) : (person.age||0);
+}
+function personGender(person){
+  return isMainCharacterPerson(person) ? G.gender : person.gender;
+}
+function personFertilityBase(person){
+  return isMainCharacterPerson(person) ? G.fertilityBase : person.fertilityBase;
+}
+function setPersonFertilityBase(person, base){
+  if(isMainCharacterPerson(person)) G.fertilityBase = base;
+  else person.fertilityBase = base;
+}
+function isPersonPregnant(person){
+  return isMainCharacterPerson(person) ? !!(G.repro && G.repro.pregnant) : !!person.pregnant;
+}
+function setPersonPregnancyState(person, pregnant, dueAge=0, partnerName='', source=''){
+  if(isMainCharacterPerson(person)){
+    ensureBioShape();
+    G.repro.pregnant = !!pregnant;
+    G.repro.dueAge = pregnant ? dueAge : 0;
+    G.repro.partnerName = pregnant ? (partnerName||'') : '';
+    G.repro.source = pregnant ? (source||'') : '';
+    return;
+  }
+  person.pregnant = !!pregnant;
+  person.pregnantDueAge = pregnant ? dueAge : 0;
+  person.pregnancyPartnerName = pregnant ? (partnerName||'') : '';
+  person.pregnancySource = pregnant ? (source||'') : '';
+}
+function fertilityForPerson(person, ageOverride=null){
+  const g = personGender(person);
+  if(g!=='female') return 0;
+  let base = personFertilityBase(person);
+  if(typeof base!=='number' || !Number.isFinite(base)){
+    base = randomFertilityBase();
+    setPersonFertilityBase(person, base);
+  }
+  const age = typeof ageOverride==='number' ? ageOverride : personAge(person);
+  let fert = base;
+  if(age>=35) fert -= (Math.min(age,44)-34) * 1.2;
+  if(age>=45) fert -= (Math.min(age,50)-44) * 6;
+  if(age>50) fert -= (age-50) * 12;
+  return Math.max(0, Math.min(100, Math.round(fert)));
+}
+function personCanGetPregnant(person){
+  if(personGender(person)!=='female') return false;
+  if(personAge(person)<18) return false;
+  if(isPersonPregnant(person)) return false;
+  return fertilityForPerson(person) > 0;
+}
+function pregnancyChanceForPerson(person, opts={}){
+  const fert = fertilityForPerson(person);
+  if(fert<=0) return 0;
+  if(opts.annual) return fert>=75 ? 0.20 : 0;
+  let chance = fert<50 ? 0.05 : 0.50;
+  if(opts.condom) chance = Math.min(chance, 0.10);
+  return chance;
+}
+function startPregnancy(person, partnerName='', source=''){
+  if(!personCanGetPregnant(person)) return false;
+  const dueAge = personAge(person) + 1;
+  setPersonPregnancyState(person, true, dueAge, partnerName, source);
+  const who = isMainCharacterPerson(person) ? 'You are' : `${person.firstName||'Your partner'} is`;
+  const by = partnerName ? ` with ${partnerName}` : '';
+  addEv(`${who} pregnant${by}.`, 'love');
+  flash('🍼 Pregnancy started','good');
+  return true;
+}
+function pregnancyDiscoveryDrama(partner, source=''){
+  if(!G.spouse || !G.spouse.alive) return;
+  if(partner && G.spouse.name===partner.name) return;
+  if(source==='annual_partner' || source==='try_for_baby' || source==='spouse_intimacy') return;
+  const findOutChance = 0.48 + Math.min(0.2, (G.sm?.controversies||0)/28);
+  if(Math.random() >= findOutChance) return;
+  const name = G.spouse.firstName || 'Your partner';
+  G.spouse.relation = clamp((G.spouse.relation||50) - rnd(18,34));
+  G.happy = clamp(G.happy - rnd(6,13));
+  G.stress = clamp((G.stress||35) + rnd(8,16));
+  addEv(`${name} found out about the pregnancy and is furious.`, 'bad');
+  if((G.spouse.relation||50)<=22 && Math.random()<0.35){
+    const split = Math.floor(Math.max(0, G.money) * 0.3);
+    G.money = Math.max(0, G.money - split);
+    G.divorces = (G.divorces||0) + 1;
+    addEv(`${name} left after the fallout. Settlement cost: ${fmt$(split)}.`, 'bad');
+    G.spouse = null;
+    G.marriageYears = 0;
+  }
+}
+function attemptRelationshipPregnancy(partner, opts={}){
+  if((G.age||0)<18) return { attempted:false, pregnant:false, reason:'underage' };
+  const candidates = [];
+  if(personCanGetPregnant(G)) candidates.push(G);
+  if(partner && personCanGetPregnant(partner)) candidates.push(partner);
+  if(!candidates.length) return { attempted:false, pregnant:false, reason:'no_female_candidate' };
+
+  let target = candidates[0];
+  if(candidates.length===2){
+    const a = fertilityForPerson(candidates[0]);
+    const b = fertilityForPerson(candidates[1]);
+    const total = Math.max(1, a+b);
+    target = Math.random() < (a/total) ? candidates[0] : candidates[1];
+  }
+  const chance = pregnancyChanceForPerson(target, opts);
+  if(chance<=0) return { attempted:true, pregnant:false, chance };
+  if(Math.random() >= chance) return { attempted:true, pregnant:false, chance };
+
+  const partnerName = (target===G)
+    ? (partner?.firstName || partner?.name || 'your partner')
+    : (G.firstname || 'you');
+  const ok = startPregnancy(target, partnerName, opts.source||'intimacy');
+  if(ok) pregnancyDiscoveryDrama(partner, opts.source||'intimacy');
+  return { attempted:true, pregnant:ok, chance, target };
+}
 
 const FEDERAL_BRACKETS_SINGLE = [
   [11600, 0.10], [47150, 0.12], [100525, 0.22], [191950, 0.24],
@@ -655,6 +785,21 @@ function ensureCareerShape(){
   G.career.layoffShield = clamp(G.career.layoffShield);
 }
 
+function ensureBioShape(){
+  if(typeof G.sportsBoostChoice!=='string') G.sportsBoostChoice = (G.sportsBoost ? 'athlete' : 'none');
+  G.sportsBoost = G.sportsBoostChoice==='athlete' ? 1 : 0;
+  if(typeof G.fertilityBase!=='number' && G.fertilityBase!==null) G.fertilityBase = null;
+  if(G.gender==='female' && (typeof G.fertilityBase!=='number' || !Number.isFinite(G.fertilityBase))){
+    G.fertilityBase = randomFertilityBase();
+  }
+  if(G.gender!=='female') G.fertilityBase = null;
+  if(!G.repro || typeof G.repro!=='object') G.repro = {};
+  if(typeof G.repro.pregnant!=='boolean') G.repro.pregnant = false;
+  if(typeof G.repro.dueAge!=='number') G.repro.dueAge = 0;
+  if(typeof G.repro.partnerName!=='string') G.repro.partnerName = '';
+  if(typeof G.repro.source!=='string') G.repro.source = '';
+}
+
 function runDirectorYearPass(){
   ensureSimShape();
   const d = G.sim.director;
@@ -730,6 +875,7 @@ function replaceGameState(state){
   ensureGovLegalShape();
   ensureSimShape();
   ensureCareerShape();
+  ensureBioShape();
   if(typeof ensurePoliticsState==='function') ensurePoliticsState();
   if(typeof ensureMMAState==='function') ensureMMAState();
   if(typeof ensurePetState==='function') ensurePetState();
@@ -1438,6 +1584,9 @@ function makePerson(role, gender){
   const fn = g==='male' ? pick(NM) : pick(NF);
   const relation = rnd(40,80);
   const compat = rnd(30,90);
+  const fertilityBase = g==='female'
+    ? (Math.random()<0.18 ? rnd(76,92) : Math.random()<0.08 ? rnd(50,75) : rnd(90,99))
+    : null;
   return {
     name: `${fn} ${pick(NS)}`,
     firstName: fn,
@@ -1450,6 +1599,11 @@ function makePerson(role, gender){
     uniEnrolled: false,
     uniCourse: '',
     anniversaryYear: null,   // for spouse
+    fertilityBase,
+    pregnant:false,
+    pregnantDueAge:0,
+    pregnancyPartnerName:'',
+    pregnancySource:'',
     traits: [],
     compat,
     relMemory:{
@@ -1532,12 +1686,77 @@ function genFamily(){
   return fam;
 }
 
+function processPregnancyYear(){
+  ensureBioShape();
+  const deliver = (person, partnerName='', source='')=>{
+    let child = null;
+    if(typeof haveChild==='function'){
+      child = haveChild(isMainCharacterPerson(person) ? null : person);
+    } else {
+      const gender = pick(['male','female']);
+      const fn = gender==='male' ? pick(NM) : pick(NF);
+      child = {
+        name: `${fn} ${G.lastname}`,
+        firstName: fn,
+        gender,
+        role: 'Child',
+        relation: rnd(70,90),
+        alive: true,
+        age: 0,
+        career: null,
+        uniEnrolled: false,
+        uniCourse: '',
+        uniYear: 0,
+        adopted: false,
+        custody: 'you',
+      };
+      G.children.push(child);
+    }
+    const by = partnerName ? ` with ${partnerName}` : '';
+    if(isMainCharacterPerson(person)){
+      addEv(`You gave birth to ${child.firstName}${by}.`, 'love');
+      setPersonPregnancyState(G, false);
+    } else {
+      addEv(`${person.firstName} gave birth to ${child.firstName}${by}.`, 'love');
+      setPersonPregnancyState(person, false);
+    }
+    G.happy = clamp(G.happy + rnd(8,16));
+    G.stress = clamp((G.stress||35) + rnd(2,7));
+    flash(`🍼 ${child.firstName} was born`,'good');
+  };
+
+  if(G.gender==='female' && G.repro.pregnant && G.repro.dueAge<=G.age){
+    deliver(G, G.repro.partnerName, G.repro.source);
+  }
+  if(G.spouse && G.spouse.alive && G.spouse.gender==='female' && G.spouse.pregnant && (G.spouse.pregnantDueAge||0)<=G.age){
+    deliver(G.spouse, G.spouse.pregnancyPartnerName, G.spouse.pregnancySource||'relationship');
+  }
+  (G.lovers||[]).forEach(l=>{
+    if(l && l.alive!==false && l.gender==='female' && l.pregnant && (l.pregnantDueAge||0)<=G.age){
+      deliver(l, l.pregnancyPartnerName, l.pregnancySource||'relationship');
+    }
+  });
+
+  const primaryPartner = (G.spouse && G.spouse.alive)
+    ? G.spouse
+    : (G.lovers||[]).filter(l=>l && l.alive!==false).sort((a,b)=>(b.relation||0)-(a.relation||0))[0];
+  if(!primaryPartner || G.age<18) return;
+
+  if(personCanGetPregnant(G) && fertilityForPerson(G)>=75 && Math.random()<0.2){
+    startPregnancy(G, primaryPartner.firstName||primaryPartner.name||'your partner', 'annual_partner');
+  }
+  if(personCanGetPregnant(primaryPartner) && fertilityForPerson(primaryPartner)>=75 && Math.random()<0.2){
+    startPregnancy(primaryPartner, G.firstname||'you', 'annual_partner');
+  }
+}
+
 // ── AGE UP ENGINE ────────────────────────────────────────────────
 function ageUp(){
   ensureFinanceShape();
   ensureGovLegalShape();
   ensureSimShape();
   ensureCareerShape();
+  ensureBioShape();
   if(typeof ensurePoliticsState==='function') ensurePoliticsState();
   if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
@@ -1753,6 +1972,7 @@ function ageUp(){
   if(typeof relationshipYearPulse==='function'){
     runYearStepSafe('relationships', ()=>relationshipYearPulse());
   }
+  runYearStepSafe('pregnancy', ()=>processPregnancyYear());
 
   // ── Random life event pool ───────────────────────────────────
   const eligible = LIFE_EVENTS.filter(e => a>=e[0] && a<=e[1]);

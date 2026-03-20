@@ -249,7 +249,7 @@ function mmaTrainDiscipline(id){
     current>=40 ? 0.68 :
     current>=25 ? 0.82 : 1;
   const variance = Math.random()<0.15 ? 1.4 : 1;
-  let gain = Math.round((rnd(2,4) + (m.gymTier>=3?1:0)) * gym.gain * damp * variance);
+  let gain = Math.round((rnd(2,4) + (m.gymTier>=3?1:0)) * gym.gain * damp * variance * sportsBoostMult());
   if(id==='wrestling' && G.age>=14 && G.age<=18){
     gain += 1;
     if(Math.random()<0.5){
@@ -284,8 +284,8 @@ function mmaTrainMixed(){
   const keys = Object.keys(MMA_DISCIPLINES);
   const primary = pick(keys);
   const secondary = pick(keys.filter(k=>k!==primary));
-  const pGain = Math.max(1, Math.round((rnd(2,3) + (m.gymTier>=2?1:0)) * gym.gain * (m.discipline[primary]>=70?0.55:0.9)));
-  const sGain = Math.max(1, Math.round((rnd(1,3)) * gym.gain * (m.discipline[secondary]>=70?0.5:0.8)));
+  const pGain = Math.max(1, Math.round((rnd(2,3) + (m.gymTier>=2?1:0)) * gym.gain * (m.discipline[primary]>=70?0.55:0.9) * sportsBoostMult()));
+  const sGain = Math.max(1, Math.round((rnd(1,3)) * gym.gain * (m.discipline[secondary]>=70?0.5:0.8) * sportsBoostMult()));
   m.discipline[primary] = mmaCap(m.discipline[primary] + pGain);
   m.discipline[secondary] = mmaCap(m.discipline[secondary] + sGain);
   m.fightIQ = mmaCap(m.fightIQ + rnd(1,3));
@@ -314,7 +314,7 @@ function mmaSpar(level){
   if(!mmaApplyTrainingCost(100 + lv*90)) return;
 
   const oppSkill = req + rnd(5,22) + lv*2;
-  const sparWinProb = mmaClamp(0.46 + (m.mmaSkill-oppSkill)/170 + (m.conditioning-50)/250, 0.14, 0.84);
+  const sparWinProb = mmaClamp(0.46 + (m.mmaSkill-oppSkill)/170 + (m.conditioning-50)/250 + (G.sportsBoost?0.04:0), 0.14, 0.88);
   const wonRounds = Math.random() < sparWinProb;
 
   if(wonRounds){
@@ -357,7 +357,7 @@ function mmaEnterCompetition(id){
   if(!mmaApplyTrainingCost(entry)) return;
   const skill = m.discipline[id] + m.fightIQ*0.2 + m.conditioning*0.15;
   const opp = m.discipline[id] + rnd(-10,16) + (m.compsThisYear*2);
-  const winProb = mmaClamp(0.44 + (skill-opp)/145, 0.18, 0.86);
+  const winProb = mmaClamp(0.44 + (skill-opp)/145 + (G.sportsBoost?0.05:0), 0.18, 0.9);
   const won = Math.random() < winProb;
 
   if(id==='wrestling' && G.age>=14 && G.age<=18){
@@ -402,7 +402,7 @@ function mmaResolveFight(oppSkill, opts={}){
   const titleTax = opts.titleFight ? 0.04 : 0;
   const pressureTax = opts.championOpponent ? 0.03 : 0;
   const injuryTax = m.injured ? 0.12 : 0;
-  const edge = (m.mmaSkill-oppSkill)/175 + (m.conditioning-50)/265 + (m.fightIQ-50)/320 + (m.confidence-50)/300 + m.gymTier*0.008;
+  const edge = (m.mmaSkill-oppSkill)/175 + (m.conditioning-50)/265 + (m.fightIQ-50)/320 + (m.confidence-50)/300 + m.gymTier*0.008 + (G.sportsBoost?0.045:0);
   const winProb = mmaClamp(0.45 + edge - titleTax - pressureTax - injuryTax, 0.08, 0.9);
   const drawProb = Math.abs(m.mmaSkill-oppSkill)<3 ? 0.04 : 0.02;
   const r = Math.random();

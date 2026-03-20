@@ -27,6 +27,26 @@ function confirmName(){
   goTo('screen-create-stats');
 }
 
+function setSportsBoostChoice(choice){
+  G.sportsBoostChoice = choice==='athlete' ? 'athlete' : 'none';
+  const el = document.getElementById('sports-boost-preview');
+  if(!el) return;
+  const athlete = G.sportsBoostChoice==='athlete';
+  el.innerHTML = `
+    <div class="choice-grid">
+      <div class="choice${athlete?' selected':''}" onclick="setSportsBoostChoice('athlete')">
+        <div class="choice-icon">🏅</div>
+        <div class="choice-name">Sports Boost</div>
+        <div class="choice-desc">Improves outcomes in school, MMA, NFL, and NBA paths.</div>
+      </div>
+      <div class="choice${!athlete?' selected':''}" onclick="setSportsBoostChoice('none')">
+        <div class="choice-icon">📘</div>
+        <div class="choice-name">No Sports Boost</div>
+        <div class="choice-desc">Standard character start.</div>
+      </div>
+    </div>`;
+}
+
 function rollStats(){
   G.health = rnd(50,95);
   G.happy  = rnd(45,90);
@@ -40,6 +60,7 @@ function rollStats(){
   const dad = G.family.find(p=>p.role==='Father');
   const mom = G.family.find(p=>p.role==='Mother');
   G.traits = inheritTraits(dad, mom);
+  if(typeof G.sportsBoostChoice!=='string') G.sportsBoostChoice = 'none';
 
   document.getElementById('stat-preview').innerHTML =
     `<div class="stat-roll-card">
@@ -47,7 +68,12 @@ function rollStats(){
       ${statBar('Happiness',G.happy,'bar-p')}
       ${statBar('Smarts',G.smarts,'bar-s')}
       ${statBar('Looks',G.looks,'bar-l')}
+    </div>
+    <div class="card" style="margin-top:10px">
+      <div class="card-title">Starting Perk</div>
+      <div id="sports-boost-preview"></div>
     </div>`;
+  setSportsBoostChoice(G.sportsBoostChoice);
 
   // people preview using inline HTML so no dependency on relationships.js
   const famHTML = G.family.map(p=>`
@@ -252,6 +278,17 @@ function beginLife(){
   G.traits = [];
   G.familyFlags = { parentsDivorced:false, stepFamilyAdded:false };
   G.proSportsTab = 'nfl';
+  G.sportsBoost = G.sportsBoostChoice==='athlete' ? 1 : 0;
+  // Hidden fertility baseline used by relationship pregnancy systems.
+  if(G.gender==='female'){
+    let base = rnd(90,99);
+    if(Math.random()<0.22) base = rnd(78,92);
+    if(Math.random()<0.08) base = rnd(52,77);
+    G.fertilityBase = base;
+  } else {
+    G.fertilityBase = null;
+  }
+  G.repro = { pregnant:false, dueAge:0, partnerName:'', source:'' };
   G.crime = { heat:0, notoriety:0, record:[], log:[], skills:{ scam:0, hack:0, violence:0 }, crew:[], currentHeist:null,
     police:{ closeness:0, arrested:false, sentence:0, inPrison:false },
     prison:{ respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } },

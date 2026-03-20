@@ -81,6 +81,22 @@ function relationshipPopup(title, body, actions){
   }
 }
 
+function runCondomChoicePopup(partner, source, onChoice){
+  const fn = partner?.firstName || partner?.name || 'your partner';
+  relationshipPopup(
+    `Protection with ${fn}`,
+    `You and ${fn} are about to have sex. Do you want to use a condom?`,
+    [
+      { label:'Use condom (safer)', cls:'btn-primary', onClick:()=>onChoice(true) },
+      { label:'No condom', cls:'btn-ghost', onClick:()=>onChoice(false) },
+      { label:'Not tonight', cls:'btn-ghost', onClick:()=>{
+        addEv(`You decided to pause with ${fn}.`, 'warn');
+        updateHUD(); renderRelationships();
+      }},
+    ]
+  );
+}
+
 function applyCheatingScandal(otherName, label){
   ensureRelationshipDramaState();
   const d = G.social.dramaFlags;
@@ -361,6 +377,8 @@ function renderRomanceTab(){
           <div class="p-name">${s.name}</div>
           <div class="p-role">Spouse · Age ${s.age} · Married ${G.marriageYears} yr${G.marriageYears!==1?'s':''} · Compat ${s.compat||'?'}%</div>
           <div style="font-size:.68rem;color:var(--muted2);margin-top:1px">${status}</div>
+          ${G.repro?.pregnant && G.gender==='female' ? `<div style="font-size:.68rem;color:var(--accent3);margin-top:2px">🤰 You are pregnant · due around age ${G.repro.dueAge||'?'}.</div>` : ''}
+          ${s.pregnant ? `<div style="font-size:.68rem;color:var(--accent3);margin-top:2px">🤰 ${s.firstName} is pregnant · due around age ${s.pregnantDueAge||'?'}. </div>` : ''}
           ${relationshipMemoryRow(s)}
           <div class="p-rel-wrap" style="margin-top:4px">
             <div class="p-rel-track" style="width:80px">
@@ -399,6 +417,7 @@ function renderRomanceTab(){
           <div class="p-name">${l.name} ${l.role==='Partner'?'<span style="font-size:.7rem;color:var(--gold)">💍 Engaged</span>':''}</div>
           <div class="p-role">${l.role==='Partner'?'Fiancé(e)':'Partner'} · Age ${l.age||'?'} · Compat ${l.compat||'?'}%</div>
           <div style="font-size:.68rem;color:var(--muted2)">${status}</div>
+          ${l.pregnant ? `<div style="font-size:.68rem;color:var(--accent3);margin-top:2px">🤰 Pregnant · due around age ${l.pregnantDueAge||'?'}. </div>` : ''}
           ${relationshipMemoryRow(l)}
           <div class="p-rel-wrap" style="margin-top:3px">
             <div class="p-rel-track" style="width:80px">
@@ -478,16 +497,17 @@ function spouseAct(type){
     applyRelationshipMemory(s, { trust:rnd(2,5), resentment:-rnd(0,2), note:'Affection without pressure' });
     flash(`😘`);
   } else if(type==='intimate'){
-    s.relation=clamp(s.relation+rnd(8,16)); G.happy=clamp(G.happy+rnd(8,14));
-    addEv(`Intimate time with ${fn}. The connection: real.`,'love');
-    applyRelationshipMemory(s, { trust:rnd(3,7), resentment:-rnd(1,2), support:true, note:'Intimacy strengthened attachment' });
-    flash(`🔥`);
-    // Baby chance
-    if(G.age>=18 && G.age<=45 && Math.random()<0.12){
-      addEv(`${fn} is pregnant. A new chapter begins.`,'love');
-      flash('🍼 Baby on the way!','good');
-      setTimeout(()=>haveChild(s),100);
-    }
+    runCondomChoicePopup(s, 'spouse_intimacy', (usedCondom)=>{
+      s.relation=clamp(s.relation+rnd(8,16)); G.happy=clamp(G.happy+rnd(8,14));
+      addEv(`Intimate time with ${fn}. The connection: real.${usedCondom?' You used protection.':''}`,'love');
+      applyRelationshipMemory(s, { trust:rnd(3,7), resentment:-rnd(1,2), support:true, note:'Intimacy strengthened attachment' });
+      if(typeof attemptRelationshipPregnancy==='function'){
+        attemptRelationshipPregnancy(s, { condom:usedCondom, source:'spouse_intimacy' });
+      }
+      flash('🔥','good');
+      updateHUD(); renderRelationships();
+    });
+    return;
   } else if(type==='anniversary'){
     if(G.marriageYears<1){ flash('Not married yet!','warn'); return; }
     const cost=rnd(100,500); G.money-=cost;
@@ -651,20 +671,30 @@ function runLoverEncounterPopup(l, type){
   if(type==='intimate'){
     relationshipPopup(`Private moment with ${fn}`, `Things get intense between you two.`, [
       { label:'Keep it private', cls:'btn-primary', onClick:()=>{
-        l.relation = clamp(l.relation + rnd(9,16));
-        G.happy = clamp(G.happy + rnd(8,14));
-        addEv(`An intimate night with ${fn} brought you closer.`, 'love');
-        applyRelationshipMemory(l, { trust:rnd(4,8), resentment:-rnd(1,3), support:true, note:'Private intimacy increased trust' });
-        if(G.spouse) maybeExposeAffair(fn, 'private affair rumor', 0.24);
-        complete();
+        runCondomChoicePopup(l, 'lover_intimacy', (usedCondom)=>{
+          l.relation = clamp(l.relation + rnd(9,16));
+          G.happy = clamp(G.happy + rnd(8,14));
+          addEv(`An intimate night with ${fn} brought you closer.${usedCondom?' You used protection.':''}`, 'love');
+          applyRelationshipMemory(l, { trust:rnd(4,8), resentment:-rnd(1,3), support:true, note:'Private intimacy increased trust' });
+          if(typeof attemptRelationshipPregnancy==='function'){
+            attemptRelationshipPregnancy(l, { condom:usedCondom, source:'lover_intimacy' });
+          }
+          if(G.spouse) maybeExposeAffair(fn, 'private affair rumor', 0.24);
+          complete();
+        });
       }},
       { label:'Post a hint online', cls:'btn-ghost', onClick:()=>{
-        l.relation = clamp(l.relation + rnd(4,10));
-        G.sm.totalFame = clamp((G.sm.totalFame||0) + rnd(1,4));
-        addEv(`You posted suggestive clues about ${fn}. Attention surged.`, 'warn');
-        applyRelationshipMemory(l, { trust:-rnd(1,4), resentment:rnd(2,6), note:'Private moment used for public clout' });
-        if(G.spouse || (G.lovers||[]).length>1) maybeExposeAffair(fn, 'social media leak', 0.42);
-        complete();
+        runCondomChoicePopup(l, 'lover_intimacy', (usedCondom)=>{
+          l.relation = clamp(l.relation + rnd(4,10));
+          G.sm.totalFame = clamp((G.sm.totalFame||0) + rnd(1,4));
+          addEv(`You posted suggestive clues about ${fn}. Attention surged.${usedCondom?' You used protection.':''}`, 'warn');
+          applyRelationshipMemory(l, { trust:-rnd(1,4), resentment:rnd(2,6), note:'Private moment used for public clout' });
+          if(typeof attemptRelationshipPregnancy==='function'){
+            attemptRelationshipPregnancy(l, { condom:usedCondom, source:'lover_intimacy' });
+          }
+          if(G.spouse || (G.lovers||[]).length>1) maybeExposeAffair(fn, 'social media leak', 0.42);
+          complete();
+        });
       }},
       { label:'Back out', cls:'btn-ghost', onClick:()=>{
         l.relation = clamp(l.relation - rnd(4,10));
@@ -749,6 +779,9 @@ function loveAct(name, type){
     if(!l.milestones.intimate){ l.milestones.intimate = true; addEv(`You and ${fn} crossed a new line together.`, 'love'); }
     addEv(`Intimate with ${fn}. Something deepened between you.`,'love');
     applyRelationshipMemory(l, { trust:rnd(3,7), resentment:-rnd(1,2), support:true, note:'Intimate connection deepened trust' });
+    if(typeof attemptRelationshipPregnancy==='function'){
+      attemptRelationshipPregnancy(l, { condom:false, source:'lover_intimacy' });
+    }
     flash(`🔥`);
   } else if(type==='special'){
     if(G.money<200){ flash('Need $200','warn'); return; }
@@ -1039,6 +1072,9 @@ function friendAct(name, type){
             f.relation = clamp(f.relation + rnd(10,18));
             G.happy = clamp(G.happy + rnd(8,14));
             addEv(`You hooked up with ${fn}. The friendship changed instantly.`, 'love');
+            if(typeof attemptRelationshipPregnancy==='function'){
+              attemptRelationshipPregnancy(f, { condom:false, source:'friend_hookup' });
+            }
             if(!G.lovers.some(x=>x.name===f.name) && Math.random()<0.72){
               const lover = { ...f, role:'Lover', relation:Math.max(55, f.relation), milestones:{ intimate:true } };
               ensurePersonRelationshipMemory(lover);
@@ -1334,12 +1370,16 @@ function haveChild(otherParent){
 
 function tryForBaby(){
   if(!G.spouse){ flash('Need a spouse to try for a baby','warn'); return; }
-  if(G.age>48){ flash('Too old to have children naturally','warn'); return; }
-  if(Math.random()<0.55){
-    const c = haveChild(G.spouse);
-    G.happy=clamp(G.happy+rnd(15,25));
-    addEv(`${G.spouse.firstName} is pregnant! ${c.firstName} will arrive soon.`,'love');
-    flash('🍼 Baby on the way!','good');
+  if((G.gender==='female' && G.repro?.pregnant) || (G.spouse.gender==='female' && G.spouse.pregnant)){
+    flash('You are already expecting.','warn');
+    return;
+  }
+  if(typeof attemptRelationshipPregnancy==='function'){
+    const result = attemptRelationshipPregnancy(G.spouse, { condom:false, source:'try_for_baby' });
+    if(!result.pregnant){
+      addEv('You tried for a baby. It didn\'t happen this time. Keep trying or give it time.','warn');
+      flash('Not this time. Keep trying.','warn');
+    }
   } else {
     addEv('You tried for a baby. It didn\'t happen this time. Keep trying or give it time.','warn');
     flash('Not this time. Keep trying.','warn');
