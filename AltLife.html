@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeSim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+
+<div id="flash"></div>
+<div id="popup-overlay" class="popup-overlay" style="display:none">
+  <div class="popup-card">
+    <div class="popup-title" id="popup-title">Title</div>
+    <div class="popup-body" id="popup-body">Body</div>
+    <div class="popup-actions" id="popup-actions"></div>
+  </div>
+</div>
+
+<div id="app">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  TITLE SCREEN                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-title" class="screen active">
+  <div class="logo">LifeSim</div>
+  <div class="logo-sub">every choice · every consequence · one life</div>
+  <div class="title-btns">
+    <button class="btn btn-primary btn-lg" onclick="goTo('screen-create-gender')">✨ New Life</button>
+  </div>
+  <div class="version-tag">v1.0 · American Edition</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  CHARACTER CREATION                                       -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<!-- Step 1: Gender -->
+<div id="screen-create-gender" class="screen">
+  <div class="create-wrap">
+    <div class="step-pip">Step 1 of 3</div>
+    <div class="step-title">Who are you?</div>
+    <div class="step-sub">Choose your gender identity.</div>
+    <div class="gender-row">
+      <div class="gender-card" onclick="pickGender('male')">
+        <span class="gender-icon">♂</span><span class="gender-lbl">Male</span>
+      </div>
+      <div class="gender-card" onclick="pickGender('female')">
+        <span class="gender-icon">♀</span><span class="gender-lbl">Female</span>
+      </div>
+      <div class="gender-card" onclick="pickGender('nonbinary')">
+        <span class="gender-icon">⚧</span><span class="gender-lbl">Non-binary</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: Name -->
+<div id="screen-create-name" class="screen">
+  <div class="create-wrap">
+    <div class="step-pip">Step 2 of 3</div>
+    <div class="step-title">Your Name</div>
+    <div class="step-sub">We've suggested one — customize or accept it.</div>
+    <div class="name-field">
+      <div class="name-field-lbl">First Name</div>
+      <input class="name-input" id="inp-first" type="text" autocomplete="off">
+    </div>
+    <div class="name-field">
+      <div class="name-field-lbl">Last Name</div>
+      <input class="name-input" id="inp-last" type="text" autocomplete="off">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="rollName()">🎲 Randomize</button>
+      <button class="btn btn-primary" onclick="confirmName()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 3: Stats -->
+<div id="screen-create-stats" class="screen">
+  <div class="create-wrap">
+    <div class="step-pip">Step 3 of 3</div>
+    <div class="step-title">Your Starting Life</div>
+    <div class="step-sub">Genetics and luck gave you these. Not your fault.</div>
+    <div id="stat-preview"></div>
+    <div id="family-preview"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="rollStats()">🎲 Reroll</button>
+      <button class="btn btn-primary" onclick="beginLife()">Begin Life →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  HUD (sticky header during play)                         -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="hud" style="display:none">
+  <div class="hud-row1">
+    <div>
+      <div class="hud-name" id="hud-name">—</div>
+      <div class="hud-meta" id="hud-meta">—</div>
+    </div>
+    <div class="age-orb" id="hud-age">0</div>
+  </div>
+  <div class="stats-grid" id="hud-bars"></div>
+  <div style="margin-top:8px">
+    <span class="money-tag" id="hud-money">💵 $0</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  TAB BAR                                                  -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-bar" style="display:none" class="tab-bar">
+  <button class="tab active" id="tab-life"          onclick="switchTab('life')">Life</button>
+  <button class="tab"        id="tab-relationships"  onclick="switchTab('relationships')">People</button>
+  <button class="tab"        id="tab-school"         onclick="switchTab('school')">School</button>
+  <button class="tab"        id="tab-social"         onclick="switchTab('social')">Social</button>
+  <button class="tab"        id="tab-media"          onclick="switchTab('media')">Online</button>
+  <button class="tab"        id="tab-jobs"           onclick="switchTab('jobs')">Jobs</button>
+  <button class="tab"        id="tab-crime"          onclick="switchTab('crime')">Crime</button>
+  <button class="tab"        id="tab-acting"          onclick="switchTab('acting')">Acting</button>
+  <button class="tab"        id="tab-prosports"       onclick="switchTab('prosports')">Pro Sports</button>
+  <button class="tab"        id="tab-activities"     onclick="switchTab('activities')">Activities</button>
+  <button class="tab"        id="tab-health"         onclick="switchTab('health')">Health</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  GAME SCREENS                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<!-- Life -->
+<div id="screen-life" class="screen">
+  <div class="pad">
+    <div class="card">
+      <div class="card-title" id="life-year-label">Age 0 — This Year</div>
+      <ul class="event-list" id="event-log"></ul>
+    </div>
+    <div id="age-up-area"></div>
+  </div>
+</div>
+
+<!-- People / Relationships -->
+<div id="screen-relationships" class="screen">
+  <div style="display:flex;border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;gap:2px;background:var(--bg);-ms-overflow-style:none;scrollbar-width:none">
+    <button class="tab active" id="rtab-family"   onclick="switchRelTab('family')">Family</button>
+    <button class="tab"        id="rtab-romance"  onclick="switchRelTab('romance')">Romance</button>
+    <button class="tab"        id="rtab-friends"  onclick="switchRelTab('friends')">Friends</button>
+    <button class="tab"        id="rtab-children" onclick="switchRelTab('children')">Children</button>
+    <button class="tab"        id="rtab-tree"     onclick="switchRelTab('tree')">Family Tree</button>
+  </div>
+  <div class="pad" id="rel-content"></div>
+</div>
+
+<!-- School -->
+<div id="screen-school" class="screen">
+  <div class="pad" id="school-content"></div>
+</div>
+
+<!-- Social -->
+<div id="screen-social" class="screen">
+  <div class="pad" id="social-content"></div>
+</div>
+
+<!-- Social Media -->
+<div id="screen-media" class="screen">
+  <div class="pad" id="media-content"></div>
+</div>
+
+<!-- Crime -->
+<div id="screen-crime" class="screen">
+  <div class="pad" id="crime-content"></div>
+</div>
+
+<!-- Jobs -->
+<div id="screen-jobs" class="screen">
+  <div class="pad" id="jobs-content"></div>
+</div>
+
+<!-- Acting -->
+<div id="screen-acting" class="screen">
+  <div class="pad" id="acting-content"></div>
+</div>
+
+<!-- Pro Sports -->
+<div id="screen-prosports" class="screen">
+  <div class="pad" id="prosports-content"></div>
+</div>
+
+<!-- NFL -->
+<div id="screen-nfl" class="screen">
+  <div class="pad" id="nfl-content"></div>
+</div>
+
+<!-- NBA -->
+<div id="screen-nba" class="screen">
+  <div class="pad" id="nba-content"></div>
+</div>
+
+<!-- Activities -->
+<div id="screen-activities" class="screen">
+  <div class="pad">
+    <div class="card">
+      <div class="card-title">What do you do this year?</div>
+      <p style="color:var(--muted2);font-size:.855rem;margin-bottom:12px">Each activity counts as your year's focus.</p>
+      <div class="choice-grid" id="activities-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Health -->
+<div id="screen-health" class="screen">
+  <div class="pad" id="health-content"></div>
+</div>
+
+<!-- Death -->
+<div id="screen-death" class="screen">
+  <div class="death-screen" id="death-content"></div>
+</div>
+
+</div><!-- /app -->
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--  SCRIPTS — order matters                                  -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<script src="src/data.js"></script>
+<script src="src/core.js"></script>
+<script src="src/creation.js"></script>
+<script src="src/relationships.js"></script>
+<script src="src/school.js"></script>
+<script src="src/social.js"></script>
+<script src="src/activities.js"></script>
+<script src="src/crime.js"></script>
+<script src="src/jobs.js"></script>
+<script src="src/health.js"></script>
+<script src="src/death.js"></script>
+<script src="src/media.js"></script>
+<script src="src/acting.js"></script>
+<script src="src/nfl.js"></script>
+<script src="src/nba.js"></script>
+<script src="src/college_research.js"></script>
+</body>
+</html>
