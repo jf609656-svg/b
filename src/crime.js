@@ -1546,6 +1546,7 @@ function renderCrime(){
         <div class="choice" onclick="gangDefend()"><div class="choice-icon">🛡️</div><div class="choice-name">Defend Block</div><div class="choice-desc">Conflict</div></div>
         <div class="choice" onclick="gangPush()"><div class="choice-icon">⚔️</div><div class="choice-name">Push Rival Zone</div><div class="choice-desc">High risk</div></div>
         <div class="choice" onclick="gangBeef()"><div class="choice-icon">😤</div><div class="choice-name">Handle Beef</div><div class="choice-desc">Choice-driven response</div></div>
+        <div class="choice" onclick="gangOpenTargetActionPopup()"><div class="choice-icon">🎯</div><div class="choice-name">Target Rival Gang</div><div class="choice-desc">Slider-based retaliation</div></div>
         <div class="choice" onclick="gangPost()"><div class="choice-icon">📱</div><div class="choice-name">Post Online</div><div class="choice-desc">Clout + heat</div></div>
         <div class="choice" onclick="gangDrugs()"><div class="choice-icon">💊</div><div class="choice-name">Drug Ops</div><div class="choice-desc">Income + heat</div></div>
         <div class="choice" onclick="gangSnitch()"><div class="choice-icon">🐀</div><div class="choice-name">Snitch</div><div class="choice-desc">Death risk</div></div>
@@ -2644,6 +2645,130 @@ function gangOpenBeefResponsePopup(){
   ], 'dark');
 }
 
+function gangTargetRival(action='graffiti', intensity=1, rivalId=''){
+  ensureCrimeShape();
+  const C = G.crime;
+  const g = C.gang;
+  if(!g.joined){ flash('Join a gang first.','warn'); return; }
+  if(rivalId){
+    g.beef.rival = String(rivalId);
+  }
+  if(!g.beef.rival){
+    const rivals = GANG_RIVAL_MAP[g.type]||[];
+    g.beef.rival = rivals.length ? pick(rivals) : '';
+  }
+  const rival = gangRivalLabel(g.beef.rival);
+  const i = Math.max(1, Math.min(4, intensity|0));
+  let baseGain = 0, heat = 0, risk = 0, cash = 0, cred = 0, msg = '';
+  if(action==='graffiti'){
+    baseGain = 4 + i*2; heat = 2 + i; risk = 0.05 + i*0.02; cred = 2 + i;
+    msg = `You tagged ${rival}'s block.`;
+  } else if(action==='chase'){
+    baseGain = 8 + i*3; heat = 4 + i*2; risk = 0.1 + i*0.04; cred = 4 + i;
+    msg = `You chased a ${rival} member through contested streets.`;
+  } else if(action==='stash'){
+    baseGain = 12 + i*4; heat = 6 + i*3; risk = 0.14 + i*0.05; cash = rnd(400, 2200) * i; cred = 5 + i*2;
+    msg = `You hit a ${rival} stash house and grabbed loot.`;
+  } else if(action==='shoot'){
+    baseGain = 18 + i*6; heat = 10 + i*4; risk = 0.22 + i*0.08; cred = 7 + i*3;
+    msg = `You opened fire on a ${rival} member in retaliation.`;
+  } else {
+    return;
+  }
+  const meta = gangTypeMeta();
+  g.beef.score = clamp((g.beef.score||0) + Math.floor(baseGain * (meta.beefBias||1)));
+  gangRecalcBeefLevel();
+  g.recentViolence = clamp((g.recentViolence||0) + Math.floor(baseGain*0.7));
+  g.cred = clamp((g.cred||10) + cred);
+  g.notoriety = clamp((g.notoriety||5) + Math.max(1, Math.floor(baseGain/3)));
+  C.heat = Math.min(100, C.heat + heat);
+  C.police.closeness = Math.min(100, C.police.closeness + Math.floor(heat*0.8));
+  if(cash>0) G.money += cash;
+  addCrimeEv(`${msg}${cash>0?` Took ${fmt$(cash)}.`:''}`, action==='shoot'?'bad':'warn');
+
+  // Immediate retaliation/injury risk
+  if(Math.random() < risk){
+    const injury = rnd(5,18) + i*2;
+    G.health = clamp(G.health - injury);
+    C.heat = Math.min(100, C.heat + rnd(4,12));
+    addEv(`Rival retaliation hit back fast. You took injuries (${injury}).`, 'bad');
+    if(action==='shoot' && i>=3){
+      const deathRisk = Math.max(0.02, Math.min(0.42,
+        (g.beef.level||0)*0.09 + (g.notoriety||0)/380 + (g.recentViolence||0)/320 - (g.cred||10)/520
+      ));
+      if(Math.random()<deathRisk*0.32){
+        die(`A revenge hit after targeting ${rival} turned fatal.`);
+        return;
+      }
+    }
+  }
+  if(C.heat>66) policeCheck();
+  updateHUD();
+  renderCrime();
+}
+
+function gangSetTargetAggression(value, action='graffiti', rivalId=''){
+  ensureCrimeShape();
+  const i = Math.max(1, Math.min(4, Number(value)||1));
+  G.crime.gang.targetAggression = i;
+  gangTargetRival(action, i, rivalId);
+}
+
+function gangExecuteTargetAction(action='graffiti', rivalId=''){
+  ensureCrimeShape();
+  const i = G.crime.gang.targetAggression||2;
+  gangTargetRival(action, i, rivalId);
+}
+
+function gangOpenRivalTargetPopup(){
+  ensureCrimeShape();
+  const g = G.crime.gang;
+  if(!g.joined){ flash('Join a gang first.','warn'); return; }
+  if(!g.beef.rival){
+    const rivals = GANG_RIVAL_MAP[g.type]||[];
+    g.beef.rival = rivals.length ? pick(rivals) : '';
+  }
+  const rivalPool = Array.from(new Set(
+    [g.beef.rival].concat(GANG_RIVAL_MAP[g.type]||[]).concat(
+      (GANG_ARCHETYPES||[]).map(x=>x.id).filter(id=>id!==g.type)
+    )
+  )).filter(Boolean);
+  const rivalOpts = rivalPool.map(id=>
+    `<option value="${id}" ${id===g.beef.rival?'selected':''}>${gangRivalLabel(id)}</option>`
+  ).join('');
+  const rival = gangRivalLabel(g.beef.rival);
+  const html = `
+    <div style="font-size:.82rem;color:var(--muted2);margin-bottom:8px">
+      Targeting: <strong style="color:var(--text)">${rival}</strong>. Choose an aggression slider level and operation.
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:.72rem;color:var(--muted2);margin-bottom:4px">Target gang</div>
+      <select id="gang-target-rival" style="width:100%;padding:8px;border-radius:8px;background:var(--card);border:1px solid rgba(255,255,255,.12);color:var(--text)">
+        ${rivalOpts}
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:.72rem;color:var(--muted2)">Aggression</span>
+      <input id="gang-target-slider" type="range" min="1" max="4" step="1" value="2" style="width:100%">
+      <span id="gang-target-slider-val" style="font-size:.72rem;color:var(--accent)">2</span>
+    </div>
+    <script>(function(){var s=document.getElementById('gang-target-slider');var v=document.getElementById('gang-target-slider-val');if(s&&v){s.oninput=function(){v.textContent=s.value;};}})();</script>
+    <div class="choice-grid">
+      <div class="choice" onclick="gangSetTargetAggression((document.getElementById('gang-target-slider')||{value:2}).value,'shoot',(document.getElementById('gang-target-rival')||{value:''}).value)"><div class="choice-icon">🔫</div><div class="choice-name">Shoot Rival Member</div><div class="choice-desc">Highest beef/heat/death risk</div></div>
+      <div class="choice" onclick="gangSetTargetAggression((document.getElementById('gang-target-slider')||{value:2}).value,'stash',(document.getElementById('gang-target-rival')||{value:''}).value)"><div class="choice-icon">🏚️</div><div class="choice-name">Rob Stash House</div><div class="choice-desc">Cash upside, retaliation risk</div></div>
+      <div class="choice" onclick="gangSetTargetAggression((document.getElementById('gang-target-slider')||{value:2}).value,'chase',(document.getElementById('gang-target-rival')||{value:''}).value)"><div class="choice-icon">🏃</div><div class="choice-name">Chase Gang Member</div><div class="choice-desc">Mid escalation</div></div>
+      <div class="choice" onclick="gangSetTargetAggression((document.getElementById('gang-target-slider')||{value:2}).value,'graffiti',(document.getElementById('gang-target-rival')||{value:''}).value)"><div class="choice-icon">🎨</div><div class="choice-name">Graffiti Their Block</div><div class="choice-desc">Low violence, still escalates</div></div>
+    </div>
+  `;
+  showPopupHTML(`Target ${rival}`, html, [
+    { label:'Cancel', cls:'btn-ghost', onClick:()=>{} }
+  ], 'dark');
+}
+
+function gangOpenTargetActionPopup(){
+  gangOpenRivalTargetPopup();
+}
+
 function processGangYear(){
   ensureCrimeShape();
   const C = G.crime;
@@ -2703,6 +2828,58 @@ function processGangYear(){
       if(Math.random()<deathRisk*0.2){
         die(`Gang war with ${gangRivalLabel(g.beef.rival)} turned fatal.`);
         return;
+      }
+      // High-beef assassination attempt popup during yearly resolution
+      if(Math.random()<0.24){
+        showPopup(`🔪 Hit Attempt: ${gangRivalLabel(g.beef.rival)}`, 'An armed rival crew pulled up on your position. Immediate call required.', [
+          { label:'Stand and shoot back', cls:'btn-primary', onClick:()=>{
+            const win = Math.random() < Math.max(0.2, Math.min(0.8, 0.36 + (g.cred||10)/180 - (C.heat||0)/260));
+            if(win){
+              g.cred = clamp((g.cred||10) + rnd(3,8));
+              g.beef.score = clamp((g.beef.score||0) + rnd(6,12));
+              C.heat = Math.min(100, C.heat + rnd(8,16));
+              addEv('You survived the hit attempt by fighting back. The streets heard about it.', 'bad');
+            } else {
+              G.health = clamp(G.health - rnd(10,24));
+              C.heat = Math.min(100, C.heat + rnd(10,20));
+              addEv('You survived but took serious injuries in the ambush.', 'bad');
+              if(Math.random()<deathRisk*0.4){
+                die(`A high-beef assassination attempt by ${gangRivalLabel(g.beef.rival)} killed you.`);
+                return;
+              }
+            }
+            renderCrime();
+          }},
+          { label:'Run and disappear', cls:'btn-ghost', onClick:()=>{
+            const escape = Math.random() < Math.max(0.25, Math.min(0.88, 0.58 + (100-(C.heat||0))/320));
+            if(escape){
+              g.cred = clamp((g.cred||10) - rnd(2,6));
+              C.heat = Math.max(0, C.heat - rnd(1,4));
+              addEv('You escaped the hit by disappearing. You live, but whispers call it a retreat.', 'warn');
+            } else {
+              G.health = clamp(G.health - rnd(8,18));
+              C.heat = Math.min(100, C.heat + rnd(6,14));
+              addEv('Escape failed cleanly—you got clipped while fleeing.', 'bad');
+            }
+            renderCrime();
+          }},
+          { label:'Call your crew for extraction', cls:'btn-ghost', onClick:()=>{
+            const cohesion = g.relationships?.cohesion||50;
+            const save = Math.random() < Math.max(0.2, Math.min(0.85, 0.34 + cohesion/180 - (g.relationships?.internalConflict||0)/260));
+            if(save){
+              g.cred = clamp((g.cred||10) + rnd(1,4));
+              g.relationships.cohesion = clamp((g.relationships.cohesion||55) + rnd(2,5));
+              C.heat = Math.min(100, C.heat + rnd(4,10));
+              addEv('Your crew extracted you under fire. Loyalty tightened.', 'warn');
+            } else {
+              g.relationships.cohesion = clamp((g.relationships.cohesion||55) - rnd(4,10));
+              G.health = clamp(G.health - rnd(9,20));
+              C.heat = Math.min(100, C.heat + rnd(8,16));
+              addEv('Extraction was sloppy. You got hurt and trust slipped inside the crew.', 'bad');
+            }
+            renderCrime();
+          }},
+        ], 'dark');
       }
     }
     g.beef.score = Math.max(0, (g.beef.score||0) - rnd(2,7));
