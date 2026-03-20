@@ -86,9 +86,8 @@
         <div class="col" style="min-width:260px;flex:1.1">
           <label for="channelSelect">Build Channel</label>
           <select id="channelSelect">
-            <option value="branch_jsdelivr">Dev Branch (jsDelivr)</option>
             <option value="branch_githack">Dev Branch (raw.githack)</option>
-            <option value="main_jsdelivr">Main Branch (jsDelivr)</option>
+            <option value="main_githack">Main Branch (raw.githack)</option>
             <option value="custom">Custom URL</option>
           </select>
         </div>
@@ -125,15 +124,13 @@
       const OWNER = 'jf609656-svg';
       const REPO = 'b';
       const DEV_BRANCH = 'cursor/game-code-expansion-921c';
-      const DEV_BRANCH_ENC = encodeURIComponent(DEV_BRANCH);
       const MAIN_BRANCH = 'main';
       const HUB_KEY = 'lifesim_hub_default_game_url_v1';
       const HUB_CH_KEY = 'lifesim_hub_channel_v1';
 
       const CHANNELS = {
-        branch_jsdelivr: `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${DEV_BRANCH_ENC}/AltLife.html`,
         branch_githack: `https://raw.githack.com/${OWNER}/${REPO}/${DEV_BRANCH}/AltLife.html`,
-        main_jsdelivr: `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${MAIN_BRANCH}/AltLife.html`,
+        main_githack: `https://raw.githack.com/${OWNER}/${REPO}/${MAIN_BRANCH}/AltLife.html`,
       };
 
       const el = {
@@ -203,9 +200,9 @@
 
       function init(){
         const qGame = readQueryOverride();
-        const savedChannel = localStorage.getItem(HUB_CH_KEY) || 'branch_jsdelivr';
+        const savedChannel = localStorage.getItem(HUB_CH_KEY) || 'branch_githack';
         const channelValid = Object.prototype.hasOwnProperty.call(CHANNELS, savedChannel) || savedChannel==='custom';
-        el.channel.value = channelValid ? savedChannel : 'branch_jsdelivr';
+        el.channel.value = channelValid ? savedChannel : 'branch_githack';
 
         if(qGame){
           el.channel.value = 'custom';
@@ -256,7 +253,7 @@
       el.reset.addEventListener('click', ()=>{
         localStorage.removeItem(HUB_KEY);
         localStorage.removeItem(HUB_CH_KEY);
-        el.channel.value = 'branch_jsdelivr';
+        el.channel.value = 'branch_githack';
         applyChannelUrl();
         setStatus('Hub defaults reset.', true);
       });

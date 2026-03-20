@@ -770,12 +770,34 @@ const GANG_ARCHETYPES = [
   { id:'clout', label:'Culture/Clout Crew', colors:'Neon', symbol:'🎤', style:'Viral identity', conflict:0.7, loyalty:0.5, income:0.4 },
 ];
 
+// Drug ecosystem catalog (trade-focused).
+// profit: rough per-unit margin in the ecosystem loop.
+// heatMult: how much law-enforcement pressure each unit tends to create.
+// addictionRate: per-use pressure toward dependence.
+// socialImpact: how strongly use harms social stability / reputation.
 const DRUG_TYPES = [
-  { id:'low', label:'Low-Tier', profit:400, heat:1.1, addict:0.1, violence:0.2 },
-  { id:'mid', label:'Mid-Tier', profit:800, heat:1.3, addict:0.15, violence:0.3 },
-  { id:'high', label:'High-Tier', profit:1600, heat:1.6, addict:0.2, violence:0.45 },
-  { id:'party', label:'Party Drugs', profit:900, heat:1.4, addict:0.12, violence:0.25 },
-  { id:'rx', label:'Prescription Abuse', profit:700, heat:1.2, addict:0.18, violence:0.15 },
+  { id:'marijuana', label:'Marijuana', profit:210, heatMult:0.55, addictionRate:0.06, socialImpact:0.10, violence:0.08, fatality:0.002 },
+  { id:'cocaine',   label:'Cocaine',   profit:620, heatMult:1.05, addictionRate:0.19, socialImpact:0.32, violence:0.22, fatality:0.010 },
+  { id:'heroin',    label:'Heroin',    profit:780, heatMult:1.30, addictionRate:0.34, socialImpact:0.58, violence:0.30, fatality:0.030 },
+  { id:'meth',      label:'Meth',      profit:730, heatMult:1.38, addictionRate:0.31, socialImpact:0.62, violence:0.44, fatality:0.025 },
+  { id:'speed',     label:'Speed',     profit:460, heatMult:0.95, addictionRate:0.17, socialImpact:0.24, violence:0.18, fatality:0.008 },
+  { id:'fentanyl',  label:'Fentanyl',  profit:980, heatMult:1.85, addictionRate:0.40, socialImpact:0.78, violence:0.55, fatality:0.090 },
+];
+
+const HALLUCINOGEN_TYPES = [
+  { id:'mushrooms', label:'Mushrooms', icon:'🍄', price:[80,240], mindSwing:[-8,12], stressSwing:[-16,8], healthSwing:[-4,2] },
+  { id:'lsd',       label:'LSD',       icon:'🧪', price:[120,320], mindSwing:[-12,14], stressSwing:[-18,10], healthSwing:[-5,1] },
+  { id:'salvia',    label:'Salvia',    icon:'🌿', price:[60,190], mindSwing:[-16,10], stressSwing:[-12,14], healthSwing:[-6,0] },
+  { id:'dmt',       label:'DMT',       icon:'🌀', price:[180,420], mindSwing:[-18,18], stressSwing:[-20,12], healthSwing:[-7,1] },
+];
+
+const HALLUCINOGEN_TRIP_EVENTS = [
+  { msg:'You are certain you crossed into another dimension and forgot to bring your body.', tone:'warn' },
+  { msg:'Time loops the same 20 seconds until you negotiate peace with a lamp.', tone:'warn' },
+  { msg:'An imaginary entity gives you life advice. Half of it is brilliant. Half is nonsense.', tone:'warn' },
+  { msg:'The room turns into a low-budget sci-fi bridge. You are somehow the captain.', tone:'good' },
+  { msg:'You explain the universe to a houseplant. The plant seems unconvinced.', tone:'warn' },
+  { msg:'Every sound looks like geometry for a while. Very profound. Very impractical.', tone:'warn' },
 ];
 const MAFIA_RANKS = ['Associate','Soldier','Caporegime','Underboss','Boss'];
 const MAFIA_RACKETS = [

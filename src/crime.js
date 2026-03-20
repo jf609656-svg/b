@@ -83,6 +83,60 @@ function randomVictimDesc(){
 
 function ensureCrimeShape(){
   if(!G.crime || typeof G.crime!=='object') G.crime = {};
+  if(!Array.isArray(G.crime.log)) G.crime.log = [];
+  if(typeof G.crime.heat!=='number') G.crime.heat = 0;
+  if(typeof G.crime.notoriety!=='number') G.crime.notoriety = 0;
+  if(!G.crime.police || typeof G.crime.police!=='object') G.crime.police = { closeness:0, arrested:false, sentence:0, inPrison:false };
+  if(!G.crime.prison || typeof G.crime.prison!=='object'){
+    G.crime.prison = { respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } };
+  }
+  if(!G.crime.gang || typeof G.crime.gang!=='object'){
+    G.crime.gang = { joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 };
+  }
+  if(!G.crime.mafia || typeof G.crime.mafia!=='object'){
+    G.crime.mafia = { joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0, rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 };
+  }
+  if(!G.crime.drugs || typeof G.crime.drugs!=='object') G.crime.drugs = {};
+  const d = G.crime.drugs;
+  if(typeof d.active!=='boolean') d.active = false;
+  if(typeof d.route!=='string') d.route = 'independent';
+  if(typeof d.tradeDrug!=='string') d.tradeDrug = 'marijuana';
+  if(!d.inventory || typeof d.inventory!=='object') d.inventory = {};
+  DRUG_TYPES.forEach(t=>{ if(typeof d.inventory[t.id]!=='number') d.inventory[t.id] = 0; });
+  if(typeof d.supplyQuality!=='number') d.supplyQuality = 45;
+  if(typeof d.instability!=='number') d.instability = 20;
+  if(!Array.isArray(d.zones) || !d.zones.length){
+    d.zones = [
+      { id:'downtown', label:'Downtown Clubs', demand:26, risk:0.9, assignment:'none', intensity:1 },
+      { id:'projects', label:'Housing Projects', demand:30, risk:1.2, assignment:'none', intensity:1 },
+      { id:'suburbs', label:'Suburbs', demand:18, risk:0.6, assignment:'none', intensity:1 },
+      { id:'industrial', label:'Industrial Strip', demand:22, risk:1.0, assignment:'none', intensity:1 },
+    ];
+  }
+  if(!d.dealers || typeof d.dealers!=='object') d.dealers = { independent:1, gang:0, mafia:0 };
+  if(typeof d.income!=='number') d.income = 0;
+  if(typeof d.lastIncome!=='number') d.lastIncome = 0;
+  if(typeof d.addictionScore!=='number') d.addictionScore = 0;
+  if(typeof d.addictionLevel!=='string') d.addictionLevel = 'None';
+  if(typeof d.inRecovery!=='boolean') d.inRecovery = false;
+  if(typeof d.relapseRisk!=='number') d.relapseRisk = 8;
+  if(!d.junkie || typeof d.junkie!=='object') d.junkie = { active:false, years:0, housing:'none', isolation:0 };
+  if(typeof d.junkie.active!=='boolean') d.junkie.active = false;
+  if(typeof d.junkie.years!=='number') d.junkie.years = 0;
+  if(typeof d.junkie.housing!=='string') d.junkie.housing = 'none';
+  if(typeof d.junkie.isolation!=='number') d.junkie.isolation = 0;
+  if(!d.trip || typeof d.trip!=='object') d.trip = { active:false, label:'', expiresAge:0, rebound:{ happy:0, smarts:0, stress:0 } };
+  if(typeof d.trip.active!=='boolean') d.trip.active = false;
+  if(typeof d.trip.label!=='string') d.trip.label = '';
+  if(typeof d.trip.expiresAge!=='number') d.trip.expiresAge = 0;
+  if(!d.trip.rebound || typeof d.trip.rebound!=='object') d.trip.rebound = { happy:0, smarts:0, stress:0 };
+  ['happy','smarts','stress'].forEach(k=>{ if(typeof d.trip.rebound[k]!=='number') d.trip.rebound[k] = 0; });
+  if(!Array.isArray(d.familyCases)) d.familyCases = [];
+  if(typeof d.recentViolence!=='number') d.recentViolence = 0;
+  if(!d.useCount || typeof d.useCount!=='object') d.useCount = {};
+  DRUG_TYPES.forEach(t=>{ if(typeof d.useCount[t.id]!=='number') d.useCount[t.id] = 0; });
+  HALLUCINOGEN_TYPES.forEach(t=>{ if(typeof d.useCount[t.id]!=='number') d.useCount[t.id] = 0; });
+
   if(!G.crime.heists || typeof G.crime.heists!=='object') G.crime.heists = {};
   const h = G.crime.heists;
   if(!h.active || typeof h.active!=='object') h.active = null;
@@ -640,6 +694,577 @@ function heistResolveSetupPopupChoice(popupId, optionId){
   renderCrime();
 }
 
+function drugById(id){
+  return DRUG_TYPES.find(d=>d.id===id) || DRUG_TYPES[0];
+}
+
+function hallucinogenById(id){
+  return HALLUCINOGEN_TYPES.find(h=>h.id===id) || HALLUCINOGEN_TYPES[0];
+}
+
+function drugRouteMeta(route){
+  if(route==='gang') return { label:'Street Gang Network', profit:1.12, heat:1.3, conflict:0.25 };
+  if(route==='mafia') return { label:'Mafia Supply Network', profit:1.24, heat:0.88, conflict:0.08 };
+  return { label:'Independent Crew', profit:1.0, heat:1.0, conflict:0.14 };
+}
+
+function drugAddictionLevel(score){
+  if(score>=82) return 'Severe';
+  if(score>=62) return 'Addicted';
+  if(score>=38) return 'Dependent';
+  if(score>=14) return 'Casual';
+  return 'None';
+}
+
+function drugSyncAddictionState(announce=true){
+  ensureCrimeShape();
+  const D = G.crime.drugs;
+  const next = drugAddictionLevel(D.addictionScore||0);
+  const prev = D.addictionLevel||'None';
+  D.addictionLevel = next;
+  if(announce && next!==prev){
+    const tone = (next==='None'||next==='Casual') ? 'warn' : 'bad';
+    addEv(`Addiction status changed: ${prev} -> ${next}.`, tone);
+  }
+  if(next!=='Severe' && D.junkie.active && (D.addictionScore||0)<70){
+    D.junkie.active = false;
+    D.junkie.housing = 'none';
+    addEv('You climbed out of junkie state. Recovery is still fragile.', 'good');
+  }
+}
+
+function drugOpenSupplyPopup(){
+  ensureCrimeShape();
+  const actions = DRUG_TYPES.map(d=>({
+    label:`${d.label} (${fmt$(Math.floor(d.profit*0.55))}/unit)`,
+    cls:'btn-ghost',
+    onClick:()=>drugChooseSupplyQty(d.id),
+  }));
+  showPopup('Acquire Supply', 'Pick what to buy. Higher margin products also spike heat and instability faster.', actions, 'dark');
+}
+
+function drugChooseSupplyQty(drugId){
+  const d = drugById(drugId);
+  showPopup(`Supply quantity: ${d.label}`, 'Bigger buys improve scale but increase bust/exposure risk.', [
+    { label:'Small (8 units)', cls:'btn-ghost', onClick:()=>drugAcquireSupply(drugId, 8) },
+    { label:'Medium (18 units)', cls:'btn-ghost', onClick:()=>drugAcquireSupply(drugId, 18) },
+    { label:'Large (36 units)', cls:'btn-primary', onClick:()=>drugAcquireSupply(drugId, 36) },
+  ], 'dark');
+}
+
+function drugAcquireSupply(drugId, qty, silent=false){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  const d = drugById(drugId);
+  const units = Math.max(1, qty|0);
+  const routeMeta = drugRouteMeta(D.route);
+  const wholesaleUnit = Math.max(35, Math.floor(d.profit * (D.route==='mafia' ? 0.43 : D.route==='gang' ? 0.5 : 0.56)));
+  const cost = wholesaleUnit * units;
+  if(G.money < cost){
+    flash(`Need ${fmt$(cost)} for this shipment.`,'warn');
+    return false;
+  }
+  G.money -= cost;
+  D.active = true;
+  D.tradeDrug = d.id;
+  D.inventory[d.id] = (D.inventory[d.id]||0) + units;
+  D.supplyQuality = clamp((D.supplyQuality||45) + rnd(1,4));
+  D.instability = clamp((D.instability||20) + Math.round(units*d.heatMult*0.22 + routeMeta.conflict*5));
+  C.heat = Math.min(100, C.heat + Math.max(1, Math.round(units * d.heatMult * 0.25)));
+  C.police.closeness = Math.min(100, C.police.closeness + Math.max(1, Math.round(units * d.heatMult * 0.18)));
+  addCrimeEv(`Supply acquired: ${units} units of ${d.label} (${fmt$(cost)}).`, 'warn');
+  if(Math.random() < (0.06 + units/460)){
+    const spoil = Math.max(1, Math.floor(units * rnd(10,28) / 100));
+    D.inventory[d.id] = Math.max(0, D.inventory[d.id] - spoil);
+    D.instability = clamp(D.instability + rnd(3,8));
+    addEv(`Supplier quality issue: ${spoil} units of ${d.label} were compromised.`, 'bad');
+  }
+  if(!silent){
+    updateHUD();
+    renderCrime();
+  }
+  return true;
+}
+
+function drugSetRoute(route){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  if(!['independent','gang','mafia'].includes(route)) return;
+  D.route = route;
+  if(route==='gang' && !C.gang.joined){
+    D.instability = clamp(D.instability + rnd(3,8));
+    addEv('You are outsourcing to street crews without direct affiliation. Betrayal risk rises.', 'warn');
+  }
+  if(route==='mafia' && !C.mafia.joined){
+    D.instability = clamp(D.instability + rnd(1,5));
+    addEv('You are buying mafia-protected lanes via brokers. Expensive, but discreet.', 'warn');
+  }
+  addCrimeEv(`Drug route switched to ${drugRouteMeta(route).label}.`, 'warn');
+  updateHUD();
+  renderCrime();
+}
+
+function drugOpenRoutePopup(){
+  showPopup('Distribution Route', 'Choose the core structure of your operation. No route is purely safe.', [
+    { label:'Independent', cls:'btn-ghost', onClick:()=>drugSetRoute('independent') },
+    { label:'Street Gangs', cls:'btn-ghost', onClick:()=>drugSetRoute('gang') },
+    { label:'Mafia Network', cls:'btn-primary', onClick:()=>drugSetRoute('mafia') },
+  ], 'dark');
+}
+
+function drugOpenZoneAssign(zoneId){
+  ensureCrimeShape();
+  const z = (G.crime.drugs.zones||[]).find(x=>x.id===zoneId);
+  if(!z) return;
+  showPopup(`Assign ${z.label}`, 'Pick who handles this zone and how aggressive the push is.', [
+    { label:'Pause this zone', cls:'btn-ghost', onClick:()=>drugAssignZone(zoneId, 'none', 1) },
+    { label:'Independent crew (normal)', cls:'btn-ghost', onClick:()=>drugAssignZone(zoneId, 'independent', 1) },
+    { label:'Street gang (hot)', cls:'btn-ghost', onClick:()=>drugAssignZone(zoneId, 'gang', 1) },
+    { label:'Mafia (low profile)', cls:'btn-primary', onClick:()=>drugAssignZone(zoneId, 'mafia', 1) },
+    { label:'Aggressive push (+income +risk)', cls:'btn-ghost', onClick:()=>drugAssignZone(zoneId, z.assignment==='none'?'independent':z.assignment, 2) },
+  ], 'dark');
+}
+
+function drugAssignZone(zoneId, assignment, intensity){
+  ensureCrimeShape();
+  const D = G.crime.drugs;
+  const z = (D.zones||[]).find(x=>x.id===zoneId);
+  if(!z) return;
+  z.assignment = assignment;
+  z.intensity = Math.max(1, Math.min(2, intensity|0));
+  if(assignment!=='none') D.active = true;
+  addCrimeEv(`${z.label} assigned to ${assignment} route (${z.intensity===2?'aggressive':'normal'}).`, 'warn');
+  renderCrime();
+}
+
+function drugRunDistributionCycle(auto=false){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  const d = drugById(D.tradeDrug||'marijuana');
+  const inv = D.inventory[d.id]||0;
+  const activeZones = (D.zones||[]).filter(z=>z.assignment!=='none');
+  if(inv<=0){
+    if(!auto) flash(`No ${d.label} inventory. Acquire supply first.`, 'warn');
+    return false;
+  }
+  if(!activeZones.length){
+    if(!auto) flash('Assign at least one zone before distribution.', 'warn');
+    return false;
+  }
+
+  let remaining = inv;
+  let net = 0;
+  let heatGain = 0;
+  let violencePulse = 0;
+  let soldTotal = 0;
+
+  activeZones.forEach(z=>{
+    if(remaining<=0) return;
+    const route = z.assignment || D.route || 'independent';
+    const routeMeta = drugRouteMeta(route);
+    const qualityMult = 0.65 + (D.supplyQuality||45)/160;
+    const demand = Math.max(4, Math.floor(z.demand * qualityMult * z.intensity));
+    const sold = Math.min(remaining, demand + rnd(0, Math.floor(demand*0.4)));
+    if(sold<=0) return;
+    remaining -= sold;
+    soldTotal += sold;
+    const gross = Math.floor(sold * d.profit * routeMeta.profit);
+    const brokerCut =
+      route==='mafia' && !C.mafia.joined ? Math.floor(gross*0.14) :
+      route==='gang' && !C.gang.joined ? Math.floor(gross*0.1) : 0;
+    net += Math.max(0, gross - brokerCut);
+    heatGain += sold * d.heatMult * z.risk * 0.11 * routeMeta.heat;
+    violencePulse += d.violence * z.risk * routeMeta.conflict * (z.intensity===2?1.25:1);
+  });
+
+  D.inventory[d.id] = Math.max(0, remaining);
+  D.lastIncome = Math.floor(net);
+  D.income = (D.income||0) + Math.floor(net);
+  G.money += Math.floor(net);
+  C.notoriety = clamp(C.notoriety + Math.max(1, Math.floor(soldTotal/18)));
+  C.heat = Math.min(100, C.heat + Math.max(1, Math.floor(heatGain)));
+  C.police.closeness = Math.min(100, C.police.closeness + Math.max(1, Math.floor(heatGain*0.7)));
+  D.instability = clamp((D.instability||20) + Math.max(0, Math.floor(violencePulse*20)));
+  D.recentViolence = clamp((D.recentViolence||0) + Math.max(0, Math.floor(violencePulse*18)));
+
+  if(soldTotal>0){
+    addCrimeEv(`Distribution cycle: sold ${soldTotal} ${d.label} units for ${fmt$(Math.floor(net))}.`, 'bad');
+    if(Math.random() < Math.min(0.5, violencePulse*0.45)){
+      G.health = clamp(G.health - rnd(2,8));
+      addEv('A distribution dispute turned violent. You survived, but it got ugly.', 'bad');
+    }
+    if(C.mafia.joined && (C.mafia.rackets||[]).some(r=>r.id==='drugs')){
+      const mafiaTake = Math.floor(net*0.08);
+      C.mafia.earnings += mafiaTake;
+      C.mafia.respect = clamp(C.mafia.respect + 1);
+    }
+    if(C.gang.joined && D.route==='gang'){
+      C.gang.cred = clamp(C.gang.cred + rnd(1,3));
+      C.gang.notoriety = clamp(C.gang.notoriety + rnd(1,4));
+    }
+  }
+
+  if(!auto) drugResolveTradeEvent();
+  if(C.heat>62) policeCheck();
+  if(!auto){
+    updateHUD();
+    renderCrime();
+  }
+  return true;
+}
+
+function drugResolveTradeEvent(){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  if(!D.active) return;
+  if(Math.random() > 0.24) return;
+  const d = drugById(D.tradeDrug||'marijuana');
+  const ev = pick(['bad_batch','supplier_missing','crew_using','raid','rival_hit']);
+  if(ev==='bad_batch'){
+    const spoiled = Math.max(1, Math.floor((D.inventory[d.id]||0) * rnd(8,24)/100));
+    D.inventory[d.id] = Math.max(0, (D.inventory[d.id]||0) - spoiled);
+    D.instability = clamp(D.instability + rnd(4,10));
+    addEv(`Bad batch alert: ${spoiled} ${d.label} units were unsellable and triggered chaos.`, 'bad');
+  } else if(ev==='supplier_missing'){
+    D.supplyQuality = clamp(D.supplyQuality - rnd(6,14));
+    D.instability = clamp(D.instability + rnd(3,8));
+    addEv('A supplier vanished overnight. Routes are unstable and prices are climbing.', 'warn');
+  } else if(ev==='crew_using'){
+    D.addictionScore = clamp(D.addictionScore + rnd(3,8));
+    D.instability = clamp(D.instability + rnd(2,7));
+    addEv('Crew members dipped into product. Discipline slipped and margins took a hit.', 'warn');
+  } else if(ev==='raid'){
+    const seizure = rnd(1200,10000);
+    C.heat = Math.min(100, C.heat + rnd(8,18));
+    C.police.closeness = Math.min(100, C.police.closeness + rnd(8,16));
+    G.money = Math.max(0, G.money - seizure);
+    addEv(`Police raid pressure cost you ${fmt$(seizure)} in seized cash and product.`, 'bad');
+    if(Math.random()<0.2) policeCheck();
+  } else {
+    C.heat = Math.min(100, C.heat + rnd(6,14));
+    D.recentViolence = clamp(D.recentViolence + rnd(6,16));
+    addEv('A rival crew hit one of your routes. The city got hotter overnight.', 'bad');
+  }
+}
+
+function drugUseTradeProduct(drugId){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  const d = drugById(drugId||D.tradeDrug||'marijuana');
+  const inv = D.inventory[d.id]||0;
+  if(inv>0){
+    D.inventory[d.id] = Math.max(0, inv-1);
+  } else {
+    const cost = Math.max(50, Math.floor(d.profit*0.5));
+    if(G.money<cost){ flash(`Need ${fmt$(cost)} to source ${d.label}.`, 'warn'); return; }
+    G.money -= cost;
+  }
+  D.useCount[d.id] = (D.useCount[d.id]||0) + 1;
+  G.happy = clamp(G.happy + rnd(2,9));
+  G.stress = clamp((G.stress||35) - rnd(1,8));
+  G.health = clamp(G.health - rnd(2,8) - Math.floor(d.socialImpact*6));
+  G.smarts = clamp(G.smarts - rnd(0,3) - Math.floor(d.socialImpact*4));
+  D.addictionScore = clamp((D.addictionScore||0) + Math.round(d.addictionRate*100) + rnd(1,5));
+  D.relapseRisk = clamp((D.relapseRisk||8) + Math.round(d.addictionRate*20));
+  if(d.id==='fentanyl' && Math.random()<Math.max(0.005, d.fatality*0.22)){
+    die('An overdose ended your story. This was avoidable.');
+    return;
+  }
+  addEv(`You used ${d.label}. Immediate relief came with a delayed bill.`, 'warn');
+  if((G.sm.totalFame||0)>=40 && Math.random()<Math.min(0.45, d.socialImpact*0.5)){
+    G.sm.controversies = (G.sm.controversies||0) + 1;
+    G.sm.totalFame = clamp((G.sm.totalFame||0) - rnd(2,8));
+    addEv(`Drug controversy hit the news cycle. Fame took a dent.`, 'bad');
+  }
+  drugSyncAddictionState();
+  updateHUD();
+  renderCrime();
+}
+
+function drugTakeHallucinogen(id){
+  ensureCrimeShape();
+  const D = G.crime.drugs;
+  const h = hallucinogenById(id);
+  const cost = rnd(h.price[0], h.price[1]);
+  if(G.money < cost){ flash(`Need ${fmt$(cost)} for ${h.label}.`, 'warn'); return; }
+  G.money -= cost;
+  D.useCount[h.id] = (D.useCount[h.id]||0) + 1;
+  const trip = pick(HALLUCINOGEN_TRIP_EVENTS);
+  const dSmarts = rnd(h.mindSwing[0], h.mindSwing[1]);
+  const dStress = rnd(h.stressSwing[0], h.stressSwing[1]);
+  const dHealth = rnd(h.healthSwing[0], h.healthSwing[1]);
+  const dHappy = rnd(-6, 12);
+  G.smarts = clamp(G.smarts + dSmarts);
+  G.stress = clamp((G.stress||35) + dStress);
+  G.health = clamp(G.health + dHealth);
+  G.happy = clamp(G.happy + dHappy);
+  D.trip = {
+    active:true,
+    label:h.label,
+    expiresAge:G.age+1,
+    rebound:{
+      happy: Math.round(-dHappy*0.5),
+      smarts: Math.round(-dSmarts*0.45),
+      stress: Math.round(-dStress*0.55),
+    }
+  };
+  addEv(`${h.icon} ${trip.msg}`, trip.tone||'warn');
+  addEv(`Trip effects: Happy ${dHappy>=0?'+':''}${dHappy}, Smarts ${dSmarts>=0?'+':''}${dSmarts}, Stress ${dStress>=0?'+':''}${dStress}.`, 'warn');
+  updateHUD();
+  renderCrime();
+}
+
+function drugOpenHallucinogenPopup(){
+  showPopup('Hallucinogens', 'Trips never boost your distribution income. They only affect your headspace and stats temporarily.', HALLUCINOGEN_TYPES.map(h=>({
+    label:`${h.icon} ${h.label}`,
+    cls:'btn-ghost',
+    onClick:()=>drugTakeHallucinogen(h.id),
+  })), 'dark');
+}
+
+function drugStartRecovery(){
+  ensureCrimeShape();
+  const D = G.crime.drugs;
+  D.inRecovery = true;
+  D.relapseRisk = clamp(Math.max(8, D.relapseRisk - rnd(1,5)));
+  addEv('You committed to recovery. It helps, but relapse risk remains real.', 'good');
+  renderCrime();
+}
+
+function drugAttendRecovery(){
+  ensureCrimeShape();
+  const D = G.crime.drugs;
+  const cost = 850;
+  if(G.money<cost){ flash(`Need ${fmt$(cost)} for treatment support.`, 'warn'); return; }
+  G.money -= cost;
+  D.inRecovery = true;
+  D.addictionScore = clamp(Math.max(0, D.addictionScore - rnd(10,18)));
+  D.relapseRisk = clamp(Math.max(6, D.relapseRisk - rnd(4,10)));
+  G.stress = clamp((G.stress||35) - rnd(5,12));
+  G.happy = clamp(G.happy + rnd(2,8));
+  drugSyncAddictionState();
+  addEv('You attended treatment support. Progress is real, even when it feels slow.', 'good');
+  updateHUD();
+  renderCrime();
+}
+
+function drugJunkieAction(type){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  if(!D.junkie.active) return;
+  if(type==='scavenge'){
+    const gain = rnd(20,140);
+    G.money += gain;
+    G.health = clamp(G.health - rnd(1,4));
+    addEv(`You scavenged enough for ${fmt$(gain)}. It barely keeps the lights on.`, 'warn');
+  } else if(type==='steal'){
+    const gain = rnd(80,360);
+    G.money += gain;
+    C.heat = Math.min(100, C.heat + rnd(6,14));
+    C.police.closeness = Math.min(100, C.police.closeness + rnd(5,12));
+    G.health = clamp(G.health - rnd(3,8));
+    addEv(`You stole to survive. It worked this time, but the net closes tighter.`, 'bad');
+    policeCheck();
+  } else if(type==='crash'){
+    D.junkie.housing = pick(['abandoned house','trap house couch','shelter bunk']);
+    D.junkie.isolation = clamp(D.junkie.isolation + rnd(2,8));
+    G.happy = clamp(G.happy - rnd(2,6));
+    addEv(`You crashed in a ${D.junkie.housing}. Stability keeps shrinking.`, 'warn');
+  }
+  updateHUD();
+  renderCrime();
+}
+
+function processDrugEcosystemYear(){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  if((D.recentViolence||0)>0) D.recentViolence = Math.max(0, D.recentViolence - rnd(8,20));
+
+  if(D.trip.active && D.trip.expiresAge<=G.age){
+    const rb = D.trip.rebound||{ happy:0, smarts:0, stress:0 };
+    G.happy = clamp(G.happy + (rb.happy||0));
+    G.smarts = clamp(G.smarts + (rb.smarts||0));
+    G.stress = clamp((G.stress||35) + (rb.stress||0));
+    addEv(`The ${D.trip.label} after-effects faded. Your baseline mind-state returned.`, 'warn');
+    D.trip = { active:false, label:'', expiresAge:0, rebound:{ happy:0, smarts:0, stress:0 } };
+  }
+
+  if(D.active && (D.zones||[]).some(z=>z.assignment!=='none') && (D.inventory[D.tradeDrug]||0)>0){
+    drugRunDistributionCycle(true);
+    addEv(`Drug network yielded ${fmt$(D.lastIncome||0)} this year from ${drugById(D.tradeDrug).label}.`, 'warn');
+  }
+
+  const lvl = drugAddictionLevel(D.addictionScore||0);
+  if(lvl==='Casual'){
+    G.health = clamp(G.health - rnd(1,2));
+    G.money -= rnd(120,360);
+  } else if(lvl==='Dependent'){
+    G.health = clamp(G.health - rnd(2,5));
+    G.happy = clamp(G.happy - rnd(2,6));
+    G.smarts = clamp(G.smarts - rnd(1,3));
+    G.money -= rnd(300,950);
+  } else if(lvl==='Addicted'){
+    G.health = clamp(G.health - rnd(4,9));
+    G.happy = clamp(G.happy - rnd(4,9));
+    G.smarts = clamp(G.smarts - rnd(2,5));
+    G.money -= rnd(700,2200);
+    if(Math.random()<0.2){
+      D.addictionScore = clamp(D.addictionScore + rnd(3,8));
+      addEv('Addiction drove a bad decision this year. Recovery got harder.', 'bad');
+    }
+  } else if(lvl==='Severe'){
+    G.health = clamp(G.health - rnd(8,16));
+    G.happy = clamp(G.happy - rnd(8,16));
+    G.smarts = clamp(G.smarts - rnd(3,8));
+    G.money -= rnd(1400,4200);
+    if(!D.junkie.active && Math.random()<0.35){
+      D.junkie.active = true;
+      D.junkie.years = 0;
+      D.junkie.housing = pick(['abandoned house','junkie house','shelter bunk']);
+      addEv('Severe addiction pushed you into a junkie survival state.', 'bad');
+    }
+  }
+
+  if(D.junkie.active){
+    D.junkie.years += 1;
+    D.junkie.isolation = clamp((D.junkie.isolation||0) + rnd(3,10));
+    G.health = clamp(G.health - rnd(3,9));
+    G.happy = clamp(G.happy - rnd(5,12));
+    G.stress = clamp((G.stress||35) + rnd(4,12));
+    if(Math.random()<0.3){
+      G.crime.heat = Math.min(100, G.crime.heat + rnd(4,12));
+      addEv('Desperation drew police attention around your junkie circle.', 'bad');
+    }
+  }
+
+  if(D.inRecovery){
+    D.addictionScore = clamp(Math.max(0, D.addictionScore - rnd(5,12)));
+    const relapseChance = Math.max(0.04, Math.min(0.65,
+      (D.relapseRisk||8)/100 + (G.stress||35)/320 + ((D.addictionLevel==='Severe')?0.12:0)
+    ));
+    if(Math.random()<relapseChance){
+      D.addictionScore = clamp(D.addictionScore + rnd(8,18));
+      addEv('Relapse episode. Recovery resets, but it is not over.', 'bad');
+    } else {
+      G.happy = clamp(G.happy + rnd(1,4));
+      G.health = clamp(G.health + rnd(1,3));
+    }
+  }
+
+  // Rare family addiction fallout (1% per family member per year)
+  (G.family||[]).forEach(p=>{
+    if(!p || p.alive===false) return;
+    if(!p.drugIssue && Math.random()<0.01){
+      p.drugIssue = { level:'casual', years:0 };
+      addEv(`Rare family crisis: ${p.firstName} developed a substance issue.`, 'bad');
+    }
+    if(!p.drugIssue) return;
+    p.drugIssue.years = (p.drugIssue.years||0) + 1;
+    if(Math.random()<0.26){
+      const ask = rnd(120,1200);
+      if(G.money>=ask && Math.random()<0.65){
+        G.money -= ask;
+        p.relation = clamp((p.relation||50) + rnd(1,3));
+        addEv(`${p.firstName} asked for help with addiction-related costs. You gave ${fmt$(ask)}.`, 'warn');
+      } else if(Math.random()<0.35){
+        const loss = rnd(80,900);
+        G.money = Math.max(0, G.money-loss);
+        p.relation = clamp((p.relation||50) - rnd(4,10));
+        addEv(`${p.firstName} stole ${fmt$(loss)} during a relapse spiral.`, 'bad');
+      }
+    }
+    if(Math.random()<0.12){
+      p.drugIssue.level = p.drugIssue.level==='casual' ? 'dependent' : 'severe';
+      p.relation = clamp((p.relation||50) - rnd(3,9));
+    } else if(Math.random()<0.08){
+      p.drugIssue = null;
+      addEv(`${p.firstName} entered recovery and stabilized this year.`, 'good');
+    }
+  });
+
+  // Fame interconnection
+  if((G.sm.totalFame||0)>=55 && lvl!=='None' && Math.random()<0.22){
+    G.sm.controversies = (G.sm.controversies||0) + 1;
+    G.sm.totalFame = clamp((G.sm.totalFame||0) - rnd(3,11));
+    addEv('Fame controversy: substance narrative dominated headlines this year.', 'bad');
+  }
+
+  // Drug-trade pressure and crackdown
+  const totalInv = Object.values(D.inventory||{}).reduce((s,v)=>s+(v||0),0);
+  if(D.active){
+    const pressure = (D.instability||20)/10 + totalInv/18 + ((D.route==='gang')?3:0) + ((D.route==='mafia')?1:0);
+    C.heat = Math.min(100, C.heat + Math.floor(pressure/6));
+    C.police.closeness = Math.min(100, C.police.closeness + Math.floor(pressure/8));
+    if(pressure>16 && Math.random()<0.22){
+      const seized = Math.min(totalInv, rnd(8,28));
+      D.inventory[D.tradeDrug] = Math.max(0, (D.inventory[D.tradeDrug]||0) - seized);
+      C.heat = Math.min(100, C.heat + rnd(6,16));
+      addEv(`Police crackdown seized ${seized} units from your pipeline.`, 'bad');
+      if(Math.random()<0.24) policeCheck();
+    }
+  }
+
+  drugSyncAddictionState(false);
+}
+
+function renderDrugEcosystemCard(){
+  ensureCrimeShape();
+  const C = G.crime;
+  const D = C.drugs;
+  const primary = drugById(D.tradeDrug||'marijuana');
+  const inv = D.inventory[primary.id]||0;
+  const zoneRows = (D.zones||[]).map(z=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:.82rem">${z.label}</div>
+        <div style="font-size:.68rem;color:var(--muted2)">Demand ${z.demand} · Risk ${z.risk.toFixed(1)} · ${z.assignment==='none'?'Paused':`${z.assignment} / ${z.intensity===2?'Aggressive':'Normal'}`}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="drugOpenZoneAssign('${z.id}')">Assign</button>
+    </div>`).join('');
+  const routeMeta = drugRouteMeta(D.route||'independent');
+  const addictionTone = D.addictionLevel==='Severe' ? 'var(--danger)' : D.addictionLevel==='Addicted' ? 'var(--gold)' : 'var(--muted2)';
+  return `<div class="card">
+    <div class="card-title">Drug Ecosystem</div>
+    <div style="font-size:.78rem;color:var(--muted2)">
+      Route: ${routeMeta.label} · Product: <strong>${primary.label}</strong> · Inventory: ${inv} units · Last cycle: ${fmt$(D.lastIncome||0)}
+    </div>
+    <div style="font-size:.72rem;color:var(--muted2);margin-top:4px">
+      Supply quality ${D.supplyQuality} · Instability ${D.instability} · Heat ${C.heat} · Recent violence ${D.recentViolence}
+    </div>
+    <div style="font-size:.72rem;color:${addictionTone};margin-top:4px">
+      Personal addiction status: <strong>${D.addictionLevel}</strong> (score ${D.addictionScore}) ${D.inRecovery?'· In recovery':''} ${D.junkie.active?'· Junkie state active':''}
+    </div>
+    <div class="choice-grid" style="margin-top:8px">
+      <div class="choice" onclick="drugOpenSupplyPopup()"><div class="choice-icon">📦</div><div class="choice-name">Acquire Supply</div><div class="choice-desc">Supply phase</div></div>
+      <div class="choice" onclick="drugRunDistributionCycle()"><div class="choice-icon">🚚</div><div class="choice-name">Run Distribution</div><div class="choice-desc">Income + risk</div></div>
+      <div class="choice" onclick="drugOpenRoutePopup()"><div class="choice-icon">🧭</div><div class="choice-name">Set Route</div><div class="choice-desc">Independent / gang / mafia</div></div>
+      <div class="choice" onclick="drugUseTradeProduct('${primary.id}')"><div class="choice-icon">💉</div><div class="choice-name">Use ${primary.label}</div><div class="choice-desc">Consumption + addiction risk</div></div>
+      <div class="choice" onclick="drugOpenHallucinogenPopup()"><div class="choice-icon">🌀</div><div class="choice-name">Hallucinogens</div><div class="choice-desc">Trip events (no income)</div></div>
+      <div class="choice" onclick="${D.inRecovery?'drugAttendRecovery()':'drugStartRecovery()'}"><div class="choice-icon">🫶</div><div class="choice-name">${D.inRecovery?'Attend Recovery':'Start Recovery'}</div><div class="choice-desc">Exit path + relapse risk</div></div>
+    </div>
+    ${D.junkie.active?`
+      <div style="font-size:.72rem;color:var(--danger);margin-top:10px">
+        Junkie state: housing = ${D.junkie.housing||'unstable'} · isolation ${D.junkie.isolation||0}
+      </div>
+      <div class="choice-grid">
+        <div class="choice" onclick="drugJunkieAction('scavenge')"><div class="choice-icon">🛒</div><div class="choice-name">Scavenge</div><div class="choice-desc">Tiny cash, health cost</div></div>
+        <div class="choice" onclick="drugJunkieAction('steal')"><div class="choice-icon">🧤</div><div class="choice-name">Steal for Money</div><div class="choice-desc">Heat spike risk</div></div>
+        <div class="choice" onclick="drugJunkieAction('crash')"><div class="choice-icon">🛏️</div><div class="choice-name">Crash House</div><div class="choice-desc">Low-quality shelter</div></div>
+      </div>
+    `:''}
+    <div style="max-height:140px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:6px;margin-top:8px">
+      ${zoneRows}
+    </div>
+  </div>`;
+}
+
 function renderCrime(){
   ensureCrimeShape();
   const cc = document.getElementById('crime-content');
@@ -754,7 +1379,7 @@ function renderCrime(){
       <div class="choice-grid">
         <div class="choice" onclick="carjack()"><div class="choice-icon">🚗</div><div class="choice-name">Carjack</div><div class="choice-desc">High risk</div></div>
         <div class="choice" onclick="holdUpStore()"><div class="choice-icon">🏪</div><div class="choice-name">Hold Up Store</div><div class="choice-desc">Bigger payout</div></div>
-        <div class="choice" onclick="sellDrugs()"><div class="choice-icon">💊</div><div class="choice-name">Sell Drugs</div><div class="choice-desc">Expansion soon</div></div>
+        <div class="choice" onclick="sellDrugs()"><div class="choice-icon">💊</div><div class="choice-name">Sell Drugs</div><div class="choice-desc">Launches full ecosystem</div></div>
       </div>
     </div>`;
   }
@@ -779,6 +1404,8 @@ function renderCrime(){
       ${a>=18?`<div class="choice" onclick="hackPeople()"><div class="choice-icon">💻</div><div class="choice-name">Hack People</div><div class="choice-desc">Skill: ${C.skills.hack}</div></div>`:''}
     </div>
   </div>`;
+
+  html += renderDrugEcosystemCard();
 
   // Age 18+ big crime
   if(a>=18){
@@ -963,13 +1590,23 @@ function holdUpStore(){
 }
 
 function sellDrugs(){
-  const gain = rnd(80,240);
-  G.money += gain; G.crime.notoriety += 2; G.crime.heat = Math.min(100, G.crime.heat + rnd(4,10));
-  addEv(`You sold drugs on the side. +$${gain}. Expansion coming.`, 'warn');
-  addCrimeEv(`Sold drugs for $${gain}.`, 'warn');
-  G.crime.police.closeness = Math.min(100, G.crime.police.closeness + rnd(3,8));
-  policeCheck();
-  updateHUD(); renderCrime();
+  ensureCrimeShape();
+  const D = G.crime.drugs;
+  if(!D.active){
+    D.active = true;
+    D.route = G.crime.mafia.joined ? 'mafia' : (G.crime.gang.joined ? 'gang' : 'independent');
+    const firstZone = (D.zones||[])[0];
+    if(firstZone) firstZone.assignment = D.route;
+    if(drugAcquireSupply('marijuana', rnd(10,20), true)){
+      addEv('You stepped into distribution. The money is real and the risk is realer.', 'warn');
+      addCrimeEv('Drug ecosystem started from street-level distribution.', 'warn');
+    }
+  } else {
+    drugRunDistributionCycle();
+  }
+  G.crime.police.closeness = Math.min(100, G.crime.police.closeness + rnd(2,6));
+  updateHUD();
+  renderCrime();
 }
 
 function attemptKill(targetName){
@@ -1883,18 +2520,20 @@ function gangPost(){
 }
 
 function gangDrugs(){
+  ensureCrimeShape();
   const D = G.crime.drugs;
-  if(!D.active){
-    D.active = true; D.tier='low'; D.supply = rnd(5,15); D.model = 'street';
-    addCrimeEv('Started small drug operation.', 'bad');
-  } else {
-    const dt = DRUG_TYPES.find(x=>x.id===D.tier);
-    const income = Math.floor(dt.profit * D.supply * (D.model==='street'?1:0.8));
-    G.money += income; D.income += income;
-    G.crime.heat = Math.min(100, G.crime.heat + Math.floor(6*dt.heat));
-    addCrimeEv(`Drug sales earned ${fmt$(income)}.`, 'bad');
+  D.active = true;
+  D.route = 'gang';
+  const zone = (D.zones||[]).find(z=>z.assignment==='none') || (D.zones||[])[0];
+  if(zone){
+    zone.assignment = 'gang';
+    zone.intensity = 2;
   }
-  renderCrime();
+  if((D.inventory[D.tradeDrug]||0)<8){
+    drugAcquireSupply(D.tradeDrug||'marijuana', rnd(8,16), true);
+  }
+  addCrimeEv('Street gang distribution route activated.', 'bad');
+  drugRunDistributionCycle();
 }
 
 function gangSnitch(){

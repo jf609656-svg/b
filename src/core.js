@@ -404,11 +404,32 @@ const G = {
       betrayalRisk:0,
       cooldown:0,
       totalTake:0,
+      setupPopupSeen:[],
     },
     police:{ closeness:0, arrested:false, sentence:0, inPrison:false },
     prison:{ respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } },
     gang:{ joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 },
-    drugs:{ active:false, tier:'low', supply:0, model:'street', heatMult:1.0, income:0, risk:0 },
+    drugs:{
+      active:false,
+      route:'independent',       // independent | gang | mafia
+      tradeDrug:'marijuana',
+      inventory:{},
+      supplyQuality:45,
+      instability:20,
+      zones:[],
+      dealers:{ independent:1, gang:0, mafia:0 },
+      income:0,
+      lastIncome:0,
+      addictionScore:0,
+      addictionLevel:'None',
+      inRecovery:false,
+      relapseRisk:8,
+      junkie:{ active:false, years:0, housing:'none', isolation:0 },
+      trip:{ active:false, label:'', expiresAge:0, rebound:{ happy:0, smarts:0, stress:0 } },
+      familyCases:[],
+      recentViolence:0,
+      useCount:{},
+    },
     mafia:{ joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0,
       rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 }
   },
@@ -887,6 +908,7 @@ function replaceGameState(state){
   ensureCareerShape();
   ensureBioShape();
   if(typeof ensurePoliticsState==='function') ensurePoliticsState();
+  if(typeof ensureCrimeShape==='function') ensureCrimeShape();
   if(typeof ensureMMAState==='function') ensureMMAState();
   if(typeof ensurePetState==='function') ensurePetState();
   if(!Array.isArray(G.pets)) G.pets = [];
@@ -2482,6 +2504,9 @@ function ageUp(){
   }
 
   // ── Crime: heat decay & retaliation ─────────────────────────
+  if(typeof processDrugEcosystemYear==='function'){
+    runYearStepSafe('drug_ecosystem', ()=>processDrugEcosystemYear());
+  }
   if(G.crime.heat>0){
     G.crime.heat = Math.max(0, G.crime.heat - rnd(3,8));
   }
