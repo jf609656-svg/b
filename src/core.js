@@ -8,7 +8,7 @@ const G = {
   // identity
   gender:'', firstname:'', lastname:'', state:'', age:0,
   // stats (0-100)
-  health:80, happy:70, smarts:50, looks:50,
+  health:80, happy:70, smarts:50, looks:50, stress:35,
   // money (raw dollars)
   money:0,
   // relationships extended
@@ -19,6 +19,16 @@ const G = {
   assets: { home:false, homeValue:0, savings:0 },   // shared assets tracked for divorce
   finance:{
     rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
+    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0 },
+    crypto:{
+      btc:0, eth:0, sol:0, meme:0,
+      marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'',
+    },
+    business:{
+      active:false, name:'', sector:'', stage:'idea',
+      employees:0, reputation:50, product:45, operations:45, marketing:40,
+      burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+    },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
       lastStateRate:0, lastYearSummary:null, delinquentYears:0,
@@ -382,6 +392,12 @@ const FEDERAL_BRACKETS_MARRIED = [
 ];
 const NO_STATE_INCOME_TAX = new Set(['Alaska','Florida','Nevada','South Dakota','Tennessee','Texas','Washington','Wyoming','New Hampshire']);
 const SOCIAL_SECURITY_WAGE_CAP = 168600;
+const CRYPTO_COIN_META = {
+  btc:  { label:'BTC',  vol:0.32, drift:0.12 },
+  eth:  { label:'ETH',  vol:0.42, drift:0.14 },
+  sol:  { label:'SOL',  vol:0.58, drift:0.16 },
+  meme: { label:'MEME', vol:0.9,  drift:0.08 },
+};
 
 function ensureFinanceShape(){
   if(!G.finance) G.finance = {};
@@ -392,6 +408,36 @@ function ensureFinanceShape(){
   if(typeof G.finance.credit!=='number') G.finance.credit = 680;
   if(typeof G.finance.investments!=='number') G.finance.investments = 0;
   if(typeof G.finance.retirement!=='number') G.finance.retirement = 0;
+  if(!G.finance.portfolio) G.finance.portfolio = {};
+  if(typeof G.finance.portfolio.indexFund!=='number') G.finance.portfolio.indexFund = 0;
+  if(typeof G.finance.portfolio.bonds!=='number') G.finance.portfolio.bonds = 0;
+  if(typeof G.finance.portfolio.realEstateFund!=='number') G.finance.portfolio.realEstateFund = 0;
+  if(typeof G.finance.portfolio.ventureFund!=='number') G.finance.portfolio.ventureFund = 0;
+  if(!G.finance.crypto) G.finance.crypto = {};
+  if(typeof G.finance.crypto.btc!=='number') G.finance.crypto.btc = 0;
+  if(typeof G.finance.crypto.eth!=='number') G.finance.crypto.eth = 0;
+  if(typeof G.finance.crypto.sol!=='number') G.finance.crypto.sol = 0;
+  if(typeof G.finance.crypto.meme!=='number') G.finance.crypto.meme = 0;
+  if(typeof G.finance.crypto.marketCycle!=='string') G.finance.crypto.marketCycle = 'neutral';
+  if(typeof G.finance.crypto.marketMomentum!=='number') G.finance.crypto.marketMomentum = 0;
+  if(typeof G.finance.crypto.lastYearPnl!=='number') G.finance.crypto.lastYearPnl = 0;
+  if(typeof G.finance.crypto.lastEvent!=='string') G.finance.crypto.lastEvent = '';
+  if(!G.finance.business) G.finance.business = {};
+  if(typeof G.finance.business.active!=='boolean') G.finance.business.active = false;
+  if(typeof G.finance.business.name!=='string') G.finance.business.name = '';
+  if(typeof G.finance.business.sector!=='string') G.finance.business.sector = '';
+  if(typeof G.finance.business.stage!=='string') G.finance.business.stage = 'idea';
+  if(typeof G.finance.business.employees!=='number') G.finance.business.employees = 0;
+  if(typeof G.finance.business.reputation!=='number') G.finance.business.reputation = 50;
+  if(typeof G.finance.business.product!=='number') G.finance.business.product = 45;
+  if(typeof G.finance.business.operations!=='number') G.finance.business.operations = 45;
+  if(typeof G.finance.business.marketing!=='number') G.finance.business.marketing = 40;
+  if(typeof G.finance.business.burn!=='number') G.finance.business.burn = 0;
+  if(typeof G.finance.business.cashReserve!=='number') G.finance.business.cashReserve = 0;
+  if(typeof G.finance.business.valuation!=='number') G.finance.business.valuation = 0;
+  if(typeof G.finance.business.years!=='number') G.finance.business.years = 0;
+  if(typeof G.finance.business.lastProfit!=='number') G.finance.business.lastProfit = 0;
+  if(typeof G.finance.business.hasInvestor!=='boolean') G.finance.business.hasInvestor = false;
   if(!G.finance.tax) G.finance.tax = {};
   if(typeof G.finance.tax.lastPaid!=='number') G.finance.tax.lastPaid = 0;
   if(typeof G.finance.tax.lastRefund!=='number') G.finance.tax.lastRefund = 0;
@@ -401,6 +447,7 @@ function ensureFinanceShape(){
   if(typeof G.finance.tax.lastStateRate!=='number') G.finance.tax.lastStateRate = 0;
   if(typeof G.finance.tax.delinquentYears!=='number') G.finance.tax.delinquentYears = 0;
   if(!G.finance.tax.lastYearSummary) G.finance.tax.lastYearSummary = null;
+  if(typeof G.stress!=='number') G.stress = 35;
 }
 
 function calcProgressiveTax(income, brackets){
@@ -528,6 +575,130 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
     taxDebtLoaded,
     effectiveRate:grossIncome>0 ? totalTax/grossIncome : 0,
   };
+}
+
+function portfolioPrincipal(){
+  ensureFinanceShape();
+  const p = G.finance.portfolio;
+  return (G.finance.investments||0) + (p.indexFund||0) + (p.bonds||0) + (p.realEstateFund||0) + (p.ventureFund||0);
+}
+
+function processInvestmentAndCryptoYear(ledger){
+  ensureFinanceShape();
+  const p = G.finance.portfolio;
+  // Legacy bucket stays as a simple broad market fund.
+  if(G.finance.investments>0){
+    const pct = rnd(-5,12)/100;
+    const delta = Math.floor(G.finance.investments * pct);
+    G.finance.investments = Math.max(0, G.finance.investments + delta);
+    if(delta>=0){
+      ledger.investmentGains += delta;
+      addEv(`Investments gained ${fmt$(delta)} this year.`, 'good');
+    } else {
+      addEv(`Investments lost ${fmt$(Math.abs(delta))} this year.`, 'warn');
+      G.stress = clamp(G.stress + rnd(1,3));
+    }
+  }
+
+  const buckets = [
+    { key:'indexFund', label:'Index fund', min:-0.08, max:0.14, stress:1 },
+    { key:'bonds', label:'Bond fund', min:-0.02, max:0.07, stress:0 },
+    { key:'realEstateFund', label:'REIT fund', min:-0.12, max:0.18, stress:2 },
+    { key:'ventureFund', label:'Venture fund', min:-0.35, max:0.45, stress:4 },
+  ];
+  buckets.forEach(b=>{
+    const value = p[b.key]||0;
+    if(value<=0) return;
+    const pct = rnd(Math.floor(b.min*100), Math.floor(b.max*100))/100;
+    const delta = Math.floor(value * pct);
+    p[b.key] = Math.max(0, value + delta);
+    if(delta>=0){
+      ledger.investmentGains += delta;
+      if(delta>500) addEv(`${b.label} returned ${fmt$(delta)} this year.`, 'good');
+    } else if(Math.abs(delta)>500){
+      addEv(`${b.label} fell ${fmt$(Math.abs(delta))} this year.`, 'warn');
+      G.stress = clamp(G.stress + b.stress);
+    }
+  });
+
+  const c = G.finance.crypto;
+  const momentumShift = rnd(-28,28)/100;
+  c.marketMomentum = Math.max(-0.65, Math.min(0.75, (c.marketMomentum||0)*0.45 + momentumShift*0.55));
+  c.marketCycle = c.marketMomentum>0.28?'bull':c.marketMomentum<-0.28?'bear':Math.abs(c.marketMomentum)<0.09?'neutral':c.marketMomentum>0?'recovery':'cooldown';
+  let cryptoPnl = 0;
+  Object.keys(CRYPTO_COIN_META).forEach(id=>{
+    const val = c[id]||0;
+    if(val<=0) return;
+    const m = CRYPTO_COIN_META[id];
+    const cyc = c.marketCycle==='bull'?0.25:c.marketCycle==='recovery'?0.12:c.marketCycle==='bear'?-0.27:c.marketCycle==='cooldown'?-0.11:0;
+    const pct = Math.max(-0.88, m.drift + cyc + c.marketMomentum + (rnd(-100,100)/100)*m.vol);
+    const delta = Math.floor(val * pct);
+    c[id] = Math.max(0, val + delta);
+    cryptoPnl += delta;
+  });
+  c.lastYearPnl = cryptoPnl;
+  if(cryptoPnl>0){
+    ledger.investmentGains += cryptoPnl;
+    if(cryptoPnl>2000) addEv(`Crypto portfolio rallied in a ${c.marketCycle} market: +${fmt$(cryptoPnl)}.`, 'good');
+  } else if(cryptoPnl<0){
+    addEv(`Crypto drawdown this year: ${fmt$(Math.abs(cryptoPnl))}. Market regime: ${c.marketCycle}.`, Math.abs(cryptoPnl)>6000?'bad':'warn');
+    G.stress = clamp(G.stress + (Math.abs(cryptoPnl)>6000 ? rnd(6,12) : rnd(2,6)));
+  }
+}
+
+function processBusinessYear(ledger){
+  ensureFinanceShape();
+  const b = G.finance.business;
+  if(!b.active) return;
+  b.years++;
+  const scale = 1 + b.employees*0.14 + Math.max(0,b.reputation-50)/130 + Math.max(0,b.product-45)/120 + Math.max(0,b.marketing-40)/160;
+  const sectorMul =
+    b.sector==='SaaS' ? 1.18 :
+    b.sector==='E-commerce' ? 1.1 :
+    (b.sector==='Fintech' || b.sector==='FinTech') ? 1.14 :
+    (b.sector==='Media' || b.sector==='Media Brand') ? 1.06 :
+    (b.sector==='Consumer' || b.sector==='Consumer Goods') ? 1.04 : 1;
+  const revenue = Math.floor(rnd(30000,120000) * scale * sectorMul);
+  const opex = Math.floor(12000 + b.burn + b.employees*rnd(7000,19000) + rnd(5000,24000));
+  let profit = revenue - opex;
+  if(Math.random()<0.14){
+    const shock = Math.floor(revenue * rnd(10,28)/100);
+    profit -= shock;
+    addEv(`${b.name||'Your company'} had a rough quarter and unexpected costs of ${fmt$(shock)}.`, 'warn');
+    G.stress = clamp(G.stress + rnd(3,7));
+  }
+  if(Math.random()<0.11){
+    const boost = Math.floor(revenue * rnd(8,22)/100);
+    profit += boost;
+    addEv(`${b.name||'Your company'} landed a strong growth push worth ${fmt$(boost)}.`, 'good');
+  }
+  b.cashReserve += profit;
+  b.lastProfit = profit;
+  b.operations = clamp(b.operations + rnd(-2,3));
+  b.product = clamp(b.product + rnd(-1,2));
+  b.marketing = clamp(b.marketing + rnd(-2,3));
+  b.reputation = clamp(b.reputation + rnd(-2,4) + (profit>0?1:-1));
+  b.stage = b.cashReserve>2000000?'scale':b.cashReserve>500000?'growth':b.cashReserve>120000?'early traction':'idea';
+  b.valuation = Math.max(0, Math.floor((Math.max(0,revenue) * (2.2 + b.reputation/80)) + b.cashReserve * 1.4));
+
+  if(profit>0){
+    const founderPay = Math.floor(profit * (b.hasInvestor?0.18:0.26));
+    G.money += founderPay;
+    ledger.otherIncome += founderPay;
+    if(founderPay>0) addEv(`${b.name||'Your company'} paid you ${fmt$(founderPay)} this year.`, 'good');
+    G.stress = clamp(G.stress - rnd(1,4));
+  } else {
+    G.stress = clamp(G.stress + rnd(4,9));
+  }
+
+  if(b.cashReserve < -120000){
+    const bailout = Math.floor(Math.abs(b.cashReserve) * 1.12);
+    G.finance.debt += bailout;
+    b.active = false;
+    b.cashReserve = 0;
+    b.employees = 0;
+    addEv(`${b.name||'Your company'} ran out of runway. It shut down and left ${fmt$(bailout)} in debt obligations.`, 'bad');
+  }
 }
 
 // ── FLASH TOAST ─────────────────────────────────────────────────
@@ -660,7 +831,8 @@ function updateHUD(){
     statBar('Health', G.health, 'bar-h') +
     statBar('Happy',  G.happy,  'bar-p') +
     statBar('Smarts', G.smarts, 'bar-s') +
-    statBar('Looks',  G.looks,  'bar-l');
+    statBar('Looks',  G.looks,  'bar-l') +
+    statBar('Stress', G.stress, 'bar-stress');
 }
 
 function statBar(label, val, cls){
@@ -849,6 +1021,7 @@ function ageUp(){
   if(a>60) G.health = clamp(G.health - rnd(0,3));
   G.happy  = clamp(G.happy  + rnd(-4,5));
   G.smarts = clamp(G.smarts + rnd(-1,2));
+  G.stress = clamp((G.stress||35) + rnd(-3,4));
   if(a<25)      G.looks = clamp(G.looks + rnd(0,2));
   else if(a>32) G.looks = clamp(G.looks - rnd(0,2));
 
@@ -1082,6 +1255,7 @@ function ageUp(){
     c.performance = clamp(c.performance + rnd(-4,6));
     c.reputation = clamp(c.reputation + rnd(-2,3));
     if(c.salary>0) addEv(`Annual salary received: ${fmt$(c.salary)} from ${c.company}.`, 'good');
+    G.stress = clamp(G.stress + rnd(1,4) + (c.hrRisk>=60?2:0) - (c.performance>=78?1:0));
 
     // coworker drift
     c.coworkers.forEach(w=>{ w.relation = clamp(w.relation + rnd(-2,4)); });
@@ -1118,6 +1292,7 @@ function ageUp(){
       addEv(`Annual bonus: ${fmt$(bonus)} from ${G.career.company}.`, 'good');
     }
     if(G.career.benefits.healthPlan) G.health = clamp(G.health + rnd(1,3));
+    if(G.career.benefits.healthPlan && Math.random()<0.3) G.stress = clamp(G.stress - 1);
     if(G.career.stockUnits>0 && G.career.stockValue>0){
       const drift = rnd(-8,12) / 100;
       G.career.stockValue = Math.max(5, Math.floor(G.career.stockValue * (1+drift)));
@@ -1205,17 +1380,10 @@ function ageUp(){
     G.finance.debt += interest;
     yearLedger.debtInterest += interest;
     addEv(`Debt interest accrued: ${fmt$(interest)}.`, 'warn');
+    G.stress = clamp(G.stress + (G.finance.debt>200000?8:G.finance.debt>75000?5:3));
   }
-  if(G.finance.investments>0){
-    const pct = rnd(-5,12)/100;
-    const delta = Math.floor(G.finance.investments * pct);
-    G.finance.investments = Math.max(0, G.finance.investments + delta);
-    if(delta>=0){
-      yearLedger.investmentGains += delta;
-      addEv(`Investments gained ${fmt$(delta)} this year.`, 'good');
-    }
-    else addEv(`Investments lost ${fmt$(Math.abs(delta))} this year.`, 'warn');
-  }
+  processInvestmentAndCryptoYear(yearLedger);
+  processBusinessYear(yearLedger);
 
   // ── HS sport passive bonus ───────────────────────────────────
   if(G.age>=14 && G.age<=17 && G.school.sport){
@@ -1479,6 +1647,37 @@ function ageUp(){
       if(c.greed>70 && Math.random()<0.1){ addCrimeEv(`${c.name} skimmed money.`, 'bad'); }
       if(c.loyalty<30 && Math.random()<0.05){ addCrimeEv(`${c.name} flipped to police.`, 'bad'); G.crime.heat=Math.min(100,G.crime.heat+10); }
     });
+  }
+
+  // ── Stress system: multi-source pressure & consequences ───────
+  if(G.money<0) G.stress = clamp(G.stress + rnd(8,14));
+  else if(G.money<5000) G.stress = clamp(G.stress + rnd(2,5));
+  if(G.finance.debt>0) G.stress = clamp(G.stress + (G.finance.debt>120000?5:G.finance.debt>40000?3:1));
+  if(G.spouse && G.spouse.relation<40) G.stress = clamp(G.stress + rnd(2,6));
+  if(G.children.length>=3) G.stress = clamp(G.stress + rnd(1,3));
+  if(G.crime.heat>=65) G.stress = clamp(G.stress + rnd(3,8));
+  if(G.sm.controversies>=3) G.stress = clamp(G.stress + rnd(2,6));
+  if(G.medical.conditions.length>=2) G.stress = clamp(G.stress + rnd(2,5));
+  if(G.housing.comfort>=72) G.stress = clamp(G.stress - rnd(1,3));
+  if(G.happy>=75) G.stress = clamp(G.stress - rnd(1,2));
+
+  if(G.stress>=90){
+    G.health = clamp(G.health - rnd(5,11));
+    G.happy = clamp(G.happy - rnd(6,12));
+    G.smarts = clamp(G.smarts - rnd(1,3));
+    if(!G.medical.conditions.includes('burnout') && Math.random()<0.35){
+      G.medical.conditions.push('burnout');
+      addEv('Chronic stress tipped into burnout. Everything feels heavier.', 'bad');
+    } else {
+      addEv('Extreme stress hit your body hard this year.', 'bad');
+    }
+  } else if(G.stress>=72){
+    G.happy = clamp(G.happy - rnd(3,7));
+    G.health = clamp(G.health - rnd(1,4));
+    addEv('High stress made this year harder than it needed to be.', 'warn');
+  } else if(G.stress<=28){
+    G.happy = clamp(G.happy + rnd(1,4));
+    if(Math.random()<0.4) G.health = clamp(G.health + rnd(1,3));
   }
 
   // ── Annual tax filing + post-tax credit drift ────────────────

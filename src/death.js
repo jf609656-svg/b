@@ -48,6 +48,7 @@ function showDeath(){
       ${G.children.length>0?`<p style="margin-bottom:5px">👶 Children: ${G.children.length} (${G.children.filter(c=>c.adopted).length} adopted)</p>`:''}
       <p style="margin-bottom:5px">👨‍👩‍👧 Family members: ${G.family.length}</p>
       <p style="margin-bottom:5px">📖 Life events: ${G.lifeEvents.length}</p>
+      <p style="margin-bottom:5px">🧠 Final stress: ${G.stress||35}/100</p>
       ${G.school.uni.course?`<p style="margin-bottom:5px">🎓 Degree: ${G.school.uni.course}</p>`:''}
       ${G.school.gpa>=3.7?`<p style="margin-bottom:5px">⭐ Honor Roll GPA: ${G.school.gpa.toFixed(1)}</p>`:''}
       ${sport&&G.school.sportMVP?`<p style="margin-bottom:5px">🏆 ${sport.label} MVP</p>`:''}
@@ -70,6 +71,8 @@ function showDeath(){
       ${G.nba.sneakerDeal?`<p style="margin-bottom:5px">👟 Sneaker deal: ${G.nba.sneakerDeal} · ${fmt$(G.nba.sneakerRevenue)} lifetime</p>`:''}
       ${G.mma&&G.mma.active?`<p style="margin-bottom:5px">🥋 MMA: Amateur ${G.mma.amateur.wins}-${G.mma.amateur.losses}${G.mma.amateur.draws?`-${G.mma.amateur.draws}`:''} · Pro ${G.mma.pro.wins}-${G.mma.pro.losses}${G.mma.pro.draws?`-${G.mma.pro.draws}`:''} · ${fmt$(G.mma.totalEarned)} earned</p>`:''}
       ${G.mma&&G.mma.pro&&G.mma.pro.ufc&&G.mma.pro.ufc.inUFC?`<p style="margin-bottom:5px">🏟️ UFC: ${G.mma.pro.ufc.wins}-${G.mma.pro.ufc.losses}${G.mma.pro.ufc.draws?`-${G.mma.pro.ufc.draws}`:''} · ${G.mma.pro.ufc.champ?'Champion':''}${G.mma.pro.ufc.interimChamp?' Interim Champion':''}${G.mma.pro.ufc.champWeight2?' · Double Champ':''}</p>`:''}
+      ${G.finance&&G.finance.business&&G.finance.business.active?`<p style="margin-bottom:5px">🏢 Business: ${G.finance.business.name||'Founder venture'} · ${fmt$(G.finance.business.valuation||0)} valuation</p>`:''}
+      ${G.finance&&G.finance.crypto?`<p style="margin-bottom:5px">🪙 Crypto holdings: ${fmt$((G.finance.crypto.btc||0)+(G.finance.crypto.eth||0)+(G.finance.crypto.sol||0)+(G.finance.crypto.meme||0))}</p>`:''}
       ${(G.nfl.endorsementIncome+G.nba.endorsementIncome)>0?`<p style="margin-bottom:5px">💼 Endorsements: ${fmt$(G.nfl.endorsementIncome+G.nba.endorsementIncome)} total</p>`:''}
       ${G.sm.onlyfans&&G.sm.onlyfans.revenue>0?`<p style="margin-bottom:5px">💗 OnlyFans lifetime: ${fmt$(G.sm.onlyfans.revenue)}</p>`:''}
       ${G.social.rival?`<p style="margin-bottom:5px">😤 Unresolved nemesis: ${G.social.rival.firstName}. They outlived you. They\'re smug about it.</p>`:''}

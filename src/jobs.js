@@ -62,6 +62,49 @@ function genCoworkers(){
   return { boss, coworkers };
 }
 
+const BUSINESS_SECTORS = [
+  { id:'saas', label:'SaaS', icon:'🧠', startCost:12000, burn:18000, upside:1.25, risk:0.5 },
+  { id:'ecom', label:'E-commerce', icon:'📦', startCost:7000, burn:13000, upside:1.1, risk:0.6 },
+  { id:'fintech', label:'FinTech', icon:'🏦', startCost:20000, burn:24000, upside:1.35, risk:0.68 },
+  { id:'media', label:'Media Brand', icon:'🎥', startCost:5000, burn:9000, upside:1.05, risk:0.45 },
+  { id:'consumer', label:'Consumer Goods', icon:'🛍️', startCost:9000, burn:14000, upside:1.12, risk:0.55 },
+];
+
+const INVESTMENT_BUCKETS = [
+  { id:'indexFund', label:'Index Fund', icon:'📈', desc:'Broad market, balanced risk' },
+  { id:'bonds', label:'Bond Fund', icon:'🧾', desc:'Lower volatility, lower upside' },
+  { id:'realEstateFund', label:'REIT Fund', icon:'🏢', desc:'Property exposure and yield' },
+  { id:'ventureFund', label:'Venture Fund', icon:'🚀', desc:'High risk, high upside' },
+];
+
+const CRYPTO_ASSETS = [
+  { id:'btc', label:'Bitcoin', icon:'₿', minAge:16 },
+  { id:'eth', label:'Ethereum', icon:'Ξ', minAge:16 },
+  { id:'sol', label:'Solana', icon:'◎', minAge:16 },
+  { id:'meme', label:'Meme Coin', icon:'🐸', minAge:18 },
+];
+
+function ensureAdvancedFinanceState(){
+  ensureFinanceShape();
+  if(typeof G.stress!=='number') G.stress = 35;
+}
+
+function portfolioTotalValue(){
+  ensureAdvancedFinanceState();
+  const p = G.finance.portfolio;
+  return (G.finance.investments||0) + (p.indexFund||0) + (p.bonds||0) + (p.realEstateFund||0) + (p.ventureFund||0);
+}
+
+function cryptoTotalValue(){
+  ensureAdvancedFinanceState();
+  const c = G.finance.crypto;
+  return (c.btc||0) + (c.eth||0) + (c.sol||0) + (c.meme||0);
+}
+
+function businessSectorById(id){
+  return BUSINESS_SECTORS.find(s=>s.id===id);
+}
+
 function startJob(job){
   const lvl = 0;
   const mult = JOB_LEVELS[lvl].payMult;
@@ -141,14 +184,17 @@ function jobAction(targetName, action){
   if(action==='befriend'){
     t.relation = clamp(t.relation + rnd(6,12));
     G.career.reputation = clamp(G.career.reputation + rnd(1,4));
+    G.stress = clamp((G.stress||35) - rnd(1,3));
     addEv(`You built rapport with ${t.firstName} at work. Connections matter.`, 'good');
   } else if(action==='troll'){
     t.relation = clamp(t.relation - rnd(10,18));
     G.career.hrRisk = clamp(G.career.hrRisk + rnd(6,12));
+    G.stress = clamp((G.stress||35) + rnd(3,7));
     addEv(`You trolled ${t.firstName} at work. It landed… badly.`, 'bad');
   } else if(action==='hang'){
     t.relation = clamp(t.relation + rnd(5,10));
     G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) - rnd(2,5));
     addEv(`You hung out with ${t.firstName} after work. They were cooler than expected.`, 'good');
   } else if(action==='hookup'){
     G.happy = clamp(G.happy + rnd(8,16));
@@ -160,6 +206,7 @@ function jobAction(targetName, action){
     t.relation = clamp(t.relation + rnd(4,10));
     G.career.performance = clamp(G.career.performance + rnd(5,12));
     G.career.hrRisk = clamp(G.career.hrRisk + rnd(1,5));
+    G.stress = clamp((G.stress||35) + rnd(1,3));
     addEv(`You and ${t.firstName} collaborated on a project. It went well.`, 'good');
   } else if(action==='network'){
     c.reputation = clamp(c.reputation + rnd(4,8));
@@ -173,19 +220,23 @@ function jobAction(targetName, action){
       c.reputation = clamp(c.reputation + 3);
       addEv(`You asked for a raise. Approved. +${fmt$(bump)}/yr.`, 'good');
       flash('Raise approved!','good');
+      G.stress = clamp((G.stress||35) - rnd(2,5));
     } else {
       c.hrRisk = clamp(c.hrRisk + 5);
       addEv(`You asked for a raise. It was awkward. The answer was "not right now."`, 'warn');
       flash('Raise denied.','warn');
+      G.stress = clamp((G.stress||35) + rnd(3,6));
     }
   } else if(action==='work'){
     c.performance = clamp(c.performance + rnd(5,12));
     G.happy = clamp(G.happy - rnd(1,4));
+    G.stress = clamp((G.stress||35) + rnd(3,7));
     addEv('You put in a strong year at work. Performance improved.','good');
   } else if(action==='slack'){
     c.performance = clamp(c.performance - rnd(6,12));
     G.happy = clamp(G.happy + rnd(2,6));
     c.hrRisk = clamp(c.hrRisk + rnd(3,8));
+    G.stress = clamp((G.stress||35) - rnd(1,4));
     addEv('You slacked off at work. It felt good. Someone noticed.', 'warn');
   }
 
@@ -202,6 +253,7 @@ function jobSpecial(action){
     c.performance = clamp(c.performance + rnd(8,16));
     c.reputation = clamp(c.reputation + rnd(6,12));
     G.happy = clamp(G.happy + rnd(4,8));
+    G.stress = clamp((G.stress||35) + rnd(1,4));
     addEv('You won a major case. Your name carried weight afterward.','love');
   } else if(action==='settlement'){
     const bonus = Math.floor(c.salary * 0.06);
@@ -211,10 +263,12 @@ function jobSpecial(action){
   } else if(action==='surgery'){
     c.performance = clamp(c.performance + rnd(8,14));
     G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
     addEv('Successful surgery. It reminded you why you chose medicine.','love');
   } else if(action==='night_shift'){
     c.performance = clamp(c.performance + rnd(4,10));
     G.health = clamp(G.health - rnd(4,10));
+    G.stress = clamp((G.stress||35) + rnd(5,10));
     addEv('You took a brutal night shift. Patients were saved. You lost sleep.','warn');
   } else if(action==='launch'){
     c.performance = clamp(c.performance + rnd(6,12));
@@ -224,14 +278,17 @@ function jobSpecial(action){
     const bonus = Math.floor(c.salary * 0.08);
     G.money += bonus;
     c.performance = clamp(c.performance + rnd(5,9));
+    G.stress = clamp((G.stress||35) + rnd(1,4));
     addEv(`You closed a deal. Bonus: ${fmt$(bonus)}.`, 'good');
   } else if(action==='mentor'){
     c.reputation = clamp(c.reputation + rnd(5,10));
     G.happy = clamp(G.happy + rnd(4,7));
+    G.stress = clamp((G.stress||35) - rnd(2,5));
     addEv('You mentored someone at work. It felt meaningful.','good');
   } else if(action==='mistake'){
     c.performance = clamp(c.performance - rnd(8,14));
     c.hrRisk = clamp(c.hrRisk + rnd(8,16));
+    G.stress = clamp((G.stress||35) + rnd(5,9));
     addEv('A serious mistake happened on your watch. HR took notes.','bad');
   } else if(action==='press'){
     G.sm.totalFame = clamp(G.sm.totalFame + rnd(1,4));
@@ -364,10 +421,165 @@ function refinanceMortgage(){
 }
 
 function invest(amount){
+  // Backward compatible quick action = index fund buy.
+  investAsset('indexFund', amount);
+}
+
+function investAsset(bucketId, amount){
+  ensureAdvancedFinanceState();
+  const bucket = INVESTMENT_BUCKETS.find(b=>b.id===bucketId);
+  if(!bucket){ flash('Investment bucket not found','warn'); return; }
+  if(amount<=0){ flash('Invalid amount','warn'); return; }
   if(G.money < amount){ flash('Not enough cash to invest','warn'); return; }
   G.money -= amount;
-  G.finance.investments += amount;
-  addEv(`You invested ${fmt$(amount)}.`, 'good');
+  G.finance.portfolio[bucketId] = (G.finance.portfolio[bucketId]||0) + amount;
+  G.stress = clamp((G.stress||35) + rnd(0,2));
+  addEv(`You allocated ${fmt$(amount)} to ${bucket.label}.`, 'good');
+  renderJobs();
+}
+
+function buyCrypto(assetId, amount){
+  ensureAdvancedFinanceState();
+  const asset = CRYPTO_ASSETS.find(a=>a.id===assetId);
+  if(!asset){ flash('Crypto asset not found','warn'); return; }
+  if(G.age < asset.minAge){ flash(`${asset.label} trading unlocks at age ${asset.minAge}.`,'warn'); return; }
+  if(amount<=0){ flash('Invalid amount','warn'); return; }
+  if(G.money < amount){ flash('Not enough cash','warn'); return; }
+  G.money -= amount;
+  G.finance.crypto[assetId] = (G.finance.crypto[assetId]||0) + amount;
+  G.stress = clamp((G.stress||35) + rnd(1,4));
+  addEv(`You bought ${fmt$(amount)} of ${asset.label}. Volatility accepted.`, 'warn');
+  renderJobs();
+}
+
+function sellCrypto(assetId, pct){
+  ensureAdvancedFinanceState();
+  const asset = CRYPTO_ASSETS.find(a=>a.id===assetId);
+  if(!asset){ flash('Crypto asset not found','warn'); return; }
+  const current = G.finance.crypto[assetId]||0;
+  if(current<=0){ flash(`No ${asset.label} position to sell.`,'warn'); return; }
+  const ratio = Math.max(0.05, Math.min(1, pct||1));
+  const amount = Math.floor(current * ratio);
+  if(amount<=0){ flash('Position too small to sell.','warn'); return; }
+  G.finance.crypto[assetId] = Math.max(0, current - amount);
+  G.money += amount;
+  G.stress = clamp((G.stress||35) - rnd(1,4));
+  addEv(`You sold ${fmt$(amount)} of ${asset.label}.`, 'good');
+  renderJobs();
+}
+
+function startBusiness(sectorId){
+  ensureAdvancedFinanceState();
+  const b = G.finance.business;
+  if(b.active){ flash('You already run a business.','warn'); return; }
+  const sector = businessSectorById(sectorId);
+  if(!sector){ flash('Sector not found.','warn'); return; }
+  if(G.age<18){ flash('Business founder mode unlocks at age 18.','warn'); return; }
+  if(G.money < sector.startCost){ flash(`Need ${fmt$(sector.startCost)} to launch this business.`,'warn'); return; }
+
+  G.money -= sector.startCost;
+  const brand = `${pick(['Nova','Apex','Pulse','Vertex','BlueSky','Orbit','Bright','Prime'])}${pick([' Labs',' Ventures',' Studio',' Works',' Systems',' Capital',' Collective'])}`;
+  b.active = true;
+  b.name = brand;
+  b.sector = sector.label;
+  b.stage = 'idea';
+  b.employees = 1;
+  b.reputation = clamp(38 + Math.floor(G.smarts/5) + rnd(-6,6));
+  b.product = clamp(42 + Math.floor(G.smarts/4) + rnd(-8,8));
+  b.operations = clamp(40 + rnd(-7,7));
+  b.marketing = clamp(36 + rnd(-8,8));
+  b.burn = sector.burn;
+  b.cashReserve = Math.floor(sector.startCost * 0.7);
+  b.valuation = Math.floor(sector.startCost * 2.2);
+  b.years = 0;
+  b.lastProfit = 0;
+  b.hasInvestor = false;
+  if(!G.career.milestones) G.career.milestones = [];
+  G.career.milestones.push({ year:G.age, text:`Founded ${brand} (${sector.label})` });
+  G.stress = clamp((G.stress||35) + rnd(8,15));
+  addEv(`You founded ${brand} in ${sector.label}. Risk up. Potential way up.`, 'love');
+  renderJobs();
+}
+
+function businessAction(action){
+  ensureAdvancedFinanceState();
+  const b = G.finance.business;
+  if(!b.active){ flash('No active business to manage.','warn'); return; }
+
+  if(action==='build'){
+    const cost = 3000 + b.employees*1200;
+    if(G.money<cost){ flash(`Need ${fmt$(cost)}`,'warn'); return; }
+    G.money -= cost;
+    b.product = clamp(b.product + rnd(4,10));
+    b.operations = clamp(b.operations + rnd(1,4));
+    b.burn += rnd(1500,4500);
+    G.stress = clamp((G.stress||35) + rnd(4,8));
+    addEv(`${b.name}: product sprint completed. Better offering, bigger monthly burn.`, 'good');
+  } else if(action==='market'){
+    const cost = 2500 + rnd(500,3500);
+    if(G.money<cost){ flash(`Need ${fmt$(cost)}`,'warn'); return; }
+    G.money -= cost;
+    b.marketing = clamp(b.marketing + rnd(4,10));
+    b.reputation = clamp(b.reputation + rnd(2,6));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    addEv(`${b.name} marketing campaign launched. Reach improved after spending ${fmt$(cost)}.`, 'good');
+  } else if(action==='hire'){
+    const hireCost = 7000 + b.employees*3500;
+    if(G.money<hireCost){ flash(`Need ${fmt$(hireCost)} to hire.`,'warn'); return; }
+    G.money -= hireCost;
+    b.employees++;
+    b.operations = clamp(b.operations + rnd(2,5));
+    b.burn += rnd(9000,19000);
+    b.reputation = clamp(b.reputation + rnd(0,3));
+    G.stress = clamp((G.stress||35) + rnd(3,7));
+    addEv(`You hired for ${b.name}. Team size is now ${b.employees}.`, 'warn');
+  } else if(action==='cut'){
+    if(b.employees<=1){ flash('No team to cut.','warn'); return; }
+    b.employees--;
+    b.burn = Math.max(6000, b.burn - rnd(7000,16000));
+    b.reputation = clamp(b.reputation - rnd(2,6));
+    b.operations = clamp(b.operations - rnd(1,4));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    addEv(`You cut headcount at ${b.name} to extend runway.`, 'bad');
+  } else if(action==='fund'){
+    const chance = 0.28 + b.product/240 + b.reputation/260 + Math.min(0.18, b.valuation/2500000);
+    if(Math.random()<chance){
+      const raise = rnd(120000,950000);
+      b.cashReserve += raise;
+      b.valuation += Math.floor(raise * rnd(6,14)/10);
+      b.hasInvestor = true;
+      b.stage = 'growth';
+      G.stress = clamp((G.stress||35) + rnd(2,5));
+      addEv(`You raised ${fmt$(raise)} for ${b.name}. Cap table got complicated.`, 'love');
+    } else {
+      b.reputation = clamp(b.reputation - rnd(1,4));
+      G.stress = clamp((G.stress||35) + rnd(3,8));
+      addEv(`Investor roadshow for ${b.name} ended in "circle back later."`, 'warn');
+    }
+  } else if(action==='salary'){
+    if(b.cashReserve<12000){ flash('Need at least $12k in business reserve.','warn'); return; }
+    const pay = Math.floor(Math.min(b.cashReserve*0.4, rnd(8000,45000)));
+    b.cashReserve -= pay;
+    G.money += pay;
+    G.stress = clamp((G.stress||35) - rnd(2,5));
+    addEv(`Founder salary withdrawn from ${b.name}: ${fmt$(pay)}.`, 'good');
+  } else if(action==='exit'){
+    if(b.valuation<250000){ flash('Valuation too low for an exit right now.','warn'); return; }
+    const multiple = b.hasInvestor ? rnd(8,15)/100 : rnd(18,32)/100;
+    const payout = Math.floor(b.valuation * multiple);
+    G.money += payout;
+    G.career.reputation = clamp(G.career.reputation + rnd(8,15));
+    G.sm.totalFame = clamp(G.sm.totalFame + rnd(2,8));
+    G.stress = clamp((G.stress||35) - rnd(8,16));
+    addEv(`You exited ${b.name} for ${fmt$(payout)}. Founder arc completed.`, 'love');
+    G.finance.business = {
+      active:false, name:'', sector:'', stage:'idea',
+      employees:0, reputation:50, product:45, operations:45, marketing:40,
+      burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+    };
+  }
+
+  updateHUD();
   renderJobs();
 }
 
@@ -377,12 +589,13 @@ function payDebt(amount){
   G.money -= amount;
   G.finance.debt = Math.max(0, G.finance.debt - amount);
   G.finance.credit = Math.min(850, G.finance.credit + 5);
+  G.stress = clamp((G.stress||35) - rnd(2,6));
   addEv(`Debt payment: ${fmt$(amount)}. Remaining debt: ${fmt$(G.finance.debt)}.`, 'good');
   renderJobs();
 }
 
 function renderJobs(){
-  ensureFinanceShape();
+  ensureAdvancedFinanceState();
   const jc = document.getElementById('jobs-content');
   if(G.age < 16){
     jc.innerHTML = `<div class="notif warn">Jobs unlock at age 16.</div>`; return;
@@ -390,6 +603,13 @@ function renderJobs(){
 
   let html = '';
   const c = G.career;
+  html += `<div class="card">
+    <div class="card-title">Work-Life Pressure</div>
+    ${statBar('Stress', G.stress||35, 'bar-stress')}
+    <p style="font-size:.78rem;color:var(--muted2);margin-top:8px">
+      ${(G.stress||35)>=80?'Very high stress: burnout risk and health penalties are likely.':(G.stress||35)>=60?'Stress is high: manage workload and finances to avoid decline.':(G.stress||35)<=30?'Stress is low: you are recovering well.':'Stress is manageable right now.'}
+    </p>
+  </div>`;
 
   // Current job
   if(c.employed){
@@ -517,6 +737,11 @@ function renderJobs(){
 
   // Finances
   const tax = G.finance.tax || {};
+  const pf = G.finance.portfolio || {};
+  const cx = G.finance.crypto || {};
+  const biz = G.finance.business || {};
+  const portfolioTotal = portfolioTotalValue();
+  const cryptoTotal = cryptoTotalValue();
   const effPct = ((tax.lastEffectiveRate||0)*100).toFixed(1);
   const statePct = ((tax.lastStateRate||0)*100).toFixed(1);
   const filedLine = tax.lastPaid>0
@@ -528,7 +753,9 @@ function renderJobs(){
     <div class="card-title">Finances</div>
     <p style="font-size:.78rem;color:var(--muted2)">Credit score: <strong style="color:${G.finance.credit>=720?'var(--accent)':G.finance.credit>=660?'var(--gold)':'var(--danger)'}">${G.finance.credit}</strong></p>
     <p style="font-size:.78rem;color:var(--muted2)">Rent: ${G.finance.rent?fmt$(G.finance.rent*12)+'/yr':'None'} · Mortgage: ${G.finance.mortgage?fmt$(G.finance.mortgage)+'/yr':'None'} · Debt: ${fmt$(G.finance.debt)}</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Investments: ${fmt$(G.finance.investments)} · Retirement: ${fmt$(G.finance.retirement||0)}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Portfolio total: ${fmt$(portfolioTotal)} · Crypto total: ${fmt$(cryptoTotal)} · Retirement: ${fmt$(G.finance.retirement||0)}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Index ${fmt$(pf.indexFund||0)} · Bonds ${fmt$(pf.bonds||0)} · REIT ${fmt$(pf.realEstateFund||0)} · Venture ${fmt$(pf.ventureFund||0)}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Crypto: BTC ${fmt$(cx.btc||0)} · ETH ${fmt$(cx.eth||0)} · SOL ${fmt$(cx.sol||0)} · MEME ${fmt$(cx.meme||0)} · ${cx.marketCycle||'neutral'} market</p>
     <p style="font-size:.78rem;color:var(--muted2)">Last tax filing: ${filedLine}</p>
     <p style="font-size:.78rem;color:var(--muted2)">State tax estimate: ${statePct}% · Taxable income: ${fmt$(tax.lastTaxableIncome||0)}</p>
     ${tax.delinquentYears>0?`<div class="notif bad" style="margin-bottom:10px">⚠️ Tax delinquency: ${tax.delinquentYears} year(s) unresolved. Penalties are compounding your debt.</div>`:''}
@@ -543,11 +770,46 @@ function renderJobs(){
       </div>`).join('')}
     </div>
     <div class="choice-grid" style="margin-top:10px">
-      <div class="choice" onclick="invest(1000)"><div class="choice-icon">📈</div><div class="choice-name">Invest $1k</div><div class="choice-desc">Long-term growth</div></div>
-      <div class="choice" onclick="invest(5000)"><div class="choice-icon">📈</div><div class="choice-name">Invest $5k</div><div class="choice-desc">Long-term growth</div></div>
-      <div class="choice" onclick="invest(10000)"><div class="choice-icon">📈</div><div class="choice-name">Invest $10k</div><div class="choice-desc">Long-term growth</div></div>
+      <div class="choice" onclick="investAsset('indexFund',1000)"><div class="choice-icon">📈</div><div class="choice-name">Index $1k</div><div class="choice-desc">Diversified equity exposure</div></div>
+      <div class="choice" onclick="investAsset('bonds',1000)"><div class="choice-icon">🧾</div><div class="choice-name">Bonds $1k</div><div class="choice-desc">Lower volatility</div></div>
+      <div class="choice" onclick="investAsset('realEstateFund',2000)"><div class="choice-icon">🏢</div><div class="choice-name">REIT $2k</div><div class="choice-desc">Property market exposure</div></div>
+      <div class="choice" onclick="investAsset('ventureFund',3000)"><div class="choice-icon">🚀</div><div class="choice-name">Venture $3k</div><div class="choice-desc">High risk / high upside</div></div>
       <div class="choice" onclick="payDebt(1000)"><div class="choice-icon">💳</div><div class="choice-name">Pay Debt $1k</div><div class="choice-desc">Boost credit</div></div>
     </div>
+    <div class="choice-grid" style="margin-top:10px">
+      <div class="choice" onclick="buyCrypto('btc',1000)"><div class="choice-icon">₿</div><div class="choice-name">Buy BTC $1k</div><div class="choice-desc">Lower relative volatility</div></div>
+      <div class="choice" onclick="buyCrypto('eth',1000)"><div class="choice-icon">Ξ</div><div class="choice-name">Buy ETH $1k</div><div class="choice-desc">Smart-contract beta</div></div>
+      <div class="choice" onclick="buyCrypto('sol',1000)"><div class="choice-icon">◎</div><div class="choice-name">Buy SOL $1k</div><div class="choice-desc">High volatility growth</div></div>
+      <div class="choice" onclick="buyCrypto('meme',500)"><div class="choice-icon">🐸</div><div class="choice-name">Buy MEME $500</div><div class="choice-desc">Speculative mania coin</div></div>
+      <div class="choice" onclick="sellCrypto('btc',0.5)"><div class="choice-icon">💸</div><div class="choice-name">Sell 50% BTC</div><div class="choice-desc">De-risk position</div></div>
+      <div class="choice" onclick="sellCrypto('eth',0.5)"><div class="choice-icon">💸</div><div class="choice-name">Sell 50% ETH</div><div class="choice-desc">Take liquidity</div></div>
+      <div class="choice" onclick="sellCrypto('sol',0.5)"><div class="choice-icon">💸</div><div class="choice-name">Sell 50% SOL</div><div class="choice-desc">Reduce drawdown risk</div></div>
+      <div class="choice" onclick="sellCrypto('meme',1)"><div class="choice-icon">💸</div><div class="choice-name">Exit MEME</div><div class="choice-desc">Full liquidation</div></div>
+    </div>
+  </div>`;
+
+  html += `<div class="card">
+    <div class="card-title">Business Builder</div>
+    ${
+      !biz.active
+      ? `<p style="font-size:.78rem;color:var(--muted2);margin-bottom:10px">Start a company, manage runway, and scale toward a meaningful exit.</p>
+         <div class="choice-grid">
+           ${BUSINESS_SECTORS.map(s=>`<div class="choice" onclick="startBusiness('${s.id}')"><div class="choice-icon">${s.icon}</div><div class="choice-name">${s.label}</div><div class="choice-desc">${fmt$(s.startCost)} start · ${fmt$(s.burn)}/yr burn baseline</div></div>`).join('')}
+         </div>`
+      : `<p style="font-size:.78rem;color:var(--muted2)"><strong style="color:var(--text)">${biz.name}</strong> · ${biz.sector} · Stage: ${biz.stage}</p>
+         <p style="font-size:.78rem;color:var(--muted2)">Employees ${biz.employees} · Burn ${fmt$(biz.burn)}/yr · Cash reserve ${fmt$(biz.cashReserve)}</p>
+         <p style="font-size:.78rem;color:var(--muted2)">Product ${biz.product} · Ops ${biz.operations} · Marketing ${biz.marketing} · Reputation ${biz.reputation}</p>
+         <p style="font-size:.78rem;color:var(--muted2)">Valuation ${fmt$(biz.valuation)} · Last profit ${fmt$(biz.lastProfit)} · ${biz.hasInvestor?'Investor-backed':'Bootstrapped'}</p>
+         <div class="choice-grid">
+           <div class="choice" onclick="businessAction('build')"><div class="choice-icon">🛠️</div><div class="choice-name">Build Product</div><div class="choice-desc">Increase product quality</div></div>
+           <div class="choice" onclick="businessAction('market')"><div class="choice-icon">📣</div><div class="choice-name">Marketing Push</div><div class="choice-desc">Grow awareness and demand</div></div>
+           <div class="choice" onclick="businessAction('hire')"><div class="choice-icon">🧑‍💼</div><div class="choice-name">Hire</div><div class="choice-desc">Scale team and operations</div></div>
+           <div class="choice" onclick="businessAction('cut')"><div class="choice-icon">✂️</div><div class="choice-name">Cut Costs</div><div class="choice-desc">Lower burn, reputational risk</div></div>
+           <div class="choice" onclick="businessAction('fund')"><div class="choice-icon">💰</div><div class="choice-name">Raise Funding</div><div class="choice-desc">Extend runway, dilute control</div></div>
+           <div class="choice" onclick="businessAction('salary')"><div class="choice-icon">🏧</div><div class="choice-name">Founder Salary</div><div class="choice-desc">Pay yourself from reserve</div></div>
+           <div class="choice" onclick="businessAction('exit')"><div class="choice-icon">🏁</div><div class="choice-name">Exit Business</div><div class="choice-desc">Cash out if valuation is ready</div></div>
+         </div>`
+    }
   </div>`;
 
   // Home & Living

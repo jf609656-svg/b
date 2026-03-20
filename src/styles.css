@@ -143,6 +143,7 @@ html, body {
 .bar-p { background: linear-gradient(90deg, #fb923c, #fbbf24); }
 .bar-s { background: linear-gradient(90deg, #818cf8, #a5b4fc); }
 .bar-l { background: linear-gradient(90deg, #f472b6, #fb7185); }
+.bar-stress { background: linear-gradient(90deg, #f87171, #fb7185); }
 .stat-num { font-family: var(--fh); font-weight: 700; font-size: .72rem; width: 24px; text-align: right; color: var(--muted2); }
 
 /* ── TABS ──────────────────────────────────────────────────── */

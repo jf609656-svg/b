@@ -32,6 +32,7 @@ function rollStats(){
   G.happy  = rnd(45,90);
   G.smarts = rnd(15,90);
   G.looks  = rnd(15,90);
+  G.stress = rnd(22,48);
   G.money  = 0;
   G.age    = 0;
   G.state  = pick(STATES);
@@ -205,6 +206,13 @@ function beginLife(){
   G.assets      = { home:false, homeValue:0, savings:0 };
   G.finance     = {
     rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
+    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0 },
+    crypto:{ btc:0, eth:0, sol:0, meme:0, marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'' },
+    business:{
+      active:false, name:'', sector:'', stage:'idea',
+      employees:0, reputation:50, product:45, operations:45, marketing:40,
+      burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+    },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
       lastStateRate:0, lastYearSummary:null, delinquentYears:0,
@@ -212,6 +220,7 @@ function beginLife(){
   };
   G.housing     = { type:'none', comfort:40, neighborhood:50, roommates:0, roommateList:[], upkeep:0, utilities:0 };
   G.relTab      = 'family';
+  G.stress     = 35;
   G.darkScore  = 0;
   G.totalYears = 0;
   G.traits = [];

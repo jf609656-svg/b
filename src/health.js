@@ -57,6 +57,7 @@ function renderHealth(){
   html+=`<div class="card">
     <div class="card-title">Current Health</div>
     ${statBar('Health', G.health, 'bar-h')}
+    ${statBar('Stress', G.stress||35, 'bar-stress')}
     <p style="font-size:.8rem;color:var(--muted2);margin-top:9px">${healthVerdict()}</p>
   </div>`;
 
@@ -137,11 +138,13 @@ function visitDoctor(type){
   if(type==='checkup'){
     if(G.money<200){ flash('Need $200','warn'); return; }
     G.money-=200; G.health=clamp(G.health+rnd(5,13));
+    G.stress=clamp((G.stress||35)-rnd(1,4));
     addEv('Annual checkup. Doctor said "looking good" while clearly concerned. (+Health)');
     flash('+Health 🩺','good');
   } else if(type==='therapy'){
     if(G.money<150){ flash('Need $150','warn'); return; }
     G.money-=150; G.happy=clamp(G.happy+rnd(8,17));
+    G.stress=clamp((G.stress||35)-rnd(8,16));
     if(G.medical.conditions.includes('depression')&&Math.random()>.44){
       G.medical.conditions=G.medical.conditions.filter(c=>c!=='depression');
       G.medical.history.push('depression');
@@ -173,6 +176,7 @@ function visitDoctor(type){
   } else if(type==='detox'){
     if(G.money<500){ flash('Need $500','warn'); return; }
     G.money-=500; G.health=clamp(G.health+rnd(10,22));
+    G.stress=clamp((G.stress||35)-rnd(5,11));
     if(G.medical.conditions.includes('burnout')){
       G.medical.conditions=G.medical.conditions.filter(c=>c!=='burnout');
       G.medical.history.push('burnout');
