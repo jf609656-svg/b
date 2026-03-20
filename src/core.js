@@ -416,6 +416,35 @@ const G = {
     approval:50,
     party:'Centrist',
     cycleYear:0,
+    popularity:35,
+    funding:0,
+    trust:50,
+    scandalRisk:12,
+    politicalCapital:38,
+    control:44,
+    stability:55,
+    economy:52,
+    activism:8,
+    campaigningSkill:20,
+    governingSkill:20,
+    survivalSkill:20,
+    policiesPassed:0,
+    legacyScore:0,
+    legacyRank:'Unproven',
+    legacyHistory:[],
+    policyStack:[],
+    office:{ level:'none', label:'Citizen', inOffice:false, termYear:0, termsWon:0, termLimit:2, removed:false, nextElectionIn:0 },
+    campaign:{
+      active:false, office:'', entryPath:'', focus:'economy', demographic:'working', tone:'unity',
+      popularity:35, funding:0, trust:50, scandalRisk:12, momentum:0,
+      speeches:0, ads:0, debates:0, travel:0, events:[],
+      regions:{ urban:50, suburban:50, rural:50 },
+    },
+    legislature:{ upper:48, lower:49, opposition:52, gridlock:40 },
+    world:{ allies:6, rivals:3, neutral:12, tension:38, tradeDeals:0, sanctions:0, wars:0, diplomacyWins:0 },
+    media:{ bias:0, heat:34, lastNarrative:'Normal cycle' },
+    ethics:{ corruption:8, investigations:0, impeachmentRisk:4, dirtyMoney:0, coverups:0, removedByImpeachment:false },
+    crisis:{ active:null, resolved:0, mishandled:0, lastOutcome:'none' },
     policy:{
       taxShift:0,                // basis points-ish in local model
       policing:50,
@@ -701,6 +730,7 @@ function replaceGameState(state){
   ensureGovLegalShape();
   ensureSimShape();
   ensureCareerShape();
+  if(typeof ensurePoliticsState==='function') ensurePoliticsState();
   if(typeof ensureMMAState==='function') ensureMMAState();
   if(typeof ensurePetState==='function') ensurePetState();
   if(!Array.isArray(G.pets)) G.pets = [];
@@ -1289,6 +1319,7 @@ function switchTab(t){
     crime:         'screen-crime',
     jobs:          'screen-jobs',
     business:      'screen-business',
+    politics:      'screen-politics',
     acting:        'screen-acting',
     prosports:     'screen-prosports',
     activities:    'screen-activities',
@@ -1303,6 +1334,7 @@ function switchTab(t){
   if(t==='crime')         renderCrime();
   if(t==='jobs')          renderJobs();
   if(t==='business')      renderBusiness();
+  if(t==='politics' && typeof renderPolitics==='function') renderPolitics();
   if(t==='acting')        renderActing();
   if(t==='prosports')     renderProSports();
   if(t==='activities')    renderActivities();
@@ -1506,6 +1538,7 @@ function ageUp(){
   ensureGovLegalShape();
   ensureSimShape();
   ensureCareerShape();
+  if(typeof ensurePoliticsState==='function') ensurePoliticsState();
   if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];

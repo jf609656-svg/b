@@ -77,6 +77,7 @@ function showDeath(){
       ${G.finance&&G.finance.crypto?`<p style="margin-bottom:5px">🪙 Crypto holdings: ${fmt$((G.finance.crypto.btc||0)+(G.finance.crypto.eth||0)+(G.finance.crypto.sol||0)+(G.finance.crypto.meme||0))}</p>`:''}
       ${G.legal&&G.legal.lawyer&&G.legal.lawyer.casesWon>0?`<p style="margin-bottom:5px">⚖️ Legal career: ${G.legal.lawyer.casesWon} major wins · ${G.legal.lawyer.settlements} settlements</p>`:''}
       ${G.legal&&G.legal.lawyer&&G.legal.lawyer.electedOffice?`<p style="margin-bottom:5px">🏛️ Public office held: ${G.legal.lawyer.electedOffice} (${G.legal.lawyer.officeYears} years)</p>`:''}
+      ${G.gov&&G.gov.legacyRank?`<p style="margin-bottom:5px">📜 Political legacy: ${G.gov.legacyRank} (${G.gov.legacyScore||0})</p>`:''}
       ${(G.nfl.endorsementIncome+G.nba.endorsementIncome)>0?`<p style="margin-bottom:5px">💼 Endorsements: ${fmt$(G.nfl.endorsementIncome+G.nba.endorsementIncome)} total</p>`:''}
       ${G.sm.onlyfans&&G.sm.onlyfans.revenue>0?`<p style="margin-bottom:5px">💗 OnlyFans lifetime: ${fmt$(G.sm.onlyfans.revenue)}</p>`:''}
       ${G.social.rival?`<p style="margin-bottom:5px">😤 Unresolved nemesis: ${G.social.rival.firstName}. They outlived you. They\'re smug about it.</p>`:''}

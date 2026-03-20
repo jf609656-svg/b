@@ -745,6 +745,16 @@ function businessAction(action){
 function legalGovAction(action){
   ensureAdvancedFinanceState();
   if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
+  if((action==='campaign' || action==='policy_business' || action==='policy_justice' || action==='policy_policing') && typeof politicsQuickAction==='function'){
+    politicsQuickAction(
+      action==='campaign' ? 'campaign_mayor' :
+      action==='policy_business' ? 'policy_business' :
+      action==='policy_justice' ? 'policy_justice' :
+      'policy_policing'
+    );
+    switchTab('politics');
+    return;
+  }
   const L = G.legal;
   const gov = G.gov;
   const lw = L.lawyer;
@@ -1062,13 +1072,17 @@ function renderJobs(){
     <p style="font-size:.78rem;color:var(--muted2)">Law profile: ${lw.profile||20} · Cases won: ${lw.casesWon||0} · Settlements: ${lw.settlements||0}</p>
     <p style="font-size:.78rem;color:var(--muted2)">Gov: ${gov.party||'Centrist'} · Approval ${gov.approval||50}% · Active law: ${gov.activeLaw||'Status Quo'}</p>
     <p style="font-size:.78rem;color:var(--muted2)">Policy → Tax shift ${gov.policy?.taxShift||0} · Policing ${gov.policy?.policing||50} · Justice ${gov.policy?.justice||50} · Business climate ${gov.policy?.businessClimate||50}</p>
+    <p style="font-size:.76rem;color:var(--muted2);margin-top:8px">Full campaigning, governing, diplomacy, crises, corruption and impeachment now live in the <strong style="color:var(--text)">Politics</strong> tab.</p>
     <div class="choice-grid" style="margin-top:10px">
       <div class="choice" onclick="legalGovAction('pay_fine')"><div class="choice-icon">💸</div><div class="choice-name">Pay Fines</div><div class="choice-desc">Reduce legal pressure</div></div>
       <div class="choice" onclick="legalGovAction('defend_self')"><div class="choice-icon">🛡️</div><div class="choice-name">Defend Lawsuit</div><div class="choice-desc">Spend cash to fight claims</div></div>
-      <div class="choice${isLawTrack?'':' disabled'}" onclick="legalGovAction('campaign')"><div class="choice-icon">🗳️</div><div class="choice-name">Run for Office</div><div class="choice-desc">${isLawTrack?'Law track route to elected office':'Requires law track'}</div></div>
-      <div class="choice${lw.electedOffice?'':' disabled'}" onclick="legalGovAction('policy_business')"><div class="choice-icon">🏢</div><div class="choice-name">Business Policy</div><div class="choice-desc">${lw.electedOffice?'Pro-growth package':'Requires elected office'}</div></div>
-      <div class="choice${lw.electedOffice?'':' disabled'}" onclick="legalGovAction('policy_justice')"><div class="choice-icon">⚖️</div><div class="choice-name">Justice Reform</div><div class="choice-desc">${lw.electedOffice?'Adjust sentencing/justice':'Requires elected office'}</div></div>
-      <div class="choice${lw.electedOffice?'':' disabled'}" onclick="legalGovAction('policy_policing')"><div class="choice-icon">🚓</div><div class="choice-name">Policing Push</div><div class="choice-desc">${lw.electedOffice?'Stricter enforcement focus':'Requires elected office'}</div></div>
+      ${isLawTrack
+        ? `<div class="choice" onclick="legalGovAction('campaign')"><div class="choice-icon">🗳️</div><div class="choice-name">Run for Office</div><div class="choice-desc">Launch mayor campaign in Politics tab</div></div>`
+        : `<div class="choice disabled"><div class="choice-icon">🗳️</div><div class="choice-name">Run for Office</div><div class="choice-desc">Requires law track / entry path prep</div></div>`
+      }
+      <div class="choice" onclick="switchTab('politics')"><div class="choice-icon">🏛️</div><div class="choice-name">Open Politics HQ</div><div class="choice-desc">Campaign, govern, survive office</div></div>
+      <div class="choice" onclick="legalGovAction('policy_business')"><div class="choice-icon">🏢</div><div class="choice-name">Tax-Cut Agenda</div><div class="choice-desc">Quick policy shortcut</div></div>
+      <div class="choice" onclick="legalGovAction('policy_justice')"><div class="choice-icon">⚖️</div><div class="choice-name">Justice Reform</div><div class="choice-desc">Quick policy shortcut</div></div>
     </div>
   </div>`;
 
