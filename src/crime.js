@@ -81,6 +81,78 @@ function randomVictimDesc(){
   return `Random target: ${age}-year-old ${vibe} ${location}.`;
 }
 
+function gangArchetype(){
+  ensureCrimeShape();
+  return GANG_ARCHETYPES.find(x=>x.id===G.crime.gang.type) || null;
+}
+
+function gangRivalsFor(typeId){
+  return (GANG_RIVAL_MAP && GANG_RIVAL_MAP[typeId]) ? GANG_RIVAL_MAP[typeId] : [];
+}
+
+function gangBeefLevelLabel(level){
+  return level>=3 ? 'War' : level===2 ? 'Active Beef' : level===1 ? 'Tension' : 'Cold';
+}
+
+function gangRandomMember(roleHint=''){
+  const rolePool = roleHint ? [roleHint] : ['enforcer','dealer','runner','hitter','lookout'];
+  return {
+    id:`gm_${Math.random().toString(36).slice(2,9)}`,
+    name:`${pick(NM.concat(NF))} ${pick(NS)}`,
+    age:rnd(16,34),
+    role:pick(rolePool),
+    loyalty:rnd(25,80),
+    aggression:rnd(18,90),
+    competence:rnd(25,86),
+    greed:rnd(16,88),
+  };
+}
+
+function gangEnsureMemberPool(){
+  ensureCrimeShape();
+  const g = G.crime.gang;
+  if(!Array.isArray(g.members)) g.members = [];
+  if(g.members.length<4){
+    while(g.members.length<4) g.members.push(gangRandomMember());
+  }
+  if(!g.hierarchy || typeof g.hierarchy!=='object') g.hierarchy = { shotCaller:'', core:[], young:[] };
+  if(!g.hierarchy.shotCaller){
+    g.hierarchy.shotCaller = g.members[0]?.name || '';
+  }
+  if(!Array.isArray(g.hierarchy.core) || !g.hierarchy.core.length){
+    g.hierarchy.core = g.members.slice(0,2).map(m=>m.name);
+  }
+  if(!Array.isArray(g.hierarchy.young) || !g.hierarchy.young.length){
+    g.hierarchy.young = g.members.slice(2,4).map(m=>m.name);
+  }
+}
+
+function gangEscalate(trigger=''){
+  ensureCrimeShape();
+  const g = G.crime.gang;
+  const a = gangArchetype();
+  const bias = a?.beefBias || 1;
+  g.beef.score = clamp((g.beef.score||0) + Math.round(rnd(8,17)*bias));
+  if(g.beef.score>=75) g.beef.level = 3;
+  else if(g.beef.score>=42) g.beef.level = 2;
+  else if(g.beef.score>=16) g.beef.level = 1;
+  g.beef.lastTrigger = trigger || g.beef.lastTrigger || 'disrespect';
+  if(!g.beef.rival){
+    const r = gangRivalsFor(g.type);
+    g.beef.rival = r.length ? pick(r) : 'unknown';
+  }
+}
+
+function gangDeescalate(amount){
+  ensureCrimeShape();
+  const g = G.crime.gang;
+  g.beef.score = clamp(Math.max(0, (g.beef.score||0) - Math.max(1, amount|0)));
+  if(g.beef.score>=75) g.beef.level = 3;
+  else if(g.beef.score>=42) g.beef.level = 2;
+  else if(g.beef.score>=16) g.beef.level = 1;
+  else g.beef.level = 0;
+}
+
 function ensureCrimeShape(){
   if(!G.crime || typeof G.crime!=='object') G.crime = {};
   if(!Array.isArray(G.crime.log)) G.crime.log = [];
@@ -93,6 +165,37 @@ function ensureCrimeShape(){
   if(!G.crime.gang || typeof G.crime.gang!=='object'){
     G.crime.gang = { joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 };
   }
+  const g = G.crime.gang;
+  if(typeof g.joined!=='boolean') g.joined = false;
+  if(typeof g.type!=='string' && g.type!==null) g.type = null;
+  if(typeof g.name!=='string' && g.name!==null) g.name = null;
+  if(typeof g.colors!=='string') g.colors = '';
+  if(typeof g.symbol!=='string') g.symbol = '';
+  if(typeof g.style!=='string') g.style = '';
+  if(typeof g.territory!=='number') g.territory = 1;
+  if(typeof g.cred!=='number') g.cred = 10;
+  if(typeof g.notoriety!=='number') g.notoriety = 5;
+  if(!Array.isArray(g.crew)) g.crew = [];
+  if(typeof g.leader!=='string' && g.leader!==null) g.leader = null;
+  if(typeof g.affiliation!=='string') g.affiliation = '';
+  if(typeof g.clout!=='number') g.clout = 0;
+  if(!Array.isArray(g.members)) g.members = [];
+  if(!g.hierarchy || typeof g.hierarchy!=='object') g.hierarchy = { shotCaller:'', core:[], young:[] };
+  if(typeof g.hierarchy.shotCaller!=='string') g.hierarchy.shotCaller = '';
+  if(!Array.isArray(g.hierarchy.core)) g.hierarchy.core = [];
+  if(!Array.isArray(g.hierarchy.young)) g.hierarchy.young = [];
+  if(!g.beef || typeof g.beef!=='object') g.beef = { rival:'', level:0, score:0, lastTrigger:'', yearsAtWar:0 };
+  if(typeof g.beef.rival!=='string') g.beef.rival = '';
+  if(typeof g.beef.level!=='number') g.beef.level = 0;
+  if(typeof g.beef.score!=='number') g.beef.score = 0;
+  if(typeof g.beef.lastTrigger!=='string') g.beef.lastTrigger = '';
+  if(typeof g.beef.yearsAtWar!=='number') g.beef.yearsAtWar = 0;
+  if(!g.relationships || typeof g.relationships!=='object') g.relationships = { cohesion:55, internalConflict:0, powerStruggle:0 };
+  if(typeof g.relationships.cohesion!=='number') g.relationships.cohesion = 55;
+  if(typeof g.relationships.internalConflict!=='number') g.relationships.internalConflict = 0;
+  if(typeof g.relationships.powerStruggle!=='number') g.relationships.powerStruggle = 0;
+  if(typeof g.retaliations!=='number') g.retaliations = 0;
+  if(typeof g.recentViolence!=='number') g.recentViolence = 0;
   if(!G.crime.mafia || typeof G.crime.mafia!=='object'){
     G.crime.mafia = { joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0, rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 };
   }
@@ -1420,11 +1523,18 @@ function renderCrime(){
   }
 
   // Street Gangs (revamp)
+  const beefLevelLabel =
+    (C.gang.beef?.level||0)>=3 ? 'War' :
+    (C.gang.beef?.level||0)>=2 ? 'Active Beef' :
+    (C.gang.beef?.level||0)>=1 ? 'Tension' : 'Calm';
   html += `<div class="card">
     <div class="card-title">Street Gangs</div>
     <div style="font-size:.78rem;color:var(--muted2);margin-bottom:8px">
-      ${C.gang.joined?`${C.gang.symbol} ${C.gang.name} · Style: ${C.gang.style} · Cred ${C.gang.cred} · Notoriety ${C.gang.notoriety}`:'Not affiliated'}
+      ${C.gang.joined
+        ? `${C.gang.symbol} ${C.gang.name} · Style: ${C.gang.style} · Cred ${C.gang.cred} · Notoriety ${C.gang.notoriety} · Beef: ${beefLevelLabel}${C.gang.beef?.rival?` vs ${gangRivalLabel(C.gang.beef.rival)}`:''}`
+        : 'Not affiliated'}
     </div>
+    ${C.gang.joined ? `<div style="font-size:.72rem;color:var(--muted2);margin-bottom:8px">Territory ${C.gang.territory} · Cohesion ${C.gang.relationships?.cohesion||0} · Internal conflict ${C.gang.relationships?.internalConflict||0} · Members ${(C.gang.members||[]).filter(m=>m.status==='active').length}</div>` : ''}
     ${!C.gang.joined?`
       <div class="choice-grid">
         ${GANG_ARCHETYPES.map(g=>`<div class="choice" onclick="gangJoin('${g.id}')"><div class="choice-icon">${g.symbol}</div><div class="choice-name">${g.label}</div><div class="choice-desc">${g.style}</div></div>`).join('')}
@@ -1435,7 +1545,7 @@ function renderCrime(){
         <div class="choice" onclick="gangTag()"><div class="choice-icon">🧱</div><div class="choice-name">Tag Territory</div><div class="choice-desc">Low risk</div></div>
         <div class="choice" onclick="gangDefend()"><div class="choice-icon">🛡️</div><div class="choice-name">Defend Block</div><div class="choice-desc">Conflict</div></div>
         <div class="choice" onclick="gangPush()"><div class="choice-icon">⚔️</div><div class="choice-name">Push Rival Zone</div><div class="choice-desc">High risk</div></div>
-        <div class="choice" onclick="gangBeef()"><div class="choice-icon">😤</div><div class="choice-name">Escalate Beef</div><div class="choice-desc">Volatile</div></div>
+        <div class="choice" onclick="gangBeef()"><div class="choice-icon">😤</div><div class="choice-name">Handle Beef</div><div class="choice-desc">Choice-driven response</div></div>
         <div class="choice" onclick="gangPost()"><div class="choice-icon">📱</div><div class="choice-name">Post Online</div><div class="choice-desc">Clout + heat</div></div>
         <div class="choice" onclick="gangDrugs()"><div class="choice-icon">💊</div><div class="choice-name">Drug Ops</div><div class="choice-desc">Income + heat</div></div>
         <div class="choice" onclick="gangSnitch()"><div class="choice-icon">🐀</div><div class="choice-name">Snitch</div><div class="choice-desc">Death risk</div></div>
@@ -2430,6 +2540,189 @@ function gangAct(type){
   // legacy no-op
 }
 
+function gangTypeMeta(){
+  const id = G.crime?.gang?.type;
+  return GANG_ARCHETYPES.find(x=>x.id===id) || GANG_ARCHETYPES[0];
+}
+
+function gangRivalLabel(id){
+  return (GANG_ARCHETYPES.find(x=>x.id===id)||{}).label || 'Rivals';
+}
+
+function gangMemberGenerate(role='young'){
+  return {
+    name:`${pick(NM.concat(NF))} ${pick(NS)}`,
+    age:rnd(16,35),
+    role,
+    loyalty:rnd(24,84),
+    aggression:rnd(20,92),
+    competence:rnd(25,88),
+    greed:rnd(12,86),
+    status:'active',
+  };
+}
+
+function gangEnsureRoster(){
+  ensureCrimeShape();
+  const g = G.crime.gang;
+  if(!Array.isArray(g.members)) g.members = [];
+  if(g.members.length>=4) return;
+  const starter = [
+    gangMemberGenerate('shot-caller'),
+    gangMemberGenerate('core'),
+    gangMemberGenerate('core'),
+    gangMemberGenerate('young'),
+    gangMemberGenerate('young'),
+  ];
+  g.members = starter;
+  g.hierarchy.shotCaller = starter[0].name;
+  g.hierarchy.core = starter.filter(m=>m.role==='core').map(m=>m.name);
+  g.hierarchy.young = starter.filter(m=>m.role==='young').map(m=>m.name);
+  if(!g.leader) g.leader = starter[0].name;
+}
+
+function gangRecalcBeefLevel(){
+  ensureCrimeShape();
+  const beef = G.crime.gang.beef;
+  const score = beef.score||0;
+  beef.level = score>=72 ? 3 : score>=38 ? 2 : score>=16 ? 1 : 0;
+}
+
+function gangEscalate(trigger='street_incident', base=8){
+  ensureCrimeShape();
+  const C = G.crime;
+  const g = C.gang;
+  if(!g.joined) return;
+  const meta = gangTypeMeta();
+  const inc = Math.max(3, Math.floor(base * (meta.beefBias||1)));
+  g.beef.score = clamp((g.beef.score||0) + inc);
+  g.beef.lastTrigger = trigger;
+  if(!g.beef.rival){
+    const rivals = GANG_RIVAL_MAP[g.type] || [];
+    g.beef.rival = rivals.length ? pick(rivals) : '';
+  }
+  gangRecalcBeefLevel();
+}
+
+function gangOpenBeefResponsePopup(){
+  ensureCrimeShape();
+  const g = G.crime.gang;
+  if(!g.joined){ flash('Join a gang first.','warn'); return; }
+  if(!g.beef.rival){
+    const rivals = GANG_RIVAL_MAP[g.type]||[];
+    g.beef.rival = rivals.length ? pick(rivals) : '';
+  }
+  showPopup(`Beef with ${gangRivalLabel(g.beef.rival)}`, 'Decide your response doctrine. Every option carries risk.', [
+    { label:'Ignore', cls:'btn-ghost', onClick:()=>{
+      g.beef.score = clamp((g.beef.score||0) + rnd(1,5));
+      g.cred = clamp((g.cred||10) - rnd(1,4));
+      G.crime.heat = Math.max(0, G.crime.heat - rnd(1,4));
+      gangRecalcBeefLevel();
+      addCrimeEv('You ignored a beef incident. Heat eased, respect dipped.', 'warn');
+      renderCrime();
+    }},
+    { label:'Respond', cls:'btn-primary', onClick:()=>{
+      g.beef.score = clamp((g.beef.score||0) + rnd(6,12));
+      g.cred = clamp((g.cred||10) + rnd(2,6));
+      g.notoriety = clamp((g.notoriety||5) + rnd(2,6));
+      G.crime.heat = Math.min(100, G.crime.heat + rnd(5,11));
+      g.recentViolence = clamp((g.recentViolence||0) + rnd(5,12));
+      gangRecalcBeefLevel();
+      addCrimeEv(`You responded to ${gangRivalLabel(g.beef.rival)} pressure.`, 'bad');
+      renderCrime();
+    }},
+    { label:'Escalate', cls:'btn-ghost', onClick:()=>{
+      g.beef.score = clamp((g.beef.score||0) + rnd(12,22));
+      g.cred = clamp((g.cred||10) + rnd(4,9));
+      g.notoriety = clamp((g.notoriety||5) + rnd(6,12));
+      G.crime.heat = Math.min(100, G.crime.heat + rnd(10,20));
+      g.recentViolence = clamp((g.recentViolence||0) + rnd(10,20));
+      gangRecalcBeefLevel();
+      addCrimeEv(`You escalated into open war posture with ${gangRivalLabel(g.beef.rival)}.`, 'bad');
+      renderCrime();
+    }},
+  ], 'dark');
+}
+
+function processGangYear(){
+  ensureCrimeShape();
+  const C = G.crime;
+  const g = C.gang;
+  if(!g.joined) return;
+  const meta = gangTypeMeta();
+  gangEnsureRoster();
+
+  // territory control and risk
+  const terrDrift = rnd(-1,2) + (meta.territoryBias>1?1:0);
+  g.territory = Math.max(1, g.territory + (terrDrift>0 && Math.random()<0.42 ? 1 : terrDrift<0 ? -1 : 0));
+  if(g.territory>6 && Math.random()<0.28){
+    C.heat = Math.min(100, C.heat + rnd(4,9));
+    addEv('Large gang footprint raised law-enforcement pressure.', 'warn');
+  }
+
+  // member-driven chaos
+  const active = g.members.filter(m=>m.status==='active');
+  active.forEach(m=>{
+    if(m.aggression>74 && Math.random()<0.16){
+      gangEscalate('member_started_fight', 9);
+      addEv(`${m.name} started trouble without orders.`, 'bad');
+    }
+    if(m.greed>76 && Math.random()<0.14){
+      const skim = rnd(180,2200);
+      G.money = Math.max(0, G.money - skim);
+      g.relationships.internalConflict = clamp((g.relationships.internalConflict||0) + rnd(4,10));
+      addEv(`${m.name} skimmed ${fmt$(skim)} from gang earnings.`, 'bad');
+    }
+    if(m.loyalty<30 && Math.random()<0.08){
+      m.status = 'flipped';
+      C.heat = Math.min(100, C.heat + rnd(8,16));
+      C.police.closeness = Math.min(100, C.police.closeness + rnd(6,14));
+      addEv(`${m.name} switched sides and fed info to rivals/cops.`, 'bad');
+    }
+    if(Math.random()<0.05 + (C.heat/420)){
+      m.status = 'jailed';
+      C.police.inPrison = C.police.inPrison || false;
+      addEv(`${m.name} got arrested in a sweep.`, 'warn');
+    }
+  });
+
+  // active beef lifecycle
+  if((g.beef.score||0)>0){
+    if(g.beef.level>=3){
+      g.beef.yearsAtWar = (g.beef.yearsAtWar||0) + 1;
+      if(Math.random()<0.28){
+        const injury = rnd(6,18);
+        G.health = clamp(G.health - injury);
+        C.heat = Math.min(100, C.heat + rnd(8,18));
+        g.recentViolence = clamp((g.recentViolence||0) + rnd(8,18));
+        addEv(`War-level retaliation from ${gangRivalLabel(g.beef.rival)} left you injured.`, 'bad');
+      }
+      const deathRisk = Math.max(0.01, Math.min(0.5,
+        g.beef.level*0.07 + (g.notoriety||0)/420 + (g.recentViolence||0)/380 - (g.cred||10)/520
+      ));
+      if(Math.random()<deathRisk*0.2){
+        die(`Gang war with ${gangRivalLabel(g.beef.rival)} turned fatal.`);
+        return;
+      }
+    }
+    g.beef.score = Math.max(0, (g.beef.score||0) - rnd(2,7));
+    gangRecalcBeefLevel();
+  }
+
+  // cohesion and control
+  const avgLoyalty = active.length ? Math.floor(active.reduce((s,m)=>s+(m.loyalty||0),0)/active.length) : 40;
+  g.relationships.cohesion = clamp(Math.floor((g.relationships.cohesion||55)*0.6 + avgLoyalty*0.4 - (g.relationships.internalConflict||0)*0.18));
+  if(g.relationships.cohesion<35 && Math.random()<0.22){
+    g.relationships.powerStruggle = clamp((g.relationships.powerStruggle||0) + rnd(4,10));
+    addEv('A power struggle inside your gang is forming.', 'warn');
+  }
+  if((g.relationships.powerStruggle||0)>70 && Math.random()<0.18){
+    g.cred = clamp((g.cred||10) - rnd(6,14));
+    g.territory = Math.max(1, g.territory - 1);
+    addEv('Internal split weakened your street control this year.', 'bad');
+  }
+}
+
 function gangJoin(typeId){
   const g = GANG_ARCHETYPES.find(x=>x.id===typeId);
   if(!g) return;
@@ -2451,10 +2744,18 @@ function gangJoinMethod(method){
   if(method==='prove') chance += 0.05;
   if(method==='prison' && G.crime.police.inPrison) chance += 0.2;
   if(Math.random()<chance){
-    C.joined = true; C.name = C.type==='set' ? (Math.random()<0.5?'Bloods':'Crips') : pick(['Southside Crew','Block 79','Neon Alley','Greyline']);
+    const meta = gangTypeMeta();
+    C.joined = true;
+    C.name = meta.label;
     C.affiliation = method;
-    C.cred = rnd(15,35); C.notoriety = rnd(10,25);
-    addCrimeEv(`Joined ${C.name} as ${C.style}.`, 'bad');
+    C.cred = rnd(15,35);
+    C.notoriety = rnd(10,25);
+    C.beef = { rival: pick(GANG_RIVAL_MAP[C.type]||[]), level:0, score:0, lastTrigger:'', yearsAtWar:0 };
+    C.relationships = { cohesion:rnd(48,66), internalConflict:rnd(4,16), powerStruggle:rnd(0,10) };
+    C.retaliations = 0;
+    C.recentViolence = 0;
+    gangEnsureRoster();
+    addCrimeEv(`Joined ${C.name} (${meta.incomeFocus}).`, 'bad');
   } else {
     addCrimeEv('Joining failed. You were rejected.', 'bad');
   }
@@ -2465,6 +2766,7 @@ function gangTag(){
   const C = G.crime.gang;
   C.cred = clamp(C.cred + rnd(2,5));
   C.territory += 1;
+  C.beef.score = clamp((C.beef.score||0) + rnd(0,4));
   G.crime.heat = Math.min(100, G.crime.heat + rnd(2,6));
   addCrimeEv('Tagged territory. Your name spreads.', 'warn');
   renderCrime();
@@ -2472,6 +2774,7 @@ function gangTag(){
 
 function gangDefend(){
   const C = G.crime.gang;
+  const meta = gangTypeMeta();
   if(Math.random()<0.6){
     C.cred = clamp(C.cred + rnd(4,8));
     addCrimeEv('Defended your block. Respect grew.', 'bad');
@@ -2479,6 +2782,9 @@ function gangDefend(){
     C.cred = clamp(C.cred - rnd(3,7));
     addCrimeEv('Defense failed. Rival took ground.', 'bad');
   }
+  C.beef.score = clamp((C.beef.score||0) + rnd(4,9));
+  if(meta.id==='bloods') C.beef.score = clamp(C.beef.score + 2);
+  gangRecalcBeefLevel();
   C.notoriety = clamp(C.notoriety + rnd(2,6));
   G.crime.heat = Math.min(100, G.crime.heat + rnd(6,12));
   renderCrime();
@@ -2486,7 +2792,9 @@ function gangDefend(){
 
 function gangPush(){
   const C = G.crime.gang;
-  if(Math.random()<0.45){
+  const meta = gangTypeMeta();
+  const pushChance = 0.42 + ((meta.territoryBias||1)-1)*0.18 - (C.beef.level>=3?0.06:0);
+  if(Math.random()<pushChance){
     C.territory += 1;
     C.cred = clamp(C.cred + rnd(6,10));
     addCrimeEv('Pushed into rival zone. Territory gained.', 'bad');
@@ -2494,25 +2802,26 @@ function gangPush(){
     C.cred = clamp(C.cred - rnd(4,8));
     addCrimeEv('Push failed. Violence erupted.', 'bad');
   }
+  C.beef.score = clamp((C.beef.score||0) + rnd(7,14));
+  gangRecalcBeefLevel();
   C.notoriety = clamp(C.notoriety + rnd(6,12));
   G.crime.heat = Math.min(100, G.crime.heat + rnd(10,18));
   renderCrime();
 }
 
 function gangBeef(){
-  const C = G.crime.gang;
-  C.notoriety = clamp(C.notoriety + rnd(5,10));
-  G.crime.heat = Math.min(100, G.crime.heat + rnd(8,14));
-  addCrimeEv('Beef escalated. Tension is high.', 'bad');
-  renderCrime();
+  gangOpenBeefResponsePopup();
 }
 
 function gangPost(){
   const C = G.crime.gang;
-  const cloutGain = C.type==='clout' ? rnd(4,9) : rnd(1,4);
+  const cloutGain = C.type==='getmoney' ? rnd(4,9) : rnd(1,4);
   C.clout = clamp(C.clout + cloutGain);
   if(G.sm.platforms && Object.keys(G.sm.platforms).length){
     Object.keys(G.sm.platforms).forEach(pid=>G.sm.platforms[pid].followers += rnd(200,1200));
+  }
+  if((C.type==='bloods' || C.type==='crips') && Math.random()<0.45){
+    gangEscalate('online_disrespect', rnd(6,13));
   }
   G.crime.heat = Math.min(100, G.crime.heat + rnd(4,10));
   addCrimeEv('Posted gang content. Clout up, heat up.', 'warn');

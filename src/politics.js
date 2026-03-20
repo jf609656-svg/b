@@ -110,6 +110,7 @@ function politicsSyncCampaignMirrors(){
 
 function politicsElectionEventPopup(force=false){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   const c = g.campaign;
   if(!c.active) return;
@@ -619,6 +620,7 @@ function politicsCampaignAction(kind, arg=''){
 
 function politicsCampaignEvent(){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const c = G.gov.campaign;
   if(!c.active) return;
   const roll = Math.random();
@@ -844,6 +846,7 @@ function politicsDiplomacyAction(kind){
 
 function politicsSpawnCrisis(){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   if(g.crisis.active) return;
   const pressure = (g.world.tension||38)/120 + (100-(g.stability||55))/180 + (g.economy<45?0.08:0);
@@ -862,6 +865,7 @@ function politicsSpawnCrisis(){
 
 function politicsHandleCrisis(response){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   const c = g.crisis.active;
   if(!c){ flash('No active crisis right now.','warn'); return; }
@@ -904,6 +908,7 @@ function politicsHandleCrisis(response){
 
 function politicsEthicsAction(kind){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   const e = g.ethics;
   if(kind==='clean'){
@@ -944,6 +949,7 @@ function politicsEthicsAction(kind){
 
 function politicsCheckInvestigations(){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   const e = g.ethics;
   const risk = Math.max(0, (e.corruption||8)/130 + (e.coverups||0)*0.07 + (g.media.heat||30)/360);
@@ -959,6 +965,7 @@ function politicsCheckInvestigations(){
 
 function politicsTryImpeachment(){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   if(!g.office.inOffice) return;
   const e = g.ethics;
@@ -998,6 +1005,7 @@ function politicsTryImpeachment(){
 
 function politicsResolveIncumbentElection(){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   const o = g.office;
   if(!o.inOffice) return;
@@ -1076,6 +1084,7 @@ function politicsFinalizeLegacy(reason='completed'){
 
 function processGovernmentYear(){
   ensurePoliticsState();
+  if((G.age||0) < 18) return;
   const g = G.gov;
   const o = g.office;
 

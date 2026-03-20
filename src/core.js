@@ -408,7 +408,16 @@ const G = {
     },
     police:{ closeness:0, arrested:false, sentence:0, inPrison:false },
     prison:{ respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } },
-    gang:{ joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 },
+    gang:{
+      joined:false, type:null, name:null, colors:'', symbol:'', style:'',
+      territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0,
+      members:[],
+      hierarchy:{ shotCaller:'', core:[], young:[] },
+      beef:{ rival:'', level:0, score:0, lastTrigger:'', yearsAtWar:0 },
+      relationships:{ cohesion:55, internalConflict:0, powerStruggle:0 },
+      retaliations:0,
+      recentViolence:0,
+    },
     drugs:{
       active:false,
       route:'independent',       // independent | gang | mafia
@@ -2506,6 +2515,9 @@ function ageUp(){
   // ── Crime: heat decay & retaliation ─────────────────────────
   if(typeof processDrugEcosystemYear==='function'){
     runYearStepSafe('drug_ecosystem', ()=>processDrugEcosystemYear());
+  }
+  if(typeof processGangYear==='function'){
+    runYearStepSafe('gang', ()=>processGangYear());
   }
   if(G.crime.heat>0){
     G.crime.heat = Math.max(0, G.crime.heat - rnd(3,8));
