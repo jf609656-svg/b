@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thronebound | Text Adventure</title>
+  <link rel="stylesheet" href="src/thrones.css">
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>Thronebound</h1>
+      <p class="tagline">A Game of Thrones inspired text-based adventure.</p>
+    </header>
+
+    <section id="setup-screen" class="card">
+      <h2>Choose Your Claim</h2>
+      <label for="player-name" class="label">Your Name</label>
+      <input id="player-name" class="text-input" type="text" maxlength="30" placeholder="Arya, Tyrion, Daenerys..." autocomplete="off">
+
+      <p class="label">Choose a Great House</p>
+      <div id="house-list" class="house-grid" role="radiogroup" aria-label="Select house"></div>
+
+      <button id="start-button" class="btn primary">Begin the Game</button>
+      <p id="setup-error" class="error" aria-live="polite"></p>
+    </section>
+
+    <section id="game-screen" class="card hidden">
+      <div class="top-row">
+        <h2 id="turn-label">Year 1</h2>
+        <div id="house-chip" class="chip">House</div>
+      </div>
+
+      <div id="stats-panel" class="stats"></div>
+
+      <article class="story">
+        <h3 id="event-title">The Realm Watches</h3>
+        <p id="event-text"></p>
+      </article>
+
+      <div id="choices" class="choices"></div>
+
+      <h3 class="log-title">Chronicle</h3>
+      <ul id="log" class="log" aria-live="polite"></ul>
+    </section>
+
+    <section id="ending-screen" class="card hidden">
+      <h2 id="ending-title">Your Fate</h2>
+      <p id="ending-text"></p>
+      <p id="score-line" class="score"></p>
+      <button id="restart-button" class="btn">Play Again</button>
+    </section>
+  </main>
+
+  <script src="src/thrones.js"></script>
+</body>
+</html>
