@@ -234,10 +234,55 @@ function renderSchool(){
   if(a<=10){ renderElementary(sc); return; }
   if(a<=13){ renderMiddle(sc); return; }
   if(a<=17){ renderHighSchool(sc); return; }
-  if(S.uni.enrolled){ renderUni(sc); return; }
+  if(S.uni.enrolled){ ensureUniState(); renderUni(sc); return; }
   if(G.career.medSchool.enrolled || G.career.lawSchool.enrolled){ renderGradSchool(sc); return; }
   if(a===18){ renderPostHS(sc); return; }
   sc.innerHTML=`<div class="notif">Past school age. Keep growing via Activities.</div>`;
+}
+
+function ensureUniState(){
+  if(!G.school) return;
+  if(!G.school.uni) G.school.uni = {};
+  const u = G.school.uni;
+  if(typeof u.enrolled!=='boolean') u.enrolled = false;
+  if(typeof u.course!=='string') u.course = '';
+  if(typeof u.year!=='number') u.year = 1;
+  if(typeof u.gpa!=='number') u.gpa = 2.5;
+  if(typeof u.honors!=='boolean') u.honors = false;
+  if(!Array.isArray(u.clubs)) u.clubs = [];
+  if(typeof u.hasResearch!=='boolean') u.hasResearch = false;
+  if(typeof u.sport!=='string') u.sport = null;
+  if(typeof u.sportYears!=='number') u.sportYears = 0;
+  if(typeof u.sportConference!=='string') u.sportConference = 'Independent';
+  if(typeof u.collegeName!=='string') u.collegeName = 'State University';
+  if(typeof u.athleteStatus!=='string') u.athleteStatus = null;
+  if(!u.athleteStats || typeof u.athleteStats!=='object') u.athleteStats = {td:0,yds:0,pts:0,reb:0,ast:0,tackles:0};
+  if(typeof u.allConference!=='boolean') u.allConference = false;
+  if(typeof u.allAmerican!=='boolean') u.allAmerican = false;
+  if(typeof u.heisman!=='boolean') u.heisman = false;
+  if(typeof u.nationalChamp!=='boolean') u.nationalChamp = false;
+  if(typeof u.draftEligible!=='boolean') u.draftEligible = false;
+  if(typeof u.draftDeclared!=='boolean') u.draftDeclared = false;
+  if(typeof u.draftRound!=='number' && u.draftRound!==null) u.draftRound = null;
+  if(typeof u.draftPick!=='number' && u.draftPick!==null) u.draftPick = null;
+  if(typeof u.draftTeam!=='string' && u.draftTeam!==null) u.draftTeam = null;
+  if(typeof u.nflDraftable!=='boolean') u.nflDraftable = false;
+  if(typeof u.nbaNextStep!=='boolean') u.nbaNextStep = false;
+  if(typeof u.frat!=='string' && u.frat!==null) u.frat = null;
+  if(typeof u.fratRank!=='string' && u.fratRank!==null) u.fratRank = null;
+  if(typeof u.fratRep!=='number') u.fratRep = 0;
+  if(typeof u.campusCrush!=='string' && u.campusCrush!==null) u.campusCrush = null;
+  if(typeof u.academicProbation!=='boolean') u.academicProbation = false;
+  if(typeof u.researchInstitution!=='boolean') u.researchInstitution = false;
+  if(typeof u.collegePrestige!=='number') u.collegePrestige = 60;
+  if(typeof u.tuitionPerYear!=='number') u.tuitionPerYear = 30000;
+  if(typeof u.activeResearch!=='string' && u.activeResearch!==null) u.activeResearch = null;
+  if(!Array.isArray(u.researchComplete)) u.researchComplete = [];
+  if(typeof u.careerUnlocked!=='string' && u.careerUnlocked!==null) u.careerUnlocked = null;
+  if(typeof u.eliteSchool!=='boolean') u.eliteSchool = false;
+  if(!Array.isArray(u.professors)) u.professors = [];
+  if(!Array.isArray(u.classmates)) u.classmates = [];
+  if(typeof u.discipline!=='number') u.discipline = 0;
 }
 
 // ── ELEMENTARY ──────────────────────────────────────────────────
@@ -780,7 +825,11 @@ function enrollWithScholarship(){
     nflDraftable:false, nbaNextStep:false,
     frat:null, fratRank:null, fratRep:0,
     campusCrush:null, academicProbation:false,
+    researchInstitution:false, collegePrestige:td.prestige||65, tuitionPerYear:0,
+    activeResearch:null, researchComplete:[], careerUnlocked:null, eliteSchool:false,
+    professors:[], classmates:[], discipline:0,
   };
+  ensureUniState();
   addEv(`Enrolled at ${off.college} on a ${off.fullRide?'full':'partial'} athletic scholarship! ${sport==='football'?'🏈':'🏀'} The next chapter: college athletics.`,'love');
   flash(`${off.college} athlete! 🎓`,'good');
   updateHUD(); switchTab('life');
@@ -895,7 +944,11 @@ function enrollCollege(course, collegeName){
     researchComplete: [],
     careerUnlocked: null,
     eliteSchool: (col.prestige||0)>=88,
+    professors:[],
+    classmates:[],
+    discipline:0,
   };
+  ensureUniState();
 
   // Deduct first year tuition
   G.money -= tuition;
@@ -1150,6 +1203,9 @@ function renderUni(sc){
 
 function ensureUniProfiles(){
   const u = G.school.uni;
+  if(!u) return;
+  if(!Array.isArray(u.professors)) u.professors = [];
+  if(!Array.isArray(u.classmates)) u.classmates = [];
   if(u.professors.length===0){
     u.professors = [makePerson('Professor'),makePerson('Professor'),makePerson('Professor')].map(p=>{
       p.age = rnd(35,65); p.relation = rnd(35,70); return p;

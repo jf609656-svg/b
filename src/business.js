@@ -55,6 +55,27 @@ const RIVAL_NAME_BANK = {
   Media:['Studio Signal','Pulsewave Media','Loudline Network','Orbit Storyworks','SilverFrame Collective'],
 };
 
+const SMALL_BIZ_OPTIONS = [
+  { id:'laundromat', icon:'🧺', name:'Neighborhood Laundromat', cost:380000, baseYield:0.12, volatility:0.16, difficulty:1, desc:'Stable cashflow, moderate maintenance.' },
+  { id:'car_wash', icon:'🚿', name:'Express Car Wash', cost:920000, baseYield:0.14, volatility:0.18, difficulty:2, desc:'Good margins but seasonal swings.' },
+  { id:'self_storage', icon:'📦', name:'Self-Storage Facility', cost:2400000, baseYield:0.11, volatility:0.12, difficulty:2, desc:'Reliable occupancy-driven income.' },
+  { id:'mini_logistics', icon:'🚚', name:'Local Logistics Hub', cost:5100000, baseYield:0.16, volatility:0.26, difficulty:3, desc:'Higher upside with operational risk.' },
+];
+
+const FRANCHISE_OPTIONS = [
+  { id:'mcd', icon:'🍟', name:'McDonald\'s Franchise', cost:2200000, baseYield:0.1, volatility:0.14, difficulty:2, desc:'Global brand power, strict operating standards.' },
+  { id:'subway', icon:'🥪', name:'Subway Franchise', cost:360000, baseYield:0.09, volatility:0.18, difficulty:1, desc:'Lower entry cost, location-sensitive outcomes.' },
+  { id:'dominos', icon:'🍕', name:'Domino\'s Franchise', cost:780000, baseYield:0.11, volatility:0.17, difficulty:2, desc:'Delivery demand with staffing pressures.' },
+  { id:'7eleven', icon:'🏪', name:'7-Eleven Franchise', cost:950000, baseYield:0.1, volatility:0.15, difficulty:2, desc:'Convenience store traffic and long-hour ops.' },
+  { id:'planet_fitness', icon:'🏋️', name:'Planet Fitness Franchise', cost:3200000, baseYield:0.12, volatility:0.21, difficulty:3, desc:'Recurring memberships and retention game.' },
+];
+
+const MEGA_BUYOUT_OPTIONS = [
+  { id:'twitter', icon:'🐦', name:'Twitter / X Buyout', cost:44000000000, baseYield:0.055, volatility:0.32, difficulty:4, desc:'Iconic social platform with high PR volatility.' },
+  { id:'netflix', icon:'🎬', name:'Netflix Buyout', cost:260000000000, baseYield:0.06, volatility:0.24, difficulty:4, desc:'Massive content machine and subscriber dynamics.' },
+  { id:'microsoft', icon:'🪟', name:'Microsoft Buyout', cost:2800000000000, baseYield:0.048, volatility:0.11, difficulty:5, desc:'Very stable giant — nearly impossible scale.' },
+];
+
 function ensureBusinessTabState(){
   if(typeof ensureAdvancedFinanceState === 'function') ensureAdvancedFinanceState();
   else ensureFinanceShape();
@@ -98,6 +119,27 @@ function ensureBusinessTabState(){
   if(b.active && !b.rivals.length){
     b.rivals = generateStartupRivals(b.sector || 'SaaS');
   }
+  if(!G.finance.empire) G.finance.empire = {};
+  const e = G.finance.empire;
+  if(!Array.isArray(e.holdings)) e.holdings = [];
+  if(typeof e.nextHoldingId !== 'number') e.nextHoldingId = 1;
+  if(typeof e.totalAcquisitions !== 'number') e.totalAcquisitions = 0;
+  if(typeof e.totalFranchises !== 'number') e.totalFranchises = 0;
+  if(typeof e.totalSmallBiz !== 'number') e.totalSmallBiz = 0;
+  if(typeof e.lastYearCashflow !== 'number') e.lastYearCashflow = 0;
+  if(typeof e.lastYearValueDelta !== 'number') e.lastYearValueDelta = 0;
+  e.holdings.forEach(h=>{
+    if(typeof h.id !== 'number') h.id = e.nextHoldingId++;
+    if(typeof h.type !== 'string') h.type = 'smallBiz';
+    if(typeof h.name !== 'string') h.name = 'Holding';
+    if(typeof h.value !== 'number') h.value = 0;
+    if(typeof h.baseYield !== 'number') h.baseYield = 0.08;
+    if(typeof h.volatility !== 'number') h.volatility = 0.2;
+    if(typeof h.difficulty !== 'number') h.difficulty = 2;
+    if(typeof h.cashflowLastYear !== 'number') h.cashflowLastYear = 0;
+  });
+  const maxHoldingId = e.holdings.reduce((m,h)=>Math.max(m, (typeof h.id==='number'?h.id:0)), 0);
+  if(e.nextHoldingId<=maxHoldingId) e.nextHoldingId = maxHoldingId + 1;
   if(!G.finance.crypto.history.length){
     const base = {
       btc:G.finance.crypto.prices.btc||100,
@@ -143,6 +185,47 @@ function businessLeadRival(b){
     if((rivals[i].strength||0) > (lead.strength||0)) lead = rivals[i];
   }
   return lead;
+}
+
+function empireTotalValue(){
+  ensureBusinessTabState();
+  const holdings = G.finance.empire.holdings || [];
+  return holdings.reduce((sum,h)=>sum + Math.max(0, h.value||0), 0);
+}
+
+function holdingTypeLabel(type){
+  if(type==='acquisition') return 'Mega Buyout';
+  if(type==='franchise') return 'Franchise';
+  return 'Small Business';
+}
+
+function holdingIdFromRef(ref){
+  if(typeof ref==='number') return ref;
+  const n = parseInt(ref, 10);
+  return Number.isFinite(n) ? n : -1;
+}
+
+function addEmpireHolding(payload){
+  ensureBusinessTabState();
+  const e = G.finance.empire;
+  const h = {
+    id:e.nextHoldingId++,
+    type:payload.type,
+    key:payload.key,
+    name:payload.name,
+    icon:payload.icon || '🏢',
+    value:payload.value,
+    baseYield:payload.baseYield,
+    volatility:payload.volatility,
+    difficulty:payload.difficulty,
+    cashflowLastYear:0,
+    acquiredAge:G.age,
+  };
+  e.holdings.push(h);
+  if(payload.type==='acquisition') e.totalAcquisitions++;
+  else if(payload.type==='franchise') e.totalFranchises++;
+  else e.totalSmallBiz++;
+  return h;
 }
 
 function starDifficulty(n){ return '★'.repeat(Math.max(1, Math.min(5, n))); }
@@ -250,6 +333,107 @@ function sellCrypto(assetId, pct){
   G.money += amt;
   G.stress = clamp((G.stress||35) - rnd(1,4));
   addEv(`You sold ${fmt$(amt)} of ${asset.label}.`, 'good');
+  updateHUD();
+  renderBusiness();
+}
+
+function buySmallBusiness(optionId){
+  ensureBusinessTabState();
+  const opt = SMALL_BIZ_OPTIONS.find(x=>x.id===optionId);
+  if(!opt){ flash('Business option not found.','warn'); return; }
+  if(G.age<18){ flash('Ownership unlocks at age 18.','warn'); return; }
+  if(G.money<opt.cost){ flash(`Need ${fmt$(opt.cost)} to acquire ${opt.name}.`,'warn'); return; }
+  G.money -= opt.cost;
+  const h = addEmpireHolding({
+    type:'smallBiz',
+    key:opt.id,
+    name:opt.name,
+    icon:opt.icon,
+    value:opt.cost,
+    baseYield:opt.baseYield,
+    volatility:opt.volatility,
+    difficulty:opt.difficulty,
+  });
+  G.stress = clamp((G.stress||35) + rnd(1,4));
+  addEv(`You acquired ${h.name} for ${fmt$(opt.cost)}. Multi-company empire starts to form.`, 'good');
+  updateHUD();
+  renderBusiness();
+}
+
+function buyFranchise(franchiseId){
+  ensureBusinessTabState();
+  const opt = FRANCHISE_OPTIONS.find(x=>x.id===franchiseId);
+  if(!opt){ flash('Franchise not found.','warn'); return; }
+  if(G.age<18){ flash('Franchise ownership unlocks at age 18.','warn'); return; }
+  if(G.money<opt.cost){ flash(`Need ${fmt$(opt.cost)} for ${opt.name}.`,'warn'); return; }
+  G.money -= opt.cost;
+  const h = addEmpireHolding({
+    type:'franchise',
+    key:opt.id,
+    name:opt.name,
+    icon:opt.icon,
+    value:opt.cost,
+    baseYield:opt.baseYield,
+    volatility:opt.volatility,
+    difficulty:opt.difficulty,
+  });
+  G.stress = clamp((G.stress||35) + rnd(2,5));
+  addEv(`You purchased a ${opt.name}. Brand systems help, but operations are demanding.`, 'love');
+  updateHUD();
+  renderBusiness();
+}
+
+function buyoutMegaCompany(targetId){
+  ensureBusinessTabState();
+  const opt = MEGA_BUYOUT_OPTIONS.find(x=>x.id===targetId);
+  if(!opt){ flash('Buyout target not found.','warn'); return; }
+  if(G.money<opt.cost){ flash(`Need ${fmt$(opt.cost)} to buy out ${opt.name}.`, 'warn'); return; }
+  if(G.age<30){ flash('Mega buyouts require age 30+ leadership credibility.', 'warn'); return; }
+  if((G.sm.totalFame||0)<25 && (G.career.reputation||50)<70){
+    flash('Need stronger fame/reputation for a mega buyout attempt.', 'warn');
+    return;
+  }
+  G.money -= opt.cost;
+  const h = addEmpireHolding({
+    type:'acquisition',
+    key:opt.id,
+    name:opt.name,
+    icon:opt.icon,
+    value:opt.cost,
+    baseYield:opt.baseYield,
+    volatility:opt.volatility,
+    difficulty:opt.difficulty,
+  });
+  G.stress = clamp((G.stress||35) + rnd(6,14));
+  G.career.reputation = clamp((G.career.reputation||50) + rnd(8,16));
+  G.sm.totalFame = clamp((G.sm.totalFame||0) + rnd(6,16));
+  addEv(`Historic deal: you bought out ${h.name} for ${fmt$(opt.cost)}. The world is watching every move.`, 'love');
+  updateHUD();
+  renderBusiness();
+}
+
+function manageHolding(holdingRef, action){
+  ensureBusinessTabState();
+  const id = holdingIdFromRef(holdingRef);
+  const e = G.finance.empire;
+  const h = e.holdings.find(x=>x.id===id);
+  if(!h){ flash('Holding not found.','warn'); return; }
+
+  if(action==='optimize'){
+    const cost = Math.floor(Math.max(5000, h.value * 0.01));
+    if(G.money<cost){ flash(`Need ${fmt$(cost)} to optimize ${h.name}.`,'warn'); return; }
+    G.money -= cost;
+    h.baseYield = Math.min(0.22, (h.baseYield||0.1) + rnd(1,3)/100);
+    h.volatility = Math.max(0.06, (h.volatility||0.2) - rnd(1,2)/100);
+    G.stress = clamp((G.stress||35) + rnd(1,4));
+    addEv(`You optimized ${h.name}. Margins improved after spending ${fmt$(cost)}.`, 'good');
+  } else if(action==='sell'){
+    const payout = Math.floor((h.value||0) * (0.88 + rnd(-6,14)/100));
+    G.money += Math.max(0, payout);
+    e.holdings = e.holdings.filter(x=>x.id!==id);
+    G.stress = clamp((G.stress||35) - rnd(1,5));
+    addEv(`You sold ${h.name} for ${fmt$(payout)}.`, payout>=(h.value||0)?'good':'warn');
+  }
   updateHUD();
   renderBusiness();
 }
@@ -630,6 +814,40 @@ function processInvestmentAndCryptoYear(ledger){
 function processBusinessYear(ledger){
   ensureBusinessTabState();
   const b = G.finance.business;
+  const e = G.finance.empire;
+  let empireCashflow = 0;
+  let empireValueDelta = 0;
+  if(e.holdings && e.holdings.length){
+    const managementFactor = Math.min(0.12, ((b.managementSkill||24)-20)/500 + (G.career.reputation||50)/1000);
+    e.holdings.forEach(h=>{
+      const noise = rnd(-100,100)/100 * (h.volatility||0.2);
+      const yieldRate = (h.baseYield||0.1) + managementFactor + noise*0.25;
+      const cashflow = Math.floor((h.value||0) * yieldRate);
+      h.cashflowLastYear = cashflow;
+      empireCashflow += cashflow;
+      if(cashflow>=0){
+        G.money += cashflow;
+        ledger.otherIncome += cashflow;
+      } else {
+        G.money += cashflow;
+        G.stress = clamp((G.stress||35) + rnd(2,5));
+      }
+      const valueRate = (h.baseYield||0.1)*0.42 + noise*0.6;
+      const valueDelta = Math.floor((h.value||0) * valueRate);
+      h.value = Math.max(50000, (h.value||0) + valueDelta);
+      empireValueDelta += valueDelta;
+    });
+    e.lastYearCashflow = empireCashflow;
+    e.lastYearValueDelta = empireValueDelta;
+    if(empireCashflow>0){
+      addEv(`Empire holdings generated ${fmt$(empireCashflow)} this year across ${e.holdings.length} companies.`, empireCashflow>5000000?'love':'good');
+    } else if(empireCashflow<0){
+      addEv(`Empire holdings had a rough year: ${fmt$(empireCashflow)} net cashflow.`, 'warn');
+    }
+  } else {
+    e.lastYearCashflow = 0;
+    e.lastYearValueDelta = 0;
+  }
   if(!b.active) return;
   const s = startupById(b.startupId);
   if(!s) return;
@@ -788,15 +1006,17 @@ function renderBusiness(){
   const b = G.finance.business;
   const c = G.finance.crypto;
   const p = G.finance.portfolio;
+  const e = G.finance.empire;
   const portfolioTotal = portfolioTotalValue();
   const cryptoTotal = cryptoTotalValue();
+  const empireValue = empireTotalValue();
   const ceiling = businessSkillCeiling(b);
   const overload = Math.max(0, (b.complexity||20) - ceiling);
 
   let html = `<div class="card">
     <div class="card-title">Founder + Capital Markets</div>
     <p style="font-size:.8rem;color:var(--muted2)">Business systems moved out of Jobs. Founder difficulty is now skill-capped: complexity can outgrow your management ability unless you train and systemize.</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Portfolio: ${fmt$(portfolioTotal)} · Crypto: ${fmt$(cryptoTotal)} · Day trades used: ${c.dayTradesThisYear||0}/4</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Portfolio: ${fmt$(portfolioTotal)} · Crypto: ${fmt$(cryptoTotal)} · Empire value: ${fmt$(empireValue)} · Day trades used: ${c.dayTradesThisYear||0}/4</p>
   </div>`;
 
   html += `<div class="card"><div class="card-title">Startups (25 Paths)</div>`;
@@ -846,6 +1066,47 @@ function renderBusiness(){
       ${(b.timeline||[]).length?`<div style="margin-top:10px">${(b.timeline||[]).slice().reverse().map(t=>`<div style="font-size:.75rem;color:var(--muted2);padding:2px 0">• Age ${t.year}: ${t.text}</div>`).join('')}</div>`:''}`;
   }
   html += `</div>`;
+
+  html += `<div class="card">
+    <div class="card-title">Multi-Company Empire</div>
+    <p style="font-size:.78rem;color:var(--muted2)">Own multiple companies at different scale levels: local businesses, franchises, and mega public-company buyouts.</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Last year cashflow: ${fmt$(e.lastYearCashflow||0)} · Value delta: ${fmt$(e.lastYearValueDelta||0)} · Holdings: ${(e.holdings||[]).length}</p>
+    <div class="section-header">Local Businesses</div>
+    <div class="choice-grid">
+      ${SMALL_BIZ_OPTIONS.map(o=>`<div class="choice" onclick="buySmallBusiness('${o.id}')">
+        <div class="choice-icon">${o.icon}</div>
+        <div class="choice-name">${o.name}</div>
+        <div class="choice-desc">${fmt$(o.cost)} · ${(o.baseYield*100).toFixed(1)}% base yield · ${o.desc}</div>
+      </div>`).join('')}
+    </div>
+    <div class="section-header">Franchises</div>
+    <div class="choice-grid">
+      ${FRANCHISE_OPTIONS.map(o=>`<div class="choice" onclick="buyFranchise('${o.id}')">
+        <div class="choice-icon">${o.icon}</div>
+        <div class="choice-name">${o.name}</div>
+        <div class="choice-desc">${fmt$(o.cost)} · ${(o.baseYield*100).toFixed(1)}% base yield · ${o.desc}</div>
+      </div>`).join('')}
+    </div>
+    <div class="section-header">Mega Buyouts (Very Expensive)</div>
+    <div class="choice-grid">
+      ${MEGA_BUYOUT_OPTIONS.map(o=>`<div class="choice" onclick="buyoutMegaCompany('${o.id}')">
+        <div class="choice-icon">${o.icon}</div>
+        <div class="choice-name">${o.name}</div>
+        <div class="choice-desc">${fmt$(o.cost)} · ${(o.baseYield*100).toFixed(1)}% base yield · ${o.desc}</div>
+      </div>`).join('')}
+    </div>
+    ${(e.holdings||[]).length?`<div class="section-header">Owned Holdings</div>
+      ${(e.holdings||[]).map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div class="p-name">${h.icon||'🏢'} ${h.name}</div>
+          <div class="p-role">${holdingTypeLabel(h.type)} · Value ${fmt$(h.value||0)} · Last cashflow ${fmt$(h.cashflowLastYear||0)}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="manageHolding('${h.id}','optimize')">Optimize</button>
+          <button class="btn btn-ghost btn-sm" onclick="manageHolding('${h.id}','sell')">Sell</button>
+        </div>
+      </div>`).join('')}`:'<div class="notif warn" style="margin-top:10px">No holdings yet. Buy your first company to begin multi-company ownership.</div>'}
+  </div>`;
 
   html += `<div class="card">
     <div class="card-title">Investing Suite</div>

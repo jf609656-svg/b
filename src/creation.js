@@ -222,6 +222,11 @@ function beginLife(){
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
       marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     },
+    empire:{
+      holdings:[], nextHoldingId:1,
+      totalAcquisitions:0, totalFranchises:0, totalSmallBiz:0,
+      lastYearCashflow:0, lastYearValueDelta:0,
+    },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
       lastStateRate:0, lastYearSummary:null, delinquentYears:0,

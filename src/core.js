@@ -34,6 +34,11 @@ const G = {
       customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
       marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
     },
+    empire:{
+      holdings:[], nextHoldingId:1,
+      totalAcquisitions:0, totalFranchises:0, totalSmallBiz:0,
+      lastYearCashflow:0, lastYearValueDelta:0,
+    },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
       lastStateRate:0, lastYearSummary:null, delinquentYears:0,
@@ -504,6 +509,14 @@ function ensureFinanceShape(){
   if(typeof G.finance.business.openDisputes!=='number') G.finance.business.openDisputes = 0;
   if(!Array.isArray(G.finance.business.rivals)) G.finance.business.rivals = [];
   if(!Array.isArray(G.finance.business.timeline)) G.finance.business.timeline = [];
+  if(!G.finance.empire) G.finance.empire = {};
+  if(!Array.isArray(G.finance.empire.holdings)) G.finance.empire.holdings = [];
+  if(typeof G.finance.empire.nextHoldingId!=='number') G.finance.empire.nextHoldingId = 1;
+  if(typeof G.finance.empire.totalAcquisitions!=='number') G.finance.empire.totalAcquisitions = 0;
+  if(typeof G.finance.empire.totalFranchises!=='number') G.finance.empire.totalFranchises = 0;
+  if(typeof G.finance.empire.totalSmallBiz!=='number') G.finance.empire.totalSmallBiz = 0;
+  if(typeof G.finance.empire.lastYearCashflow!=='number') G.finance.empire.lastYearCashflow = 0;
+  if(typeof G.finance.empire.lastYearValueDelta!=='number') G.finance.empire.lastYearValueDelta = 0;
   if(!G.finance.tax) G.finance.tax = {};
   if(typeof G.finance.tax.lastPaid!=='number') G.finance.tax.lastPaid = 0;
   if(typeof G.finance.tax.lastRefund!=='number') G.finance.tax.lastRefund = 0;
@@ -1211,6 +1224,11 @@ function addEv(text, type=''){
   const ev = {text, type};
   G.lifeEvents.push(ev);
   G.yearEvents.push(ev);
+  if(typeof G.stress==='number'){
+    if(type==='love') G.stress = clamp(G.stress - rnd(1,3));
+    else if(type==='good' && Math.random()<0.45) G.stress = clamp(G.stress - 1);
+    else if(type==='bad') G.stress = clamp(G.stress + 1);
+  }
   // Track darkness
   if(type==='bad') G.darkScore++;
 }
@@ -1384,7 +1402,9 @@ function ageUp(){
   if(a>60) G.health = clamp(G.health - rnd(0,3));
   G.happy  = clamp(G.happy  + rnd(-4,5));
   G.smarts = clamp(G.smarts + rnd(-1,2));
-  G.stress = clamp((G.stress||35) + rnd(-3,4));
+  G.stress = clamp((G.stress||35) + rnd(-5,2));
+  if((G.happy||50)>=70) G.stress = clamp((G.stress||35) - rnd(2,5));
+  else if((G.happy||50)>=58) G.stress = clamp((G.stress||35) - rnd(1,3));
   if(a<25)      G.looks = clamp(G.looks + rnd(0,2));
   else if(a>32) G.looks = clamp(G.looks - rnd(0,2));
 

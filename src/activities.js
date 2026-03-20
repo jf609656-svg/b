@@ -92,6 +92,7 @@ function confirmTravel(){
   G.smarts = clamp(G.smarts + rnd(0,4) + (loc.culture||0));
   G.health = clamp(G.health + rnd(-4,4) + (cls.luxury>=2?2:0));
   G.looks = clamp(G.looks + (cls.luxury>=2?rnd(1,4):0));
+  G.stress = clamp((G.stress||35) - rnd(5,12) - luxury);
 
   // Events
   const general = pick(TRAVEL_GENERAL_EVENTS);
@@ -135,6 +136,9 @@ function applyTravelEvent(ev){
   if(ev.health) G.health = clamp(G.health + rnd(ev.health[0], ev.health[1]));
   if(ev.looks)  G.looks = clamp(G.looks + rnd(ev.looks[0], ev.looks[1]));
   if(ev.money)  G.money += rnd(ev.money[0], ev.money[1]);
+  if(ev.happy && ev.happy[1]>0){
+    G.stress = clamp((G.stress||35) - rnd(1,4));
+  }
   addEv(ev.msg,'good');
 }
 
