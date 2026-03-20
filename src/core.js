@@ -147,6 +147,7 @@ const G = {
     reputation:50,
     drugFlags:{},     // { substanceId: true/false, substanceId_hooked: true/false }
     dramaFlags:{},
+    exLovers:[],
   },
   // health
   medical:{

@@ -6,6 +6,7 @@
 function renderSocial(){
   const sc = document.getElementById('social-content');
   const a  = G.age;
+  ensureSocialHookupState();
 
   if(a<10){
     sc.innerHTML=`<div class="notif warn">Social life unlocks at age 10. Go play outside.</div>`; return;
@@ -101,7 +102,232 @@ function renderSocial(){
     </div>`;
   }
 
+  // ── One Night Stand + Ex Lovers Hub (17+) ────────────────────
+  if(a>=17){
+    const exCount = (G.social.exLovers||[]).filter(x=>x && x.alive!==false).length;
+    html += `<div class="card">
+      <div class="card-title">One Night Stands</div>
+      <p style="color:var(--muted2);font-size:.78rem;margin-bottom:10px">
+        Casual encounters can create chemistry, drama, pregnancy risk, and future complications.
+      </p>
+      <div class="choice-grid">
+        <div class="choice" onclick="openOneNightStandPopup()"><div class="choice-icon">🌙</div><div class="choice-name">Find One Night Stand</div><div class="choice-desc">Pick location + person</div></div>
+        <div class="choice" onclick="openExLoversPopup()"><div class="choice-icon">📞</div><div class="choice-name">Ex Lovers Menu</div><div class="choice-desc">${exCount} tracked</div></div>
+      </div>
+    </div>`;
+  }
+
   sc.innerHTML = html;
+}
+
+function ensureSocialHookupState(){
+  if(!G.social || typeof G.social!=='object'){
+    G.social = { clique:null, rival:null, partyCount:0, reputation:50, drugFlags:{}, dramaFlags:{}, exLovers:[] };
+  }
+  if(!Array.isArray(G.social.exLovers)) G.social.exLovers = [];
+}
+
+const ONS_LOCATIONS = [
+  { id:'house_party', label:'House Party', icon:'🏠', minAge:17, base:0.58, cost:[0,45], vibe:'Chaotic and loud. Social risk is high.' },
+  { id:'night_club', label:'Night Club', icon:'🪩', minAge:18, base:0.54, cost:[20,95], vibe:'High energy, high confidence plays.' },
+  { id:'gym', label:'Gym', icon:'🏋️', minAge:17, base:0.36, cost:[0,30], vibe:'Awkward if it fails, smooth if it lands.' },
+  { id:'bar', label:'Bar', icon:'🍸', minAge:18, base:0.5, cost:[15,80], vibe:'Classic but still risky.' },
+  { id:'dating_app', label:'Dating App', icon:'📱', minAge:17, base:0.62, cost:[0,35], vibe:'Fast matches, mixed reliability.' },
+];
+
+function oneNightPreferredGender(){
+  return G.gender==='male' ? 'female' : (G.gender==='female' ? 'male' : pick(['male','female']));
+}
+
+function oneNightLocMeta(id){
+  return ONS_LOCATIONS.find(x=>x.id===id) || ONS_LOCATIONS[0];
+}
+
+function buildOneNightCandidate(locationId){
+  const preferred = oneNightPreferredGender();
+  const p = makePerson('Ex Lover', preferred);
+  p.age = Math.max(17, (G.age||17) + rnd(-5,4));
+  p.hookupOrigin = locationId||'social';
+  p.role = 'Ex Lover';
+  p.oneNight = true;
+  p.relation = rnd(38,72);
+  p.compat = rnd(28,92);
+  p.alive = true;
+  return p;
+}
+
+function openOneNightStandPopup(){
+  ensureSocialHookupState();
+  if((G.age||0)<17){ flash('Must be 17+ for this feature.','warn'); return; }
+  const opts = ONS_LOCATIONS
+    .filter(l=>(G.age||0)>=l.minAge)
+    .map(l=>({ label:`${l.icon} ${l.label}`, cls:'btn-ghost', onClick:()=>openOneNightCandidatePopup(l.id) }));
+  opts.push({ label:'Cancel', cls:'btn-ghost', onClick:()=>{} });
+  showPopup(
+    'Find a One Night Stand',
+    'Pick where you want to look. Different places have different vibes and outcomes.',
+    opts,
+    'dark'
+  );
+}
+
+function openOneNightCandidatePopup(locationId){
+  ensureSocialHookupState();
+  const loc = oneNightLocMeta(locationId);
+  const p = buildOneNightCandidate(locationId);
+  const raw = JSON.stringify(p).replace(/'/g,"\\'");
+  const html = `
+    <div class="person-card" style="margin-bottom:8px">
+      <div class="p-avatar av-love">${p.gender==='female'?'💃':'🕺'}</div>
+      <div>
+        <div class="p-name">${p.name}</div>
+        <div class="p-role">Age ${p.age} · Compat ${p.compat}% · Met at ${loc.label}</div>
+      </div>
+    </div>
+    <div style="font-size:.78rem;color:var(--muted2);margin-bottom:10px">${loc.vibe}</div>
+    <div class="choice-grid">
+      <div class="choice" onclick='oneNightHookup("${locationId}", ${raw})'><div class="choice-icon">🔥</div><div class="choice-name">Hook Up</div><div class="choice-desc">Proceed tonight</div></div>
+      <div class="choice" onclick="renderSocial()"><div class="choice-icon">🚪</div><div class="choice-name">Back Out</div><div class="choice-desc">No move tonight</div></div>
+    </div>
+  `;
+  showPopupHTML(`Encounter at ${loc.label}`, html, [{ label:'Close', cls:'btn-ghost', onClick:()=>{} }], 'dark');
+}
+
+function addToExLovers(person, from='one_night'){
+  ensureSocialHookupState();
+  if(!person || !person.name) return null;
+  const list = G.social.exLovers;
+  const idx = list.findIndex(x=>x && x.name===person.name);
+  if(idx>=0){
+    const merged = { ...list[idx], ...person, role:'Ex Lover', alive:person.alive!==false, lastSeenAge:G.age||0, source:from };
+    if(from==='one_night_stand'){
+      merged.hookupCount = (list[idx].hookupCount||0) + 1;
+    }
+    list[idx] = merged;
+    return list[idx];
+  }
+  const ex = {
+    ...person,
+    role:'Ex Lover',
+    alive:person.alive!==false,
+    relation: typeof person.relation==='number' ? person.relation : rnd(40,70),
+    compat: typeof person.compat==='number' ? person.compat : rnd(30,90),
+    source:from,
+    hookupCount: from==='one_night_stand' ? 1 : 0,
+    lastSeenAge:G.age||0,
+    pregnant: !!person.pregnant,
+    pregnantDueAge: person.pregnantDueAge||0,
+    pregnancyPartnerName: person.pregnancyPartnerName||'',
+    pregnancySource: person.pregnancySource||'',
+  };
+  list.push(ex);
+  if(list.length>30) list.shift();
+  return ex;
+}
+
+function oneNightHookup(locationId, person){
+  ensureSocialHookupState();
+  const loc = oneNightLocMeta(locationId);
+  if(!person || !person.name){ flash('Could not load encounter.','warn'); return; }
+  const chance = Math.max(0.18, Math.min(0.92, (loc.base||0.5) + (G.looks||50)/240 + (G.social?.reputation||50)/320));
+  const cost = rnd(loc.cost[0], loc.cost[1]);
+  if(G.money < cost){ flash(`Need ${fmt$(cost)} for tonight.`, 'warn'); return; }
+  G.money -= cost;
+  if(Math.random() > chance){
+    G.happy = clamp(G.happy - rnd(2,8));
+    G.social.reputation = clamp((G.social.reputation||50) - rnd(0,3));
+    addEv(`You tried at ${loc.label}, but it didn't happen tonight.`, 'warn');
+    updateHUD(); renderSocial();
+    return;
+  }
+
+  runCondomChoicePopup(person, 'one_night_stand', (usedCondom)=>{
+    const ex = addToExLovers(person, 'one_night_stand');
+    ex.lastSeenAge = G.age||0;
+    ex.relation = clamp((ex.relation||50) + rnd(4,11));
+    G.happy = clamp(G.happy + rnd(8,14));
+    addEv(`You hooked up with ${ex.firstName} at ${loc.label}.${usedCondom?' You used protection.':''}`, 'love');
+    if(typeof attemptRelationshipPregnancy==='function'){
+      attemptRelationshipPregnancy(ex, { condom:usedCondom, source:'one_night_stand' });
+    }
+    if((G.spouse || (G.lovers||[]).length>0) && Math.random()<0.24){
+      addEv(`Someone recognized you at ${loc.label}. Rumors started spreading.`, 'bad');
+      if(G.social && typeof G.social.reputation==='number') G.social.reputation = clamp(G.social.reputation - rnd(4,10));
+    }
+    updateHUD(); renderSocial();
+  });
+}
+
+function openExLoversPopup(){
+  ensureSocialHookupState();
+  const ex = (G.social.exLovers||[]).filter(x=>x && x.alive!==false);
+  if(!ex.length){
+    showPopup('Ex Lovers', 'No ex lovers tracked yet. Try a one night stand first.', [{ label:'Close', cls:'btn-ghost', onClick:()=>{} }], 'dark');
+    return;
+  }
+  const html = ex.slice().reverse().map((p, i)=>`
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-weight:700">${p.name}</div>
+          <div style="font-size:.72rem;color:var(--muted2)">Age ${p.age||'?'} · Compat ${p.compat||'?'}% · Hookups ${p.hookupCount||1}</div>
+        </div>
+        <div style="font-size:.72rem;color:var(--muted2)">Rel ${p.relation||50}%</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="exLoverAction(${(G.social.exLovers||[]).indexOf(p)}, 'booty')">📞 Booty Call</button>
+        <button class="btn btn-ghost btn-sm" onclick="exLoverAction(${(G.social.exLovers||[]).indexOf(p)}, 'date')">💘 Try to Date</button>
+      </div>
+    </div>
+  `).join('');
+  showPopupHTML('Ex Lovers Menu', `<div style="max-height:58vh;overflow:auto;padding-right:4px">${html}</div>`, [{ label:'Close', cls:'btn-ghost', onClick:()=>{} }], 'dark');
+}
+
+function exLoverAction(index, mode){
+  ensureSocialHookupState();
+  const list = G.social.exLovers||[];
+  const p = list[index];
+  if(!p || p.alive===false){ flash('They are no longer available.','warn'); return; }
+  if(mode==='booty'){
+    const chance = Math.min(0.9, 0.28 + (p.relation||50)/170 + (p.compat||50)/260);
+    if(Math.random()>chance){
+      p.relation = clamp((p.relation||50) - rnd(3,9));
+      addEv(`${p.firstName} ignored your booty call.`, 'warn');
+      updateHUD(); renderSocial();
+      return;
+    }
+    runCondomChoicePopup(p, 'ex_lover_booty_call', (usedCondom)=>{
+      p.hookupCount = (p.hookupCount||1) + 1;
+      p.relation = clamp((p.relation||50) + rnd(4,10));
+      G.happy = clamp(G.happy + rnd(6,12));
+      addEv(`You linked up with ${p.firstName} again.`, 'love');
+      if(typeof attemptRelationshipPregnancy==='function'){
+        attemptRelationshipPregnancy(p, { condom:usedCondom, source:'ex_lover_booty_call' });
+      }
+      updateHUD(); renderSocial();
+    });
+    return;
+  }
+  if(mode==='date'){
+    const chance = Math.min(0.9, 0.24 + (p.relation||50)/130 + (p.compat||50)/240);
+    if(Math.random()>chance){
+      p.relation = clamp((p.relation||50) - rnd(4,11));
+      addEv(`You tried to date ${p.firstName}, but they said no.`, 'bad');
+      updateHUD(); renderSocial();
+      return;
+    }
+    // Move from ex-lovers to active lovers list.
+    const lover = { ...p, role:'Lover', oneNight:false };
+    if(!Array.isArray(G.lovers)) G.lovers = [];
+    if(!G.lovers.some(x=>x.name===lover.name)){
+      G.lovers.push(lover);
+    }
+    G.social.exLovers = list.filter((_,i)=>i!==index);
+    addEv(`You and ${p.firstName} decided to try real dating.`, 'love');
+    G.happy = clamp(G.happy + rnd(8,14));
+    updateHUD();
+    if(typeof switchTab==='function') switchTab('relationships'); else renderSocial();
+  }
 }
 
 function sleepoverEvent(){

@@ -119,7 +119,7 @@ function beginLife(){
   };
   G.social = {
     clique:null, rival:null, partyCount:0,
-    reputation:50, drugFlags:{}, dramaFlags:{}
+    reputation:50, drugFlags:{}, dramaFlags:{}, exLovers:[]
   };
   G.medical    = { conditions:[], history:[] };
   G.sm = {

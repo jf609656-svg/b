@@ -559,6 +559,80 @@ function spouseAct(type){
   updateHUD(); renderRelationships();
 }
 
+function relationshipYearsWithPerson(p){
+  if(!p || typeof p!=='object') return 0;
+  if(typeof p.anniversaryYear==='number' && Number.isFinite(p.anniversaryYear)){
+    return Math.max(0, (G.age||0) - p.anniversaryYear);
+  }
+  if(typeof p.relStartedAge!=='number' || !Number.isFinite(p.relStartedAge)){
+    // Older saves may not track start year; default to "not fresh" to avoid over-triggering.
+    p.relStartedAge = Math.max(0, (G.age||0) - 2);
+  }
+  return Math.max(0, (G.age||0) - (p.relStartedAge||0));
+}
+
+function maybeGangSpecialDateBetrayal(l){
+  const gang = G.crime?.gang;
+  if(!l || !gang || !gang.joined) return false;
+  const beefLevel = gang.beef?.level || 0;
+  const beefScore = gang.beef?.score || 0;
+  const highBeef = beefLevel >= 2 || beefScore >= 45;
+  if(!highBeef) return false;
+  if((l.relation||50) > 45) return false;
+  if(relationshipYearsWithPerson(l) >= 2) return false;
+
+  const betrayalChance = Math.max(0.06, Math.min(0.48,
+    0.12 +
+    ((45 - (l.relation||45)) / 130) +
+    (beefLevel>=3 ? 0.11 : 0.05) +
+    ((gang.notoriety||0) / 420)
+  ));
+  if(Math.random() >= betrayalChance) return false;
+
+  const fn = l.firstName || l.name || 'your partner';
+  relationshipPopup(
+    `Setup on the "Special Date"`,
+    `${fn} invited you out, but it was a setup. Rival shooters jumped you because of gang beef.`,
+    [
+      { label:'What happened?', cls:'btn-primary', onClick:()=>{
+        const heat = G.crime?.heat || 0;
+        const fatalRisk = Math.max(0.06, Math.min(0.58,
+          0.12 + beefLevel*0.08 + heat/320 + (gang.recentViolence||0)/300 - (G.health||50)/260
+        ));
+        const hardRobberyRisk = 0.58;
+        const roll = Math.random();
+        const moneyLoss = Math.max(120, Math.floor(Math.min((G.money||0) * 0.36, rnd(350, 9000))));
+        const injury = rnd(5, 18);
+
+        G.lovers = (G.lovers||[]).filter(x=>x.name!==l.name);
+        applyRelationshipMemory(l, {
+          trust:-15, resentment:15, conflict:true, brokePromise:true,
+          note:'Partner betrayed and set you up during gang beef'
+        });
+        G.social.dramaFlags.partnerBetrayals = (G.social.dramaFlags.partnerBetrayals||0) + 1;
+
+        if(roll < fatalRisk){
+          addEv(`${fn} betrayed you and set you up. The ambush was fatal.`, 'bad');
+          die(`Killed in a gang setup after a special date with ${fn}.`);
+          return;
+        }
+        if(roll < fatalRisk + hardRobberyRisk){
+          G.money = Math.max(0, (G.money||0) - moneyLoss);
+          G.health = clamp((G.health||80) - injury);
+          G.crime.heat = Math.min(100, (G.crime.heat||0) + rnd(7,16));
+          addEv(`${fn} betrayed you. You survived, but got robbed for ${fmt$(moneyLoss)} and injured.`, 'bad');
+        } else {
+          G.health = clamp((G.health||80) - injury);
+          G.crime.heat = Math.min(100, (G.crime.heat||0) + rnd(8,18));
+          addEv(`${fn} tried to set you up, but you escaped wounded. The relationship is over.`, 'bad');
+        }
+        updateHUD(); renderRelationships();
+      }},
+    ]
+  );
+  return true;
+}
+
 function runLoverEncounterPopup(l, type){
   const fn = l.firstName;
   ensurePersonRelationshipMemory(l);
@@ -706,6 +780,7 @@ function runLoverEncounterPopup(l, type){
     return true;
   }
   if(type==='special'){
+    if(maybeGangSpecialDateBetrayal(l)) return true;
     relationshipPopup(`Plan something special for ${fn}?`, `This can be unforgettable if you commit.`, [
       { label:'Grand gesture', cls:'btn-primary', onClick:()=>{
         const cost = rnd(250,900);
@@ -916,6 +991,7 @@ function doDate(p, style){
   const bonus    = G.looks/200;
   const threshold = style==='ask' ? .46 : .36;
   if(Math.random()+bonus > threshold){
+    p.relStartedAge = G.age||0;
     p.relation = rnd(60,90); p.role='Lover'; p.compat = rnd(30,90); G.lovers.push(p);
     addEv(`You and ${p.firstName} started dating! ❤️`,'love');
     G.happy = clamp(G.happy+16);
@@ -1076,7 +1152,7 @@ function friendAct(name, type){
               attemptRelationshipPregnancy(f, { condom:false, source:'friend_hookup' });
             }
             if(!G.lovers.some(x=>x.name===f.name) && Math.random()<0.72){
-              const lover = { ...f, role:'Lover', relation:Math.max(55, f.relation), milestones:{ intimate:true } };
+              const lover = { ...f, role:'Lover', relation:Math.max(55, f.relation), milestones:{ intimate:true }, relStartedAge:G.age||0 };
               ensurePersonRelationshipMemory(lover);
               G.friends = G.friends.filter(x=>x.name!==f.name);
               G.lovers.push(lover);
