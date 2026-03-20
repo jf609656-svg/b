@@ -114,6 +114,7 @@ function ensureCareerOverhaulState(){
   G.career.influence = clamp(G.career.influence);
   G.career.burnout = clamp(G.career.burnout);
   G.career.layoffShield = clamp(G.career.layoffShield);
+  if(typeof ensureMedicalCareerState==='function') ensureMedicalCareerState();
 }
 
 function inferCareerTrack(job){

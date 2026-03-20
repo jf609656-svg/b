@@ -221,6 +221,31 @@ const G = {
     medSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false },
     lawSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false },
     licenses:{ medical:false, law:false },
+    medicalCareer:{
+      active:false,
+      stage:'none', // none|junior_doctor|specialist_training|consultant
+      specialization:null, // surgery|psychiatry|general_practice
+      yearsInStage:0,
+      yearsTotal:0,
+      hospitalId:'county_general',
+      policy:'balanced', // care_first|balanced|profit_first
+      suspendedYears:0,
+      stats:{ knowledge:40, skill:34, stress:28, reputation:42, ethics:62, burnout:14 },
+      annual:{
+        actionsUsed:0, timeUsed:0, shifts:0, rest:0,
+        patientsSeen:0, diagnosed:0, correctDx:0, uncertainDx:0, misDx:0,
+        outcomes:{ success:0, partial:0, failure:0, critical:0 },
+        lawsuits:0, bonuses:0, penalties:0,
+      },
+      insurance:{ active:true, coverage:65, premium:4500, deductible:12000 },
+      hospital:{ quality:58, funding:52, volume:55, type:'public' },
+      patientQueue:[],
+      resolvedCases:[],
+      nextCaseId:1,
+      underInvestigation:false,
+      investigationRisk:0,
+      pendingSpecialization:false,
+    },
   },
   // acting
   acting:{
@@ -821,6 +846,80 @@ function ensureCareerShape(){
   if(!G.career.medSchool) G.career.medSchool = { enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false };
   if(!G.career.lawSchool) G.career.lawSchool = { enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false };
   if(!G.career.licenses) G.career.licenses = { medical:false, law:false };
+  if(!G.career.medicalCareer || typeof G.career.medicalCareer!=='object'){
+    G.career.medicalCareer = {
+      active:false, stage:'none', specialization:null, yearsInStage:0, yearsTotal:0,
+      hospitalId:'county_general', policy:'balanced', suspendedYears:0,
+      stats:{ knowledge:40, skill:34, stress:28, reputation:42, ethics:62, burnout:14 },
+      annual:{
+        actionsUsed:0, timeUsed:0, shifts:0, rest:0,
+        patientsSeen:0, diagnosed:0, correctDx:0, uncertainDx:0, misDx:0,
+        outcomes:{ success:0, partial:0, failure:0, critical:0 },
+        lawsuits:0, bonuses:0, penalties:0,
+      },
+      insurance:{ active:true, coverage:65, premium:4500, deductible:12000 },
+      hospital:{ quality:58, funding:52, volume:55, type:'public' },
+      patientQueue:[], resolvedCases:[], nextCaseId:1,
+      underInvestigation:false, investigationRisk:0, pendingSpecialization:false,
+    };
+  }
+  const mc = G.career.medicalCareer;
+  if(typeof mc.active!=='boolean') mc.active = false;
+  if(typeof mc.stage!=='string') mc.stage = 'none';
+  if(typeof mc.specialization!=='string' && mc.specialization!==null) mc.specialization = null;
+  if(typeof mc.yearsInStage!=='number') mc.yearsInStage = 0;
+  if(typeof mc.yearsTotal!=='number') mc.yearsTotal = 0;
+  if(typeof mc.hospitalId!=='string') mc.hospitalId = 'county_general';
+  if(typeof mc.policy!=='string') mc.policy = 'balanced';
+  if(typeof mc.suspendedYears!=='number') mc.suspendedYears = 0;
+  if(!mc.stats || typeof mc.stats!=='object') mc.stats = {};
+  if(typeof mc.stats.knowledge!=='number') mc.stats.knowledge = 40;
+  if(typeof mc.stats.skill!=='number') mc.stats.skill = 34;
+  if(typeof mc.stats.stress!=='number') mc.stats.stress = 28;
+  if(typeof mc.stats.reputation!=='number') mc.stats.reputation = 42;
+  if(typeof mc.stats.ethics!=='number') mc.stats.ethics = 62;
+  if(typeof mc.stats.burnout!=='number') mc.stats.burnout = 14;
+  if(!mc.annual || typeof mc.annual!=='object'){
+    mc.annual = {
+      actionsUsed:0, timeUsed:0, shifts:0, rest:0,
+      patientsSeen:0, diagnosed:0, correctDx:0, uncertainDx:0, misDx:0,
+      outcomes:{ success:0, partial:0, failure:0, critical:0 },
+      lawsuits:0, bonuses:0, penalties:0,
+    };
+  }
+  if(typeof mc.annual.actionsUsed!=='number') mc.annual.actionsUsed = 0;
+  if(typeof mc.annual.timeUsed!=='number') mc.annual.timeUsed = 0;
+  if(typeof mc.annual.shifts!=='number') mc.annual.shifts = 0;
+  if(typeof mc.annual.rest!=='number') mc.annual.rest = 0;
+  if(typeof mc.annual.patientsSeen!=='number') mc.annual.patientsSeen = 0;
+  if(typeof mc.annual.diagnosed!=='number') mc.annual.diagnosed = 0;
+  if(typeof mc.annual.correctDx!=='number') mc.annual.correctDx = 0;
+  if(typeof mc.annual.uncertainDx!=='number') mc.annual.uncertainDx = 0;
+  if(typeof mc.annual.misDx!=='number') mc.annual.misDx = 0;
+  if(!mc.annual.outcomes || typeof mc.annual.outcomes!=='object') mc.annual.outcomes = {};
+  if(typeof mc.annual.outcomes.success!=='number') mc.annual.outcomes.success = 0;
+  if(typeof mc.annual.outcomes.partial!=='number') mc.annual.outcomes.partial = 0;
+  if(typeof mc.annual.outcomes.failure!=='number') mc.annual.outcomes.failure = 0;
+  if(typeof mc.annual.outcomes.critical!=='number') mc.annual.outcomes.critical = 0;
+  if(typeof mc.annual.lawsuits!=='number') mc.annual.lawsuits = 0;
+  if(typeof mc.annual.bonuses!=='number') mc.annual.bonuses = 0;
+  if(typeof mc.annual.penalties!=='number') mc.annual.penalties = 0;
+  if(!mc.insurance || typeof mc.insurance!=='object') mc.insurance = {};
+  if(typeof mc.insurance.active!=='boolean') mc.insurance.active = true;
+  if(typeof mc.insurance.coverage!=='number') mc.insurance.coverage = 65;
+  if(typeof mc.insurance.premium!=='number') mc.insurance.premium = 4500;
+  if(typeof mc.insurance.deductible!=='number') mc.insurance.deductible = 12000;
+  if(!mc.hospital || typeof mc.hospital!=='object') mc.hospital = {};
+  if(typeof mc.hospital.quality!=='number') mc.hospital.quality = 58;
+  if(typeof mc.hospital.funding!=='number') mc.hospital.funding = 52;
+  if(typeof mc.hospital.volume!=='number') mc.hospital.volume = 55;
+  if(typeof mc.hospital.type!=='string') mc.hospital.type = 'public';
+  if(!Array.isArray(mc.patientQueue)) mc.patientQueue = [];
+  if(!Array.isArray(mc.resolvedCases)) mc.resolvedCases = [];
+  if(typeof mc.nextCaseId!=='number') mc.nextCaseId = 1;
+  if(typeof mc.underInvestigation!=='boolean') mc.underInvestigation = false;
+  if(typeof mc.investigationRisk!=='number') mc.investigationRisk = 0;
+  if(typeof mc.pendingSpecialization!=='boolean') mc.pendingSpecialization = false;
   G.career.influence = clamp(G.career.influence);
   G.career.burnout = clamp(G.career.burnout);
   G.career.layoffShield = clamp(G.career.layoffShield);
@@ -2078,6 +2177,9 @@ function ageUp(){
       flash('🩺 Medical license earned','good');
     }
   }
+  if(typeof processMedicalCareerYear==='function'){
+    runYearStepSafe('medical_career', ()=>processMedicalCareerYear(yearLedger));
+  }
 
   if(G.career.lawSchool.enrolled){
     const ls = G.career.lawSchool;
@@ -2111,6 +2213,11 @@ function ageUp(){
     } else {
       addEv('Bar exam retake didn’t go your way. Another try next year.', 'warn');
     }
+  }
+
+  // ── Deep medical career yearly simulation ───────────────────
+  if(typeof medicalProgressYear==='function'){
+    runYearStepSafe('medical_career', ()=>medicalProgressYear());
   }
 
   // ── Careers: salary + promotions + HR risk ──────────────────
