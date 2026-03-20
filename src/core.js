@@ -395,6 +395,16 @@ const G = {
     skills:{ scam:0, hack:0, violence:0 },
     crew:[],
     currentHeist:null,
+    heists:{
+      active:null,
+      history:[],
+      market:{},
+      planningQuality:0,
+      crewEfficiency:0,
+      betrayalRisk:0,
+      cooldown:0,
+      totalTake:0,
+    },
     police:{ closeness:0, arrested:false, sentence:0, inPrison:false },
     prison:{ respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } },
     gang:{ joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 },
@@ -2474,6 +2484,12 @@ function ageUp(){
   // ── Crime: heat decay & retaliation ─────────────────────────
   if(G.crime.heat>0){
     G.crime.heat = Math.max(0, G.crime.heat - rnd(3,8));
+  }
+  if(G.crime.heists && typeof G.crime.heists.cooldown==='number' && G.crime.heists.cooldown>0){
+    G.crime.heists.cooldown = Math.max(0, G.crime.heists.cooldown - 1);
+    if(G.crime.heists.cooldown===0){
+      addEv('The city cooled off. New heist windows opened.', 'warn');
+    }
   }
   if(G.crime.heat>=70 && Math.random()<0.2){
     const loss = rnd(200,2000);

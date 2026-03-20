@@ -1,9 +1,11 @@
 function addCrimeEv(text, type=''){
+  ensureCrimeShape();
   G.crime.log.push({ text, type, age:G.age });
   if(G.crime.log.length>50) G.crime.log.shift();
 }
 
 function policeCheck(){
+  ensureCrimeShape();
   const P = G.crime.police;
   const risk = (G.crime.heat/120) + (P.closeness/150);
   if(!P.inPrison && Math.random()<risk*0.25){
@@ -79,7 +81,292 @@ function randomVictimDesc(){
   return `Random target: ${age}-year-old ${vibe} ${location}.`;
 }
 
+function ensureCrimeShape(){
+  if(!G.crime || typeof G.crime!=='object') G.crime = {};
+  if(!G.crime.heists || typeof G.crime.heists!=='object') G.crime.heists = {};
+  const h = G.crime.heists;
+  if(!h.active || typeof h.active!=='object') h.active = null;
+  if(!Array.isArray(h.history)) h.history = [];
+  if(!h.market || typeof h.market!=='object') h.market = {};
+  if(typeof h.planningQuality!=='number') h.planningQuality = 0;
+  if(typeof h.crewEfficiency!=='number') h.crewEfficiency = 0;
+  if(typeof h.betrayalRisk!=='number') h.betrayalRisk = 0;
+  if(typeof h.cooldown!=='number') h.cooldown = 0;
+  if(typeof h.totalTake!=='number') h.totalTake = 0;
+  if(typeof G.crime.currentHeist!=='string' && G.crime.currentHeist!==null) G.crime.currentHeist = null;
+}
+
+const HEIST_TIER_META = {
+  entry:{ label:'Entry', heatMult:0.75, deathRisk:0.02, fame:2 },
+  urban:{ label:'Urban', heatMult:1.0, deathRisk:0.05, fame:4 },
+  major:{ label:'Major', heatMult:1.25, deathRisk:0.09, fame:7 },
+  national:{ label:'National', heatMult:1.6, deathRisk:0.14, fame:10 },
+  apex:{ label:'Apex', heatMult:1.95, deathRisk:0.22, fame:14 },
+};
+
+const HEIST_BLUEPRINTS = [
+  {
+    id:'jewellery_store',
+    label:'Jewellery Store Heist',
+    location:'Crownline Jewellery Exchange, Midtown',
+    tier:'entry',
+    difficulty:28,
+    minNotoriety:0,
+    minSetups:2,
+    payout:[90000,220000],
+    baseHeat:14,
+    specialistRole:'Safecracker',
+    setups:[
+      { id:'store_recon', label:'Recon floor layout', desc:'Map cameras and guard rotations.', cost:2500, planning:10, success:5, risk:-8, payout:0.02, heat:1 },
+      { id:'smash_kit', label:'Build smash kit', desc:'Fast-entry tools for cases.', cost:4000, planning:7, success:4, risk:-2, payout:0.08, heat:2 },
+      { id:'silent_case', label:'Acquire glass cutter', desc:'Quiet case access.', cost:7000, planning:10, success:7, risk:-10, payout:-0.03, heat:0 },
+      { id:'exit_route', label:'Scout police response lanes', desc:'Predict patrol timing around the block.', cost:3000, planning:8, success:4, risk:-6, payout:0.01, heat:0 },
+    ],
+    steps:[
+      { id:'entry', title:'Store entry', prompt:'Alarmed front and service hallway both look viable.', options:[
+        { label:'Smash front and shock crowd', success:9, risk:14, payout:0.15, casualty:8, heat:9, speed:20, betrayal:4 },
+        { label:'Service hallway breach', success:6, risk:7, payout:0.06, casualty:3, heat:5, speed:12, betrayal:1 },
+        { label:'Wait for shift change', success:4, risk:4, payout:-0.02, casualty:1, heat:2, speed:-8, betrayal:0 },
+      ]},
+      { id:'vault', title:'Vault room', prompt:'Safe door is old-school steel with upgraded relockers.', options:[
+        { label:'Safecracker takes lead', success:8, risk:5, payout:0.12, casualty:1, heat:3, speed:8, betrayal:0 },
+        { label:'Enforcer uses thermic lance', success:5, risk:11, payout:0.16, casualty:6, heat:8, speed:15, betrayal:2 },
+        { label:'Grab display stock and bail', success:7, risk:4, payout:-0.18, casualty:1, heat:2, speed:18, betrayal:0 },
+      ]},
+      { id:'escape', title:'Exit', prompt:'Two police units are approaching from opposite streets.', options:[
+        { label:'Driver forces alley exit', success:8, risk:11, payout:0.02, casualty:5, heat:7, speed:12, betrayal:1 },
+        { label:'Blend into crowd in disguise', success:5, risk:6, payout:-0.05, casualty:1, heat:1, speed:-3, betrayal:3 },
+        { label:'Shoot through checkpoint', success:3, risk:16, payout:0.07, casualty:12, heat:12, speed:16, betrayal:4 },
+      ]},
+    ],
+  },
+  {
+    id:'citibank',
+    label:'Citibank Heist',
+    location:'Citibank Financial Center, Downtown',
+    tier:'urban',
+    difficulty:45,
+    minNotoriety:20,
+    minSetups:3,
+    payout:[420000,980000],
+    baseHeat:24,
+    specialistRole:'Negotiator',
+    setups:[
+      { id:'inside_info', label:'Inside teller schedule', desc:'Identify peak cash windows and panic button habits.', cost:12000, planning:12, success:7, risk:-8, payout:0.05, heat:2 },
+      { id:'vault_access', label:'Vault access strategy', desc:'Steal keycard clone and lock timing.', cost:18000, planning:14, success:10, risk:-9, payout:0.09, heat:3 },
+      { id:'crowd_model', label:'Crowd flow simulation', desc:'Predict hostages and line-of-sight issues.', cost:8000, planning:8, success:5, risk:-6, payout:0.02, heat:1 },
+      { id:'getaway_cells', label:'Distributed getaway cars', desc:'Burner vehicles across 3 blocks.', cost:16000, planning:10, success:6, risk:-8, payout:0.03, heat:1 },
+    ],
+    steps:[
+      { id:'lobby_control', title:'Lobby control', prompt:'A security guard is reaching for the silent alarm.', options:[
+        { label:'Hard intimidation', success:7, risk:12, payout:0.12, casualty:8, heat:10, speed:15, betrayal:2 },
+        { label:'Negotiator calms room', success:6, risk:5, payout:0.02, casualty:2, heat:4, speed:4, betrayal:0 },
+        { label:'Abort lobby and push vault only', success:4, risk:7, payout:-0.2, casualty:3, heat:5, speed:8, betrayal:1 },
+      ]},
+      { id:'vault_breach', title:'Vault breach', prompt:'Time lock has 4 minutes left on cycle.', options:[
+        { label:'Wait for legal cycle and crack', success:8, risk:4, payout:0.08, casualty:1, heat:2, speed:-6, betrayal:2 },
+        { label:'Explosive hinge cut', success:5, risk:14, payout:0.16, casualty:9, heat:11, speed:18, betrayal:3 },
+        { label:'Cut losses and clear cash drawers', success:7, risk:5, payout:-0.14, casualty:2, heat:3, speed:11, betrayal:0 },
+      ]},
+      { id:'city_escape', title:'City escape', prompt:'Downtown traffic is gridlocked after the first dispatch call.', options:[
+        { label:'Driver uses tunnel route', success:8, risk:8, payout:0.04, casualty:4, heat:6, speed:9, betrayal:0 },
+        { label:'Switch to subway egress', success:6, risk:6, payout:-0.03, casualty:2, heat:2, speed:2, betrayal:2 },
+        { label:'Hijack ambulance corridor', success:4, risk:13, payout:0.07, casualty:7, heat:9, speed:14, betrayal:3 },
+      ]},
+    ],
+  },
+  {
+    id:'federal_reserve',
+    label:'Federal Reserve Heist',
+    location:'Federal Reserve Currency Annex, Manhattan',
+    tier:'national',
+    difficulty:72,
+    minNotoriety:48,
+    minSetups:4,
+    payout:[2200000,6200000],
+    baseHeat:42,
+    specialistRole:'Security Engineer',
+    setups:[
+      { id:'blueprints', label:'Acquire subterranean blueprints', desc:'Map service tunnels and seismic sensors.', cost:60000, planning:16, success:10, risk:-10, payout:0.03, heat:3 },
+      { id:'cipher_keys', label:'Obtain rotating cipher keys', desc:'Spoof two-factor door chains.', cost:90000, planning:18, success:14, risk:-12, payout:0.07, heat:4 },
+      { id:'power_override', label:'Substation override package', desc:'Create controlled blackout windows.', cost:55000, planning:12, success:8, risk:-7, payout:0.04, heat:3 },
+      { id:'federal_safehouse', label:'Federal manhunt safehouses', desc:'Prep 3-state fallback route.', cost:70000, planning:15, success:9, risk:-9, payout:0.02, heat:1 },
+      { id:'counterintel', label:'Counterintelligence leak scan', desc:'Check for informants and watchers.', cost:40000, planning:11, success:7, risk:-8, payout:0.01, heat:1 },
+    ],
+    steps:[
+      { id:'approach', title:'Approach', prompt:'Choose opening doctrine: stealth corridor or forceful breach.', options:[
+        { label:'Stealth doctrine', success:10, risk:5, payout:0.03, casualty:2, heat:4, speed:-3, betrayal:0 },
+        { label:'Brute breach doctrine', success:4, risk:15, payout:0.15, casualty:11, heat:14, speed:18, betrayal:3 },
+      ]},
+      { id:'core_vault', title:'Core vault network', prompt:'Inner vault sits behind timed interlocks and pressure flooring.', options:[
+        { label:'Precision sequenced unlock', success:11, risk:5, payout:0.08, casualty:1, heat:3, speed:-4, betrayal:0 },
+        { label:'Forced relay bypass', success:6, risk:12, payout:0.14, casualty:7, heat:9, speed:10, betrayal:2 },
+        { label:'Take reserve transfer pallets only', success:8, risk:6, payout:-0.2, casualty:2, heat:4, speed:13, betrayal:1 },
+      ]},
+      { id:'federal_response', title:'Federal response', prompt:'National response protocol is active and comms are saturated.', options:[
+        { label:'Split crew into two escape cells', success:8, risk:9, payout:-0.05, casualty:5, heat:7, speed:6, betrayal:4 },
+        { label:'Keep crew tight and armored', success:6, risk:12, payout:0.02, casualty:7, heat:10, speed:8, betrayal:1 },
+        { label:'Burn decoy truck convoy', success:7, risk:8, payout:-0.08, casualty:3, heat:5, speed:12, betrayal:0 },
+      ]},
+    ],
+  },
+  {
+    id:'yacht',
+    label:'Steven Croft Yacht Heist',
+    location:'Croft\'s yacht "Lucent Vow", Atlantic route',
+    tier:'major',
+    difficulty:58,
+    minNotoriety:36,
+    minSetups:3,
+    payout:[950000,2800000],
+    baseHeat:30,
+    specialistRole:'Diver',
+    setups:[
+      { id:'route_ping', label:'Route interception intel', desc:'Track moving route and weather windows.', cost:22000, planning:12, success:7, risk:-7, payout:0.05, heat:1 },
+      { id:'boarding_kit', label:'Boarding kit and grapples', desc:'Tooling for moving-hull entry.', cost:15000, planning:9, success:5, risk:-5, payout:0.03, heat:1 },
+      { id:'manifest', label:'Diamond manifest leak', desc:'Identify where Croft stores stones onboard.', cost:30000, planning:14, success:10, risk:-8, payout:0.1, heat:2 },
+      { id:'coastline_exit', label:'Coastline extraction cache', desc:'Fuel and med cache near extraction cove.', cost:18000, planning:8, success:5, risk:-6, payout:0.01, heat:1 },
+    ],
+    steps:[
+      { id:'intercept', title:'Open water intercept', prompt:'Sea state is unstable and yacht speed is increasing.', options:[
+        { label:'Night shadow approach', success:8, risk:7, payout:0.03, casualty:3, heat:4, speed:5, betrayal:0 },
+        { label:'Direct speedboat slam', success:5, risk:13, payout:0.12, casualty:8, heat:9, speed:16, betrayal:2 },
+      ]},
+      { id:'board', title:'Boarding', prompt:'Deck security rotates every 90 seconds.', options:[
+        { label:'Diver inserts from stern', success:10, risk:6, payout:0.05, casualty:2, heat:3, speed:4, betrayal:1 },
+        { label:'Enforcer clears top deck', success:6, risk:12, payout:0.14, casualty:9, heat:11, speed:14, betrayal:2 },
+        { label:'Social bluff as catering', success:7, risk:8, payout:-0.03, casualty:2, heat:2, speed:2, betrayal:3 },
+      ]},
+      { id:'exfil', title:'Marine exfiltration', prompt:'Coast guard chatter confirms active sweep.', options:[
+        { label:'Drop to submarine tender', success:8, risk:8, payout:-0.04, casualty:3, heat:5, speed:10, betrayal:0 },
+        { label:'Race to private marina', success:6, risk:11, payout:0.03, casualty:6, heat:8, speed:14, betrayal:1 },
+        { label:'Scuttle decoy boat and swim', success:5, risk:10, payout:-0.09, casualty:7, heat:4, speed:3, betrayal:2 },
+      ]},
+    ],
+  },
+  {
+    id:'casino',
+    label:'Grand Crescent Casino Heist',
+    location:'Grand Crescent Casino, Las Venturas',
+    tier:'major',
+    difficulty:63,
+    minNotoriety:40,
+    minSetups:3,
+    payout:[1100000,3600000],
+    baseHeat:33,
+    specialistRole:'Con Artist',
+    setups:[
+      { id:'disguises', label:'Acquire staff disguises', desc:'High-end uniforms and chips authentication.', cost:26000, planning:12, success:8, risk:-7, payout:0.03, heat:1 },
+      { id:'inside_host', label:'Flip pit manager', desc:'Secure insider path to vault elevator.', cost:42000, planning:16, success:11, risk:-10, payout:0.08, heat:3 },
+      { id:'security_map', label:'Map surveillance spine', desc:'Track dead zones and mafia watch points.', cost:28000, planning:13, success:9, risk:-9, payout:0.04, heat:2 },
+      { id:'countroom_clone', label:'Clone count room keyset', desc:'Access to back cash processing rooms.', cost:24000, planning:11, success:8, risk:-7, payout:0.05, heat:2 },
+    ],
+    steps:[
+      { id:'approach', title:'Approach method', prompt:'Pick a doctrine for the casino floor.', options:[
+        { label:'Stealth infiltration', success:10, risk:5, payout:0.02, casualty:1, heat:3, speed:-2, betrayal:1 },
+        { label:'Social engineering con', success:8, risk:7, payout:0.07, casualty:2, heat:4, speed:4, betrayal:2 },
+        { label:'Aggressive takeover', success:5, risk:15, payout:0.16, casualty:10, heat:12, speed:15, betrayal:0 },
+      ]},
+      { id:'mafia_guard', title:'Mafia guards', prompt:'House mafia detail spots movement near the count room.', options:[
+        { label:'Pay them off quietly', success:7, risk:5, payout:-0.08, casualty:1, heat:2, speed:2, betrayal:0 },
+        { label:'Con artist misdirection', success:8, risk:8, payout:0.03, casualty:3, heat:5, speed:5, betrayal:2 },
+        { label:'Enforcer neutralizes guards', success:5, risk:14, payout:0.1, casualty:9, heat:10, speed:11, betrayal:3 },
+      ]},
+      { id:'count_room', title:'Count room extraction', prompt:'Vault timers and table-game revenue bundles are moving fast.', options:[
+        { label:'Hit high-value chips only', success:8, risk:6, payout:0.06, casualty:2, heat:4, speed:8, betrayal:0 },
+        { label:'Drain full count room', success:6, risk:11, payout:0.15, casualty:6, heat:9, speed:12, betrayal:2 },
+        { label:'Take digital ledger and blackmail', success:7, risk:8, payout:-0.04, casualty:2, heat:3, speed:3, betrayal:4 },
+      ]},
+    ],
+  },
+  {
+    id:'train',
+    label:'Ridgeway Train Heist',
+    location:'Ridgeway elevated freight line',
+    tier:'urban',
+    difficulty:52,
+    minNotoriety:30,
+    minSetups:3,
+    payout:[520000,1500000],
+    baseHeat:27,
+    specialistRole:'Demolitions',
+    setups:[
+      { id:'schedule', label:'Steal rail timetable', desc:'Locate high-value cars and patrol intervals.', cost:12000, planning:10, success:6, risk:-7, payout:0.04, heat:1 },
+      { id:'track_tools', label:'Track tool staging', desc:'Signal jammers and clamp packs.', cost:18000, planning:11, success:8, risk:-8, payout:0.05, heat:2 },
+      { id:'bridge_spot', label:'Choose interception bridge', desc:'Higher loot odds, worse escape if wrong.', cost:14000, planning:8, success:5, risk:-5, payout:0.09, heat:1 },
+      { id:'cargo_manifest', label:'Cargo manifest leak', desc:'Avoid decoy containers.', cost:21000, planning:12, success:8, risk:-7, payout:0.07, heat:2 },
+    ],
+    steps:[
+      { id:'intercept', title:'Interception timing', prompt:'Train speed is 10% higher than projected.', options:[
+        { label:'Force emergency brake now', success:6, risk:12, payout:0.12, casualty:7, heat:8, speed:16, betrayal:2 },
+        { label:'Shadow and intercept at tunnel', success:8, risk:7, payout:0.04, casualty:3, heat:4, speed:8, betrayal:1 },
+        { label:'Abort and re-hit another car', success:4, risk:4, payout:-0.1, casualty:1, heat:1, speed:-6, betrayal:4 },
+      ]},
+      { id:'car_entry', title:'Cargo car entry', prompt:'Two armored cars and one decoy container are in view.', options:[
+        { label:'Demolitions opens armored car', success:8, risk:10, payout:0.11, casualty:5, heat:7, speed:12, betrayal:1 },
+        { label:'Hacker spoof smart lock', success:7, risk:6, payout:0.06, casualty:2, heat:3, speed:5, betrayal:0 },
+        { label:'Grab easiest visible cargo', success:6, risk:5, payout:-0.13, casualty:1, heat:2, speed:10, betrayal:2 },
+      ]},
+      { id:'time_window', title:'Limited decision window', prompt:'Air unit ETA is under 4 minutes.', options:[
+        { label:'Take partial haul and jump', success:8, risk:6, payout:-0.05, casualty:2, heat:3, speed:14, betrayal:0 },
+        { label:'Push for max haul', success:5, risk:13, payout:0.15, casualty:8, heat:10, speed:9, betrayal:2 },
+        { label:'Detach car and tow later', success:4, risk:9, payout:0.04, casualty:4, heat:5, speed:2, betrayal:5 },
+      ]},
+    ],
+  },
+  {
+    id:'little_wayne_island',
+    label:'Little Wayne Island Heist',
+    location:'Little Wayne Island, estate of billionaire host circles',
+    tier:'apex',
+    difficulty:88,
+    minNotoriety:68,
+    minSetups:4,
+    payout:[8200000,22000000],
+    baseHeat:55,
+    specialistRole:'Infiltration Architect',
+    setups:[
+      { id:'island_recon', label:'Recon security grid', desc:'Map elite patrol boats, drones, thermal nets.', cost:180000, planning:18, success:12, risk:-11, payout:0.05, heat:4 },
+      { id:'entry_vector', label:'Secure entry method', desc:'Subsea tunnel, helicopter spoof, or dock clone.', cost:210000, planning:16, success:11, risk:-10, payout:0.04, heat:4 },
+      { id:'disable_systems', label:'Disable sensor lattice', desc:'Interference package for cameras and pressure floors.', cost:230000, planning:17, success:12, risk:-12, payout:0.05, heat:5 },
+      { id:'insider', label:'Insider intelligence', desc:'Flip island operations staff for vault timing.', cost:260000, planning:20, success:14, risk:-12, payout:0.08, heat:5 },
+      { id:'extraction', label:'Ocean extraction chain', desc:'Multi-hop extraction with decoys due to isolation.', cost:170000, planning:13, success:9, risk:-8, payout:0.02, heat:2 },
+    ],
+    steps:[
+      { id:'isolation_entry', title:'Island entry', prompt:'Island weather is changing and helipad checks doubled.', options:[
+        { label:'Subsea breach during storm', success:9, risk:11, payout:0.06, casualty:6, heat:6, speed:9, betrayal:1 },
+        { label:'Forged VIP convoy docking', success:8, risk:8, payout:0.04, casualty:3, heat:4, speed:5, betrayal:3 },
+        { label:'Direct armed insertion', success:5, risk:18, payout:0.17, casualty:14, heat:15, speed:17, betrayal:0 },
+      ]},
+      { id:'estate_core', title:'Estate core', prompt:'Panic vault route forks into trophy room, crypto cold-room, and art wing.', options:[
+        { label:'Hit vault and leave art', success:9, risk:9, payout:0.11, casualty:4, heat:7, speed:7, betrayal:0 },
+        { label:'Split crew across all wings', success:6, risk:14, payout:0.2, casualty:9, heat:12, speed:11, betrayal:6 },
+        { label:'Trigger blackout and ghost path', success:8, risk:7, payout:0.06, casualty:3, heat:5, speed:4, betrayal:2 },
+      ]},
+      { id:'collapse_window', title:'Collapse window', prompt:'Island lockdown starts in 90 seconds and sea lanes are blocked.', options:[
+        { label:'Hold formation and force one lane', success:7, risk:13, payout:0.03, casualty:8, heat:10, speed:10, betrayal:1 },
+        { label:'Break into micro-teams', success:8, risk:9, payout:-0.06, casualty:5, heat:6, speed:8, betrayal:7 },
+        { label:'Burn decoy yacht extraction', success:6, risk:11, payout:-0.1, casualty:4, heat:5, speed:12, betrayal:0 },
+      ]},
+    ],
+  },
+];
+
+const HEIST_ROLE_NAMES = {
+  Hacker:['Iris Vale','Niko Byte','Kade Cipher','Lena Null','Rafe Loop','Mila Vector'],
+  Driver:['Mason Drift','Tara Slip','Jace Pike','Rin Voss','Dex Havoc','Juno Vale'],
+  Enforcer:['Bruno Slate','Kira Knox','Viktor Hale','Jett Rook','Mara Stone','Axel Ward'],
+  'Safecracker':['Owen Dial','Kimi Locke','Silas Pin','Aria Tumblers'],
+  Negotiator:['Rhea Vox','Parker Lane','Noah Silk','Lina Hart'],
+  'Security Engineer':['Dorian Mesh','Asha Gate','Quinn Relay','Ivo Circuit'],
+  Diver:['Nadia Deep','Cole Keel','Mira Tide','Rowan Reef'],
+  'Con Artist':['Sienna Bluff','Eli Monroe','Nora Mint','Cal Vane'],
+  Demolitions:['Rex Blaster','Tova Fuse','Gage Flint','Milo Charge'],
+  'Infiltration Architect':['Lyra Ghost','Cass Ward','Evren Shade','Nina Prism'],
+};
+
 function renderCrime(){
+  ensureCrimeShape();
   const cc = document.getElementById('crime-content');
   const a = G.age;
   const C = G.crime;
@@ -220,19 +507,14 @@ function renderCrime(){
 
   // Age 18+ big crime
   if(a>=18){
-    const heists = HEIST_LOCATIONS.filter(h=>C.notoriety>=h.minNotoriety).slice(0,4);
     html += `<div class="card">
       <div class="card-title">Big Crime (18+)</div>
       <div class="choice-grid">
         <div class="choice" onclick="kidnap('low')"><div class="choice-icon">🧢</div><div class="choice-name">Kidnap (Low)</div><div class="choice-desc">Risky</div></div>
         <div class="choice" onclick="kidnap('high')"><div class="choice-icon">👑</div><div class="choice-name">Kidnap (High)</div><div class="choice-desc">Very risky</div></div>
       </div>
-      <div class="section-header" style="margin-top:10px">Heists</div>
-      <div class="choice-grid">
-        ${heists.map(h=>`<div class="choice" onclick="startHeist('${h.id}')"><div class="choice-icon">💰</div><div class="choice-name">${h.label}</div><div class="choice-desc">${fmt$(h.payout)} · Roles ${h.roles.length}</div></div>`).join('')}
-      </div>
-      ${heists.length===0?`<div class="notif warn" style="margin-top:8px">Notorious status too low for heists.</div>`:''}
     </div>`;
+    html += renderHeistOperationsCard();
   }
 
   // Street Gangs (revamp)
@@ -554,49 +836,594 @@ function kidnap(level){
   updateHUD(); renderCrime();
 }
 
-function startHeist(heistId){
-  const h = HEIST_LOCATIONS.find(x=>x.id===heistId);
-  if(!h) return;
-  const pool = HEIST_CREW_POOL.filter(c=>{
-    if(G.crime.notoriety<20) return c.skill<=60;
-    if(G.crime.notoriety<40) return c.skill<=70;
-    return true;
+function heistBlueprintById(id){
+  return HEIST_BLUEPRINTS.find(h=>h.id===id) || null;
+}
+
+function heistRequiredRoles(blueprint){
+  return ['Hacker','Driver','Enforcer', blueprint.specialistRole];
+}
+
+function heistRoleProfile(role, difficulty=50){
+  const isSpecial = !['Hacker','Driver','Enforcer'].includes(role);
+  const difficultyLift = Math.floor(difficulty/18);
+  const minSkill = (isSpecial ? 44 : 38) + difficultyLift;
+  const maxSkill = (isSpecial ? 92 : 88) + Math.floor(difficulty/28);
+  return {
+    minSkill: Math.min(95, minSkill),
+    maxSkill: Math.min(98, maxSkill),
+    minLoyalty: isSpecial ? 38 : 34,
+    maxLoyalty: 88,
+    minGreed: 18 + Math.floor(difficulty/14),
+    maxGreed: 90,
+  };
+}
+
+function heistGenerateCandidate(role, difficulty=50){
+  const profile = heistRoleProfile(role, difficulty);
+  const names = HEIST_ROLE_NAMES[role] || ['Alex Voss','Casey Vale','Jordan Pike','Riley Hart'];
+  const name = `${pick(names)} ${pick(NS)}`;
+  const skill = rnd(profile.minSkill, profile.maxSkill);
+  const loyalty = rnd(profile.minLoyalty, profile.maxLoyalty);
+  const greed = rnd(profile.minGreed, profile.maxGreed);
+  const baseFee = Math.max(6000, Math.floor((skill*skill) * 6 + difficulty*550));
+  const upfront = baseFee + rnd(0, Math.floor(baseFee*0.35));
+  const cutPct = Math.max(7, Math.min(28, Math.floor(skill/6) + Math.floor(greed/20) - Math.floor(loyalty/30)));
+  const edge = skill>=88 ? 'elite operator' : skill>=75 ? 'pro' : skill>=60 ? 'solid' : 'risky';
+  return {
+    id:`${role}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+    role,
+    name,
+    skill,
+    loyalty,
+    greed,
+    upfront,
+    cutPct,
+    edge,
+  };
+}
+
+function heistRefreshMarket(role, silent=false){
+  ensureCrimeShape();
+  const C = G.crime;
+  const active = C.heists.active;
+  if(!active) return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+  const count = role===bp.specialistRole ? 5 : 4;
+  C.heists.market[role] = Array.from({length:count}, ()=>heistGenerateCandidate(role, bp.difficulty));
+  if(!silent) renderCrime();
+}
+
+function heistComputePlanning(active){
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return 0;
+  const setupBase = Math.floor((active.completedSetups.length / Math.max(1, bp.setups.length)) * 48);
+  const raw = 22 + setupBase + (active.setupEffects.planning||0) + (active.decisionEffects.success||0) - Math.max(0, active.decisionEffects.risk||0);
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+function heistComputeCrewEfficiency(active){
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return 0;
+  const roles = heistRequiredRoles(bp);
+  const hired = roles.map(r=>active.crew[r]).filter(Boolean);
+  if(!hired.length) return 0;
+  const avgSkill = hired.reduce((s,c)=>s+c.skill,0)/hired.length;
+  const avgLoyalty = hired.reduce((s,c)=>s+c.loyalty,0)/hired.length;
+  const avgGreed = hired.reduce((s,c)=>s+c.greed,0)/hired.length;
+  const roleCoverage = (hired.length/roles.length) * 24;
+  const raw = avgSkill*0.48 + avgLoyalty*0.34 - avgGreed*0.22 + roleCoverage;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+function heistComputeBetrayalRisk(active){
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return 0;
+  const hired = heistRequiredRoles(bp).map(r=>active.crew[r]).filter(Boolean);
+  if(!hired.length) return 0;
+  let risk = 4 + Math.floor(bp.difficulty/15);
+  hired.forEach(m=>{
+    const greedGap = Math.max(0, m.greed - m.loyalty);
+    risk += Math.floor(greedGap/7);
+    if(m.contract==='cut' && m.cutPct<=10) risk += 4;
+    if(m.contract==='upfront') risk = Math.max(0, risk-2);
   });
-  const driver = pick(pool.filter(c=>c.role==='Driver'));
-  const gunman = pick(pool.filter(c=>c.role==='Gunman'));
-  const hacker = h.roles.includes('Hacker') ? pick(pool.filter(c=>c.role==='Hacker')) : null;
-  const crew = [driver, gunman].concat(hacker? [hacker] : []);
-  showPopup(
-    'Heist Plan',
-    `${h.label} · Roles: ${h.roles.join(', ')}`,
+  risk += Math.max(0, 40 - heistComputePlanning(active))/6;
+  return Math.max(0, Math.min(95, Math.round(risk)));
+}
+
+function heistRecalcScores(){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active) return;
+  G.crime.heists.planningQuality = heistComputePlanning(active);
+  G.crime.heists.crewEfficiency = heistComputeCrewEfficiency(active);
+  G.crime.heists.betrayalRisk = heistComputeBetrayalRisk(active);
+}
+
+function heistCanLaunch(active, bp){
+  if(!active || !bp) return false;
+  const enoughSetups = active.completedSetups.length >= bp.minSetups;
+  const roles = heistRequiredRoles(bp);
+  const fullCrew = roles.every(r=>!!active.crew[r]);
+  return enoughSetups && fullCrew;
+}
+
+function renderHeistOperationsCard(){
+  ensureCrimeShape();
+  const C = G.crime;
+  const hs = C.heists;
+  const active = hs.active;
+  if(active){
+    const bp = heistBlueprintById(active.id);
+    if(!bp) return `<div class="card"><div class="notif bad">Active heist data missing.</div></div>`;
+    heistRecalcScores();
+    const roles = heistRequiredRoles(bp);
+    const setupRows = bp.setups.map(s=>{
+      const done = active.completedSetups.includes(s.id);
+      return `<div class="choice${done?' disabled':''}" onclick="${done?'':`heistDoSetup('${s.id}')`}">
+        <div class="choice-icon">${done?'✅':'🛠️'}</div>
+        <div class="choice-name">${s.label}</div>
+        <div class="choice-desc">${s.desc}</div>
+        <div style="font-size:.66rem;color:var(--muted2);margin-top:2px">${fmt$(s.cost)} · plan +${s.planning}${done?' · done':''}</div>
+      </div>`;
+    }).join('');
+    const crewRows = roles.map(role=>{
+      const member = active.crew[role];
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:.84rem">${role}</div>
+          <div style="font-size:.7rem;color:var(--muted2)">${member?`${member.name} · skill ${member.skill} · loyalty ${member.loyalty} · greed ${member.greed}`:'Unfilled slot'}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="heistOpenHire('${role}')">${member?'Replace':'Hire'}</button>
+      </div>`;
+    }).join('');
+    const nextStep = bp.steps[active.stepIndex];
+    const canLaunch = heistCanLaunch(active, bp);
+    return `<div class="card">
+      <div class="card-title">Heist Operation: ${bp.label}</div>
+      <div style="font-size:.78rem;color:var(--muted2)">${bp.location}</div>
+      ${active.dynamic && active.dynamic.seaState ? `<div style="font-size:.72rem;color:var(--muted2)">Current sea state: ${active.dynamic.seaState} · route shift ${active.dynamic.routeShift}</div>` : ''}
+      <div style="font-size:.76rem;color:var(--muted2);margin-top:4px">Tier ${HEIST_TIER_META[bp.tier].label} · Difficulty ${bp.difficulty} · Cooldown ${hs.cooldown} year(s)</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+        <div class="sm-stat"><div class="sm-stat-val">${hs.planningQuality}</div><div class="sm-stat-lbl">Planning</div></div>
+        <div class="sm-stat"><div class="sm-stat-val">${hs.crewEfficiency}</div><div class="sm-stat-lbl">Crew Efficiency</div></div>
+        <div class="sm-stat"><div class="sm-stat-val">${hs.betrayalRisk}%</div><div class="sm-stat-lbl">Betrayal Risk</div></div>
+        <div class="sm-stat"><div class="sm-stat-val">${active.completedSetups.length}/${bp.setups.length}</div><div class="sm-stat-lbl">Setups</div></div>
+      </div>
+      <div class="section-header" style="margin-top:10px">Setup phase (${bp.minSetups} minimum)</div>
+      <div class="choice-grid">${setupRows}</div>
+      <div class="section-header" style="margin-top:10px">Crew phase (Leader: You)</div>
+      ${crewRows}
+      <div class="section-header" style="margin-top:10px">Execution phase</div>
+      <div style="font-size:.76rem;color:var(--muted2)">
+        ${active.stage==='setup'
+          ? 'Complete setup and crew requirements, then launch.'
+          : nextStep
+            ? `Next decision: ${nextStep.title} - ${nextStep.prompt}`
+            : 'Execution complete. Resolving outcome...'}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${active.stage==='setup'
+          ? `<button class="btn ${canLaunch?'btn-primary':'btn-ghost'} btn-sm" ${canLaunch?'':'disabled'} onclick="heistLaunchExecution()">Launch Heist</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="heistRunStepDecision()">Run Next Decision</button>`}
+        <button class="btn btn-ghost btn-sm" onclick="heistAbortPlan()">Abort Heist Plan</button>
+      </div>
+    </div>`;
+  }
+
+  const rows = HEIST_BLUEPRINTS.map(h=>{
+    const unlocked = C.notoriety>=h.minNotoriety && hs.cooldown<=0;
+    const payout = `${fmt$(h.payout[0])} - ${fmt$(h.payout[1])}`;
+    return `<div class="choice${unlocked?'':' disabled'}" onclick="${unlocked?`startHeist('${h.id}')`:''}">
+      <div class="choice-icon">🎯</div>
+      <div class="choice-name">${h.label}</div>
+      <div class="choice-desc">${h.location}</div>
+      <div style="font-size:.66rem;color:var(--muted2);margin-top:3px">${HEIST_TIER_META[h.tier].label} · Diff ${h.difficulty} · ${payout}</div>
+      <div style="font-size:.64rem;color:${unlocked?'var(--accent2)':'var(--danger)'};margin-top:2px">${unlocked?'Ready to plan':`Need notoriety ${h.minNotoriety}${hs.cooldown>0?' and cooldown clear':''}`}</div>
+    </div>`;
+  }).join('');
+
+  const historyRows = (hs.history||[]).slice(0,4).map(x=>`
+    <div style="font-size:.74rem;color:var(--muted2);padding:3px 0">
+      Age ${x.age}: ${x.label} - ${x.outcome.replace('_',' ')} (plan ${x.planning}, crew ${x.crewEff})
+    </div>
+  `).join('');
+
+  return `<div class="card">
+    <div class="card-title">Heist Operations</div>
+    <div style="font-size:.78rem;color:var(--muted2)">Deep, multi-phase jobs with setup, crew management, execution decisions, and major fallout.</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+      <div class="sm-stat"><div class="sm-stat-val">${hs.planningQuality||0}</div><div class="sm-stat-lbl">Last Planning</div></div>
+      <div class="sm-stat"><div class="sm-stat-val">${hs.crewEfficiency||0}</div><div class="sm-stat-lbl">Last Crew Eff.</div></div>
+      <div class="sm-stat"><div class="sm-stat-val">${fmt$(hs.totalTake||0)}</div><div class="sm-stat-lbl">Career Heist Take</div></div>
+    </div>
+    <div class="choice-grid" style="margin-top:10px">${rows}</div>
+    <div class="section-header" style="margin-top:10px">Recent outcomes</div>
+    ${historyRows || '<div class="notif warn" style="margin-top:6px">No major heists completed yet.</div>'}
+  </div>`;
+}
+
+function startHeist(heistId){
+  ensureCrimeShape();
+  const bp = heistBlueprintById(heistId);
+  if(!bp){ flash('Heist blueprint missing.','warn'); return; }
+  if(G.crime.heists.active){ flash('Finish or abort the active heist first.','warn'); return; }
+  if(G.age<18){ flash('Heists unlock at age 18.','warn'); return; }
+  if(G.crime.heists.cooldown>0){ flash(`You need to lay low for ${G.crime.heists.cooldown} more year(s).`,'warn'); return; }
+  if(G.crime.notoriety < bp.minNotoriety){ flash(`Need notoriety ${bp.minNotoriety}.`,'warn'); return; }
+
+  const roles = heistRequiredRoles(bp);
+  const active = {
+    id:bp.id,
+    stage:'setup',
+    specialistRole:bp.specialistRole,
+    completedSetups:[],
+    setupEffects:{ planning:0, success:0, risk:0, payout:0, heat:0, casualty:0, betrayal:0, speed:0 },
+    decisionEffects:{ success:0, risk:0, payout:0, heat:0, casualty:0, betrayal:0, speed:0 },
+    crew:Object.fromEntries(roles.map(r=>[r,null])),
+    timeline:[],
+    stepIndex:0,
+    launched:false,
+    upfrontPaid:0,
+    dynamic:{},
+  };
+  if(bp.id==='yacht'){
+    const seaState = pick(['calm','crosswind','stormfront']);
+    const routeShift = rnd(-6,10);
+    active.dynamic = { seaState, routeShift };
+    if(seaState==='stormfront') active.setupEffects.risk += 4;
+    if(routeShift>4) active.setupEffects.risk += 2;
+    addCrimeEv(`Yacht route update: sea ${seaState}, route shift ${routeShift}.`, 'warn');
+  }
+  G.crime.heists.active = active;
+  G.crime.currentHeist = bp.id;
+  roles.forEach(r=>{ heistRefreshMarket(r, true); });
+  addCrimeEv(`Planning started: ${bp.label}.`, 'bad');
+  flash(`Planning ${bp.label}`,'warn');
+  renderCrime();
+}
+
+function heistDoSetup(setupId){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active || active.stage!=='setup') return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+  const setup = bp.setups.find(s=>s.id===setupId);
+  if(!setup) return;
+  if(active.completedSetups.includes(setup.id)){ flash('Setup already complete.','warn'); return; }
+  if(G.money<setup.cost){ flash(`Need ${fmt$(setup.cost)}.`,'warn'); return; }
+  G.money -= setup.cost;
+
+  const executionChance = Math.max(0.28, Math.min(0.92, 0.7 + (G.crime.skills.hack+G.crime.skills.scam)/320 - bp.difficulty/260));
+  const success = Math.random() < executionChance;
+  if(success){
+    active.completedSetups.push(setup.id);
+    active.setupEffects.planning += setup.planning;
+    active.setupEffects.success += setup.success;
+    active.setupEffects.risk += setup.risk;
+    active.setupEffects.payout += setup.payout;
+    active.setupEffects.heat += setup.heat;
+    addCrimeEv(`Setup success: ${setup.label}.`, 'warn');
+    addEv(`Setup complete: ${setup.label}.`, 'good');
+  } else {
+    active.setupEffects.risk += Math.max(2, Math.abs(setup.risk)-1);
+    active.setupEffects.betrayal += 2;
+    G.crime.heat = Math.min(100, G.crime.heat + rnd(2,7));
+    G.crime.police.closeness = Math.min(100, G.crime.police.closeness + rnd(3,8));
+    addCrimeEv(`Setup failed: ${setup.label}.`, 'bad');
+    addEv(`Setup failed: ${setup.label}. You are now on more radar.`, 'bad');
+  }
+  heistRecalcScores();
+  updateHUD();
+  renderCrime();
+}
+
+function heistOpenHire(role){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active) return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+  if(!G.crime.heists.market[role] || !G.crime.heists.market[role].length) heistRefreshMarket(role);
+  const list = (G.crime.heists.market[role]||[]).slice(0,4);
+  if(!list.length){ flash('No candidates available.','warn'); return; }
+
+  const actions = list.map(c=>({
+    label:`${c.name} (S${c.skill} L${c.loyalty} G${c.greed})`,
+    cls:'btn-ghost',
+    onClick:()=>heistOfferContract(role, c.id),
+  }));
+  actions.push({ label:'Refresh candidates', cls:'btn-primary', onClick:()=>heistRefreshMarket(role) });
+  showPopup(`Hire ${role}`, `Pick a ${role}. Low pay can increase betrayal risk.`, actions, 'dark');
+}
+
+function heistOfferContract(role, candidateId){
+  ensureCrimeShape();
+  const candidates = G.crime.heists.market[role] || [];
+  const c = candidates.find(x=>x.id===candidateId);
+  if(!c) return;
+  const canUpfront = G.money>=c.upfront;
+  showPopup(`Contract: ${c.name}`,
+    `${role} | Skill ${c.skill} | Loyalty ${c.loyalty} | Greed ${c.greed}`,
     [
-      { label:'Back Out', cls:'btn-ghost', onClick:()=>{} },
-      { label:'Execute Heist', cls:'btn-primary', onClick:()=>executeHeist(h, crew) },
+      { label:`Upfront ${fmt$(c.upfront)}`, cls:'btn-primary', disabled:!canUpfront, onClick:()=>heistHireCrew(role, candidateId, 'upfront') },
+      { label:`Profit cut ${c.cutPct}%`, cls:'btn-ghost', onClick:()=>heistHireCrew(role, candidateId, 'cut') },
+      { label:'Back', cls:'btn-ghost', onClick:()=>heistOpenHire(role) },
     ],
     'dark'
   );
 }
 
-function executeHeist(h, crew){
-  const skill = crew.reduce((s,c)=>s+c.skill,0) / crew.length;
-  const chance = 0.4 + (skill/200) - (G.crime.heat/200);
-  const cut = crew.reduce((s,c)=>s+c.cut,0);
-  if(Math.random()<chance){
-    const take = Math.floor(h.payout * (1 - cut/100));
-    G.money += take;
-    G.crime.notoriety += Math.floor(h.heat/2);
-    G.crime.heat = Math.min(100, G.crime.heat + h.heat);
-    addEv(`Heist success: ${h.label}. You cleared ${fmt$(take)}.`, 'bad');
-    addCrimeEv(`Heist success: ${h.label}.`, 'bad');
-  } else {
-    G.crime.heat = Math.min(100, G.crime.heat + h.heat + 10);
-    G.health = clamp(G.health - rnd(8,16));
-    addEv(`Heist failed at ${h.label}. You barely escaped.`, 'bad');
-    addCrimeEv(`Heist failed: ${h.label}.`, 'bad');
+function heistHireCrew(role, candidateId, contract){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active || active.stage!=='setup') return;
+  const candidates = G.crime.heists.market[role] || [];
+  const c = candidates.find(x=>x.id===candidateId);
+  if(!c){ flash('Candidate gone.','warn'); return; }
+  if(contract==='upfront' && G.money<c.upfront){ flash(`Need ${fmt$(c.upfront)}.`,'warn'); return; }
+  if(contract==='upfront'){
+    G.money -= c.upfront;
+    active.upfrontPaid += c.upfront;
   }
-  G.crime.police.closeness = Math.min(100, G.crime.police.closeness + rnd(15,25));
-  policeCheck();
-  updateHUD(); renderCrime();
+  active.crew[role] = {
+    id:c.id,
+    role:c.role,
+    name:c.name,
+    skill:c.skill,
+    loyalty:c.loyalty,
+    greed:c.greed,
+    contract,
+    cutPct: contract==='cut' ? c.cutPct : 0,
+    upfront: contract==='upfront' ? c.upfront : 0,
+  };
+  addCrimeEv(`Crew hired: ${c.name} as ${role} (${contract}).`, 'warn');
+  heistRecalcScores();
+  updateHUD();
+  renderCrime();
+}
+
+function heistLaunchExecution(){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active || active.stage!=='setup') return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+  if(!heistCanLaunch(active, bp)){
+    flash(`Need at least ${bp.minSetups} setups and a full crew.`, 'warn');
+    return;
+  }
+  active.stage = 'execution';
+  active.launched = true;
+  active.stepIndex = 0;
+  addEv(`Execution started: ${bp.label}.`, 'bad');
+  addCrimeEv(`Execution phase started at ${bp.location}.`, 'bad');
+  renderCrime();
+}
+
+function heistCrewRuntimeEvent(active, bp){
+  if(Math.random()>0.38) return;
+  const roles = heistRequiredRoles(bp);
+  const members = roles.map(r=>active.crew[r]).filter(Boolean);
+  if(!members.length) return;
+  const m = pick(members);
+  const stress = (active.decisionEffects.risk||0) + (bp.difficulty/4);
+  const panicChance = Math.max(0.08, Math.min(0.55, 0.18 + (stress/120) - m.loyalty/300));
+  const betrayalPulse = Math.max(0.02, Math.min(0.45, 0.06 + (m.greed-m.loyalty)/180));
+  if(Math.random()<betrayalPulse){
+    active.decisionEffects.betrayal += 7;
+    active.decisionEffects.success -= 4;
+    addEv(`${m.name} ignored orders mid-heist to secure personal loot.`, 'bad');
+    addCrimeEv(`Crew disobeyed: ${m.name}.`, 'bad');
+    return;
+  }
+  if(Math.random()<panicChance){
+    active.decisionEffects.risk += 6;
+    active.decisionEffects.speed -= 6;
+    addEv(`${m.name} panicked under pressure and slowed the operation.`, 'warn');
+    addCrimeEv(`Crew panic: ${m.name}.`, 'warn');
+    return;
+  }
+  active.decisionEffects.success += 6;
+  active.decisionEffects.risk -= 4;
+  addEv(`${m.name} executed perfectly under pressure.`, 'good');
+  addCrimeEv(`Exceptional crew performance: ${m.name}.`, 'good');
+}
+
+function heistRunStepDecision(){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active || active.stage!=='execution') return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+  if(active.stepIndex>=bp.steps.length){
+    heistResolveOutcome();
+    return;
+  }
+  const step = bp.steps[active.stepIndex];
+  const actions = step.options.map(opt=>({
+    label:opt.label,
+    cls:'btn-primary',
+    onClick:()=>heistApplyDecisionOption(opt),
+  }));
+  showPopup(`${bp.label}: ${step.title}`, step.prompt, actions, 'dark');
+}
+
+function heistApplyDecisionOption(opt){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active || active.stage!=='execution') return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+  active.decisionEffects.success += opt.success||0;
+  active.decisionEffects.risk += opt.risk||0;
+  active.decisionEffects.payout += opt.payout||0;
+  active.decisionEffects.casualty = (active.decisionEffects.casualty||0) + (opt.casualty||0);
+  active.decisionEffects.heat += opt.heat||0;
+  active.decisionEffects.speed += opt.speed||0;
+  active.decisionEffects.betrayal += opt.betrayal||0;
+  active.timeline.push({ age:G.age, step:active.stepIndex+1, choice:opt.label });
+  heistCrewRuntimeEvent(active, bp);
+  active.stepIndex += 1;
+  if(active.stepIndex>=bp.steps.length){
+    heistResolveOutcome();
+    return;
+  }
+  heistRecalcScores();
+  renderCrime();
+}
+
+function heistApplyArrest(bp, severity){
+  const P = G.crime.police;
+  const baseYears = bp.tier==='apex' ? rnd(12,24)
+    : bp.tier==='national' ? rnd(8,16)
+    : bp.tier==='major' ? rnd(4,10)
+    : bp.tier==='urban' ? rnd(3,7)
+    : rnd(1,4);
+  const years = Math.max(1, baseYears + Math.floor(severity/30));
+  P.inPrison = true;
+  P.sentence = years;
+  P.arrested = false;
+  initPrison();
+  G.legal.criminalStrikes = (G.legal.criminalStrikes||0) + 1;
+  addEv(`Heist collapse led to arrest. Sentence: ${years} year(s).`, 'bad');
+  addCrimeEv(`Arrested after ${bp.label}. Sentence ${years} years.`, 'bad');
+}
+
+function heistResolveOutcome(){
+  ensureCrimeShape();
+  const C = G.crime;
+  const hs = C.heists;
+  const active = hs.active;
+  if(!active) return;
+  const bp = heistBlueprintById(active.id);
+  if(!bp) return;
+
+  heistRecalcScores();
+  const plan = hs.planningQuality;
+  const crewEff = hs.crewEfficiency;
+  const betrayalRisk = hs.betrayalRisk + (active.decisionEffects.betrayal||0);
+  const noiseRisk = (active.setupEffects.risk||0) + (active.decisionEffects.risk||0);
+  const payoffMod = 1 + (active.setupEffects.payout||0) + (active.decisionEffects.payout||0);
+  const tier = HEIST_TIER_META[bp.tier] || HEIST_TIER_META.major;
+  let successChance = 0.2
+    + plan/250
+    + crewEff/260
+    + ((active.setupEffects.success||0) + (active.decisionEffects.success||0))/220
+    - bp.difficulty/170
+    - (C.heat||0)/260
+    - noiseRisk/250;
+  if(C.gang && C.gang.joined){
+    successChance += 0.02;
+    C.heat = Math.min(100, C.heat + 1);
+  }
+  if(bp.id==='casino' && C.mafia && C.mafia.joined){
+    successChance += 0.04;
+  }
+  successChance = Math.max(0.05, Math.min(0.92, successChance));
+
+  const hired = heistRequiredRoles(bp).map(r=>active.crew[r]).filter(Boolean);
+  const betrayers = [];
+  let stolenShare = 0;
+  hired.forEach(m=>{
+    const betrayChance = Math.max(0.01, Math.min(0.55,
+      0.03 + (m.greed-m.loyalty)/200 + betrayalRisk/320 + (m.contract==='cut' && m.cutPct<=10 ? 0.08 : 0)
+    ));
+    if(Math.random()<betrayChance){
+      betrayers.push(m.name);
+      stolenShare += 0.08 + m.greed/550;
+      successChance -= 0.06;
+    }
+  });
+  if(betrayers.length){
+    addEv(`Betrayal during the job: ${betrayers.join(', ')} broke protocol.`, 'bad');
+    addCrimeEv(`Betrayal: ${betrayers.join(', ')}.`, 'bad');
+  }
+
+  const roll = Math.random();
+  let outcome = 'failure';
+  let fullSuccess = false;
+  if(roll < successChance*0.72){
+    outcome = 'success_full';
+    fullSuccess = true;
+  } else if(roll < successChance){
+    outcome = 'success_partial';
+  }
+
+  const heatGainBase = Math.floor(bp.baseHeat * tier.heatMult) + Math.max(0, active.setupEffects.heat||0) + Math.max(0, active.decisionEffects.heat||0);
+  const heatGain = heatGainBase + (bp.id==='federal_reserve' ? 16 : 0);
+
+  if(outcome.startsWith('success')){
+    const grossBase = rnd(bp.payout[0], bp.payout[1]);
+    const gross = Math.max(0, Math.floor(grossBase * (fullSuccess ? 1 : 0.62) * Math.max(0.25, payoffMod)));
+    const crewCut = hired.reduce((sum,m)=>sum + (m.contract==='cut' ? m.cutPct : 0), 0) / 100;
+    const betrayalLoss = Math.min(0.5, stolenShare);
+    const net = Math.max(0, Math.floor(gross * (1 - crewCut - betrayalLoss)));
+    G.money += net;
+    hs.totalTake += net;
+    C.heat = Math.min(100, C.heat + heatGain + (fullSuccess?0:4));
+    C.notoriety = clamp(C.notoriety + Math.floor(bp.difficulty/5) + (fullSuccess?6:3));
+    C.police.closeness = Math.min(100, C.police.closeness + Math.floor(heatGain/2) + rnd(8,14));
+    if(G.sm) G.sm.totalFame = clamp((G.sm.totalFame||0) + tier.fame + (fullSuccess?4:1));
+    addEv(`${fullSuccess?'Heist success':'Partial success'} at ${bp.location}. Net take: ${fmt$(net)}.`, fullSuccess?'love':'warn');
+    addCrimeEv(`${bp.label}: ${fullSuccess?'full success':'partial success'} for ${fmt$(net)}.`, fullSuccess?'bad':'warn');
+  } else {
+    C.heat = Math.min(100, C.heat + heatGain + rnd(10,18));
+    C.notoriety = clamp(C.notoriety + Math.floor(bp.difficulty/8) + 2);
+    C.police.closeness = Math.min(100, C.police.closeness + rnd(16,28));
+    const casualtyPressure = Math.max(0, (active.decisionEffects.casualty||0) + noiseRisk + bp.difficulty);
+    const deathChance = Math.max(0.01, Math.min(0.75, tier.deathRisk + casualtyPressure/360));
+    const arrestChance = Math.max(0.15, Math.min(0.88, 0.34 + casualtyPressure/240 + (bp.tier==='national'||bp.tier==='apex'?0.12:0)));
+    const fate = Math.random();
+    if(fate < deathChance){
+      addCrimeEv(`Failed ${bp.label}. Fatal collapse.`, 'bad');
+      die(`The ${bp.label} at ${bp.location} went terminal. You did not make it out.`);
+      return;
+    }
+    if(fate < deathChance + arrestChance){
+      heistApplyArrest(bp, casualtyPressure);
+    } else {
+      const injury = rnd(14,32) + Math.floor(casualtyPressure/18);
+      G.health = clamp(G.health - injury);
+      G.happy = clamp(G.happy - rnd(8,18));
+      addEv(`Heist failure at ${bp.location}. You escaped wounded and empty-handed.`, 'bad');
+      addCrimeEv(`${bp.label} failed. Escaped wounded.`, 'bad');
+    }
+  }
+
+  hs.history.unshift({
+    age:G.age,
+    id:bp.id,
+    label:bp.label,
+    location:bp.location,
+    tier:bp.tier,
+    planning:plan,
+    crewEff,
+    betrayal:betrayers.length,
+    outcome,
+  });
+  if(hs.history.length>20) hs.history.pop();
+  hs.cooldown = bp.tier==='apex' ? 2 : 1;
+  hs.active = null;
+  C.currentHeist = null;
+  heistRecalcScores();
+  updateHUD();
+  renderCrime();
+}
+
+function heistAbortPlan(){
+  ensureCrimeShape();
+  const active = G.crime.heists.active;
+  if(!active){ return; }
+  const bp = heistBlueprintById(active.id);
+  G.crime.heists.active = null;
+  G.crime.currentHeist = null;
+  G.crime.heat = Math.min(100, G.crime.heat + rnd(1,4));
+  addCrimeEv(`Heist plan aborted${bp?`: ${bp.label}`:''}.`, 'warn');
+  renderCrime();
 }
 
 function genInmates(){
