@@ -65,6 +65,10 @@ function beginLife(){
   G.lifeEvents = [{ text:`You were born in ${G.state}. Your story begins.`, type:'' }];
   G.yearEvents  = [...G.lifeEvents];
   G.travel = { log:[], visited:[] };
+  G.sim = {
+    mode:'balanced',
+    director:{ lastPressure:0, lastRecovery:0, lastNet:0, lastStressDelta:0, lastAge:0, history:[] },
+  };
   G.school = {
     stage:'none', grade:0, gpa:2.5,
     trouble:0, expelled:false, teachers:[], classmates:[],

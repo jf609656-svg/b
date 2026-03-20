@@ -54,6 +54,18 @@ const G = {
   // history
   lifeEvents:[], yearEvents:[],
   travel:{ log:[], visited:[] },
+  // simulation director telemetry
+  sim:{
+    mode:'balanced',
+    director:{
+      lastPressure:0,
+      lastRecovery:0,
+      lastNet:0,
+      lastStressDelta:0,
+      lastAge:0,
+      history:[],
+    },
+  },
   // school
   school:{
     stage:'none',
@@ -558,6 +570,62 @@ function ensureGovLegalShape(){
   if(typeof G.gov.activeLaw!=='string') G.gov.activeLaw = 'Status Quo';
 }
 
+function ensureSimShape(){
+  if(!G.sim) G.sim = {};
+  if(typeof G.sim.mode!=='string') G.sim.mode = 'balanced';
+  if(!G.sim.director) G.sim.director = {};
+  const d = G.sim.director;
+  if(typeof d.lastPressure!=='number') d.lastPressure = 0;
+  if(typeof d.lastRecovery!=='number') d.lastRecovery = 0;
+  if(typeof d.lastNet!=='number') d.lastNet = 0;
+  if(typeof d.lastStressDelta!=='number') d.lastStressDelta = 0;
+  if(typeof d.lastAge!=='number') d.lastAge = 0;
+  if(!Array.isArray(d.history)) d.history = [];
+}
+
+function runDirectorYearPass(){
+  ensureSimShape();
+  const d = G.sim.director;
+  const pressure =
+    (G.money<0 ? 3.5 : G.money<5000 ? 1.2 : 0) +
+    (G.finance.debt>200000 ? 4 : G.finance.debt>75000 ? 2.4 : G.finance.debt>0 ? 1 : 0) +
+    (G.spouse && (G.spouse.relation||50)<40 ? 1.8 : 0) +
+    ((G.children?.length||0)>=3 ? 1 : 0) +
+    ((G.crime?.heat||0)>=70 ? 2.2 : (G.crime?.heat||0)>=50 ? 1 : 0) +
+    ((G.sm?.controversies||0)>=3 ? 1.6 : (G.sm?.controversies||0)>0 ? 0.6 : 0) +
+    ((G.medical?.conditions?.length||0)>=2 ? 1.4 : 0) +
+    ((G.legal?.finesDue||0)>0 ? 0.8 : 0);
+
+  const recovery =
+    ((G.happy||50)>=88 ? 4 : (G.happy||50)>=72 ? 2.6 : (G.happy||50)>=58 ? 1.2 : 0) +
+    ((G.health||50)>=80 ? 1.4 : (G.health||50)>=65 ? 0.7 : 0) +
+    ((G.housing?.comfort||40)>=75 ? 2.1 : (G.housing?.comfort||40)>=60 ? 1.1 : 0) +
+    ((G.friends||[]).length>=4 ? 0.8 : (G.friends||[]).length>=2 ? 0.4 : 0) +
+    ((G.lovers||[]).length>0 ? 0.35 : 0) +
+    ((G.social?.partyCount||0)>=8 ? 0.5 : 0);
+
+  const net = pressure - recovery;
+  const before = G.stress||35;
+  const target = clamp(36 + net*8 + (G.age>=50?3:0));
+  let delta = Math.round((target - before) * 0.38) + rnd(-2,2);
+  delta = Math.max(-14, Math.min(14, delta));
+  G.stress = clamp(before + delta);
+
+  d.lastPressure = Math.round(pressure*10)/10;
+  d.lastRecovery = Math.round(recovery*10)/10;
+  d.lastNet = Math.round(net*10)/10;
+  d.lastStressDelta = delta;
+  d.lastAge = G.age;
+  d.history.push({ age:G.age, pressure:d.lastPressure, recovery:d.lastRecovery, net:d.lastNet, stress:G.stress });
+  if(d.history.length>10) d.history.shift();
+
+  if(d.lastNet>=2.8){
+    addEv('This year felt overloaded: too many pressure sources stacked at once.', 'warn');
+  } else if(d.lastNet<=-2.2){
+    addEv('This year felt grounded and manageable. Your routines are stabilizing.', 'good');
+  }
+}
+
 function runYearStepSafe(label, fn){
   try{
     return fn();
@@ -588,6 +656,7 @@ function replaceGameState(state){
   Object.assign(G, state);
   ensureFinanceShape();
   ensureGovLegalShape();
+  ensureSimShape();
   if(typeof ensureMMAState==='function') ensureMMAState();
   if(typeof ensurePetState==='function') ensurePetState();
   if(!Array.isArray(G.pets)) G.pets = [];
@@ -1379,6 +1448,7 @@ function genFamily(){
 function ageUp(){
   ensureFinanceShape();
   ensureGovLegalShape();
+  ensureSimShape();
   if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];
@@ -2101,19 +2171,8 @@ function ageUp(){
     });
   }
 
-  // ── Stress system: multi-source pressure & consequences ───────
-  if(G.money<0) G.stress = clamp(G.stress + rnd(4,8));
-  else if(G.money<5000) G.stress = clamp(G.stress + rnd(1,3));
-  if(G.finance.debt>0) G.stress = clamp(G.stress + (G.finance.debt>120000?3:G.finance.debt>40000?2:1));
-  if(G.spouse && G.spouse.relation<40) G.stress = clamp(G.stress + rnd(1,4));
-  if(G.children.length>=3) G.stress = clamp(G.stress + rnd(0,2));
-  if(G.crime.heat>=65) G.stress = clamp(G.stress + rnd(2,5));
-  if(G.sm.controversies>=3) G.stress = clamp(G.stress + rnd(1,4));
-  if(G.medical.conditions.length>=2) G.stress = clamp(G.stress + rnd(1,3));
-  if(G.housing.comfort>=72) G.stress = clamp(G.stress - rnd(3,8));
-  if(G.happy>=75) G.stress = clamp(G.stress - rnd(2,5));
-  if(G.happy>=88) G.stress = clamp(G.stress - rnd(2,4));
-  if((G.social?.partyCount||0)>=5 && Math.random()<0.35) G.stress = clamp(G.stress - rnd(1,3));
+  // ── Stress system: director pass + consequences ────────────────
+  runDirectorYearPass();
 
   if(G.stress>=90){
     G.health = clamp(G.health - rnd(5,11));
@@ -2184,17 +2243,25 @@ setTimeout(()=>{ try{ refreshSaveUI(); }catch(_e){} }, 0);
 // ── LIFE TAB ────────────────────────────────────────────────────
 function renderLife(){
   document.getElementById('life-year-label').textContent = `Age ${G.age} — This Year`;
+  ensureSimShape();
+  const director = G.sim.director||{};
   const recent = [...G.yearEvents].reverse().slice(0,8);
+  const directorLine = (director.lastAge===G.age)
+    ? `<li class="event-item">
+        <div class="ev-pip-wrap"><span class="edot good"></span></div>
+        <span class="ev-text" style="color:var(--muted2)">Director review → Pressure ${director.lastPressure||0} · Recovery ${director.lastRecovery||0} · Net ${director.lastNet>=0?'+':''}${director.lastNet||0} · Stress ${director.lastStressDelta>=0?'+':''}${director.lastStressDelta||0}</span>
+      </li>`
+    : '';
   document.getElementById('event-log').innerHTML = recent.length
     ? recent.map(e=>`
         <li class="event-item ${e.type||''}">
           <div class="ev-pip-wrap"><span class="edot ${e.type||''}"></span></div>
           <span class="ev-text">${e.text}</span>
-        </li>`).join('')
+        </li>`).join('') + directorLine
     : `<li class="event-item">
         <div class="ev-pip-wrap"><span class="edot"></span></div>
         <span class="ev-text" style="color:var(--muted2)">A quiet year. Nothing much happened. Sometimes that's okay.</span>
-       </li>`;
+       </li>${directorLine}`;
 
   const aa = document.getElementById('age-up-area');
   if(G.age>=90){
