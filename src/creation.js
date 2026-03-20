@@ -183,6 +183,7 @@ function beginLife(){
     injuries:[],
     injured:false,
     recoveryWeeks:0,
+    bjjBelt:'White Belt',
     trainingSessionsThisYear:0,
     sparsThisYear:0,
     compsThisYear:0,

@@ -319,6 +319,7 @@ const G = {
     injuries:[],
     injured:false,
     recoveryWeeks:0,
+    bjjBelt:'White Belt',
     trainingSessionsThisYear:0,
     sparsThisYear:0,
     compsThisYear:0,
@@ -1225,9 +1226,10 @@ function addEv(text, type=''){
   G.lifeEvents.push(ev);
   G.yearEvents.push(ev);
   if(typeof G.stress==='number'){
-    if(type==='love') G.stress = clamp(G.stress - rnd(1,3));
-    else if(type==='good' && Math.random()<0.45) G.stress = clamp(G.stress - 1);
-    else if(type==='bad') G.stress = clamp(G.stress + 1);
+    if(type==='love') G.stress = clamp(G.stress - rnd(2,5));
+    else if(type==='good') G.stress = clamp(G.stress - rnd(1,2));
+    else if(type==='warn' && Math.random()<0.28) G.stress = clamp(G.stress + 1);
+    else if(type==='bad') G.stress = clamp(G.stress + rnd(1,2));
   }
   // Track darkness
   if(type==='bad') G.darkScore++;
@@ -1402,9 +1404,9 @@ function ageUp(){
   if(a>60) G.health = clamp(G.health - rnd(0,3));
   G.happy  = clamp(G.happy  + rnd(-4,5));
   G.smarts = clamp(G.smarts + rnd(-1,2));
-  G.stress = clamp((G.stress||35) + rnd(-5,2));
-  if((G.happy||50)>=70) G.stress = clamp((G.stress||35) - rnd(2,5));
-  else if((G.happy||50)>=58) G.stress = clamp((G.stress||35) - rnd(1,3));
+  G.stress = clamp((G.stress||35) + rnd(-8,0));
+  if((G.happy||50)>=70) G.stress = clamp((G.stress||35) - rnd(3,7));
+  else if((G.happy||50)>=58) G.stress = clamp((G.stress||35) - rnd(2,4));
   if(a<25)      G.looks = clamp(G.looks + rnd(0,2));
   else if(a>32) G.looks = clamp(G.looks - rnd(0,2));
 
@@ -1822,7 +1824,7 @@ function ageUp(){
     G.finance.debt += interest;
     yearLedger.debtInterest += interest;
     addEv(`Debt interest accrued: ${fmt$(interest)}.`, 'warn');
-    G.stress = clamp(G.stress + (G.finance.debt>200000?8:G.finance.debt>75000?5:3));
+    G.stress = clamp(G.stress + (G.finance.debt>200000?5:G.finance.debt>75000?3:2));
   }
   runYearStepSafe('investments', ()=>processInvestmentAndCryptoYear(yearLedger));
   runYearStepSafe('business', ()=>processBusinessYear(yearLedger));
@@ -1857,7 +1859,8 @@ function ageUp(){
     const newStreams = Math.floor((mus.streams * rnd(3,12)/100 + mus.tracks * rnd(100,800)) * opinionMult * instBonus);
     mus.streams += newStreams;
     // Rate per stream (label gives better rate)
-    const streamRate = mus.labelTier>=3 ? 0.006 : mus.labelTier>=2 ? 0.005 : 0.004;
+    const fameMoneyMult = 1 + Math.min(1.4, (G.sm.totalFame||0)/95);
+    const streamRate = (mus.labelTier>=3 ? 0.006 : mus.labelTier>=2 ? 0.005 : 0.004) * fameMoneyMult;
     const musicRev = Math.floor(newStreams * streamRate);
     // Producer royalties
     const prodRev = mus.isProducer ? Math.floor(mus.producerCredits * rnd(500,3000)) : 0;
@@ -1988,8 +1991,12 @@ function ageUp(){
       activePlatforms.forEach(pid=>{
         const acc = G.sm.platforms[pid];
         const base = Math.floor((acc.followers*0.05 + rnd(200,2000)) * fameBoost);
+        const fameMonetization = 1 + Math.min(1.15, (G.sm.totalFame||0)/90);
+        const passiveRev = Math.floor(base * 0.002 * (SM_PLATFORMS[pid].revenueMulti||1) * fameMonetization);
         acc.followers += base;
-        acc.revenue += Math.floor(base * 0.002 * (SM_PLATFORMS[pid].revenueMulti||1));
+        acc.revenue += passiveRev;
+        G.sm.totalRevenue += passiveRev;
+        G.money += passiveRev;
       });
     }
   }
@@ -2012,6 +2019,7 @@ function ageUp(){
     if(tier){
       let pay = tier.pay;
       if(G.sm.sponsor.exclusive) pay = Math.floor(pay*1.2);
+      pay = Math.floor(pay * (1 + Math.min(1.2, (G.sm.totalFame||0)/100)));
       G.money += pay; G.sm.totalRevenue += pay;
       addEv(`Sponsor payout from ${G.sm.sponsor.brand||'your sponsor'}: ${fmt$(pay)}.`, 'good');
       if(G.sm.controversies>=3 && Math.random()<0.2){
@@ -2094,16 +2102,18 @@ function ageUp(){
   }
 
   // ── Stress system: multi-source pressure & consequences ───────
-  if(G.money<0) G.stress = clamp(G.stress + rnd(8,14));
-  else if(G.money<5000) G.stress = clamp(G.stress + rnd(2,5));
-  if(G.finance.debt>0) G.stress = clamp(G.stress + (G.finance.debt>120000?5:G.finance.debt>40000?3:1));
-  if(G.spouse && G.spouse.relation<40) G.stress = clamp(G.stress + rnd(2,6));
-  if(G.children.length>=3) G.stress = clamp(G.stress + rnd(1,3));
-  if(G.crime.heat>=65) G.stress = clamp(G.stress + rnd(3,8));
-  if(G.sm.controversies>=3) G.stress = clamp(G.stress + rnd(2,6));
-  if(G.medical.conditions.length>=2) G.stress = clamp(G.stress + rnd(2,5));
-  if(G.housing.comfort>=72) G.stress = clamp(G.stress - rnd(1,3));
-  if(G.happy>=75) G.stress = clamp(G.stress - rnd(1,2));
+  if(G.money<0) G.stress = clamp(G.stress + rnd(4,8));
+  else if(G.money<5000) G.stress = clamp(G.stress + rnd(1,3));
+  if(G.finance.debt>0) G.stress = clamp(G.stress + (G.finance.debt>120000?3:G.finance.debt>40000?2:1));
+  if(G.spouse && G.spouse.relation<40) G.stress = clamp(G.stress + rnd(1,4));
+  if(G.children.length>=3) G.stress = clamp(G.stress + rnd(0,2));
+  if(G.crime.heat>=65) G.stress = clamp(G.stress + rnd(2,5));
+  if(G.sm.controversies>=3) G.stress = clamp(G.stress + rnd(1,4));
+  if(G.medical.conditions.length>=2) G.stress = clamp(G.stress + rnd(1,3));
+  if(G.housing.comfort>=72) G.stress = clamp(G.stress - rnd(3,8));
+  if(G.happy>=75) G.stress = clamp(G.stress - rnd(2,5));
+  if(G.happy>=88) G.stress = clamp(G.stress - rnd(2,4));
+  if((G.social?.partyCount||0)>=5 && Math.random()<0.35) G.stress = clamp(G.stress - rnd(1,3));
 
   if(G.stress>=90){
     G.health = clamp(G.health - rnd(5,11));

@@ -76,6 +76,11 @@ const MEGA_BUYOUT_OPTIONS = [
   { id:'microsoft', icon:'🪟', name:'Microsoft Buyout', cost:2800000000000, baseYield:0.048, volatility:0.11, difficulty:5, desc:'Very stable giant — nearly impossible scale.' },
 ];
 
+function finiteNum(v, fallback){
+  const n = typeof v==='number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function ensureBusinessTabState(){
   if(typeof ensureAdvancedFinanceState === 'function') ensureAdvancedFinanceState();
   else ensureFinanceShape();
@@ -86,14 +91,19 @@ function ensureBusinessTabState(){
   });
   if(!G.finance.crypto) G.finance.crypto = {};
   CRYPTO_COINS_V2.forEach(c=>{
-    if(typeof G.finance.crypto[c.id] !== 'number') G.finance.crypto[c.id] = 0;
+    G.finance.crypto[c.id] = Math.max(0, finiteNum(G.finance.crypto[c.id], 0));
   });
   if(!G.finance.crypto.prices) G.finance.crypto.prices = { btc:100, eth:100, sol:100, meme:100 };
+  G.finance.crypto.prices.btc = Math.max(5, Math.floor(finiteNum(G.finance.crypto.prices.btc, 100)));
+  G.finance.crypto.prices.eth = Math.max(5, Math.floor(finiteNum(G.finance.crypto.prices.eth, 100)));
+  G.finance.crypto.prices.sol = Math.max(5, Math.floor(finiteNum(G.finance.crypto.prices.sol, 100)));
+  G.finance.crypto.prices.meme = Math.max(5, Math.floor(finiteNum(G.finance.crypto.prices.meme, 100)));
   if(!Array.isArray(G.finance.crypto.history)) G.finance.crypto.history = [];
   if(typeof G.finance.crypto.dayTradesThisYear !== 'number') G.finance.crypto.dayTradesThisYear = 0;
   if(typeof G.finance.crypto.traderSkill !== 'number') G.finance.crypto.traderSkill = 20;
   if(typeof G.finance.crypto.tradesWon !== 'number') G.finance.crypto.tradesWon = 0;
   if(typeof G.finance.crypto.tradesLost !== 'number') G.finance.crypto.tradesLost = 0;
+  G.finance.crypto.marketMomentum = Math.max(-0.9, Math.min(0.9, finiteNum(G.finance.crypto.marketMomentum, 0)));
   if(!G.finance.business) G.finance.business = {};
   const b = G.finance.business;
   if(typeof b.startupId !== 'string') b.startupId = '';
@@ -156,6 +166,18 @@ function ensureBusinessTabState(){
         meme:Math.max(5, Math.floor(base.meme * (0.9 + i*0.01 + rnd(-8,8)/100))),
       });
     }
+  }
+  G.finance.crypto.history = G.finance.crypto.history
+    .map(x=>({
+      age:Math.max(0, Math.floor(finiteNum(x.age, G.age||0))),
+      btc:Math.max(5, Math.floor(finiteNum(x.btc, G.finance.crypto.prices.btc||100))),
+      eth:Math.max(5, Math.floor(finiteNum(x.eth, G.finance.crypto.prices.eth||100))),
+      sol:Math.max(5, Math.floor(finiteNum(x.sol, G.finance.crypto.prices.sol||100))),
+      meme:Math.max(5, Math.floor(finiteNum(x.meme, G.finance.crypto.prices.meme||100))),
+    }))
+    .filter(x=>Number.isFinite(x.btc) && Number.isFinite(x.eth) && Number.isFinite(x.sol) && Number.isFinite(x.meme));
+  if(G.finance.crypto.history.length>96){
+    G.finance.crypto.history = G.finance.crypto.history.slice(-96);
   }
 }
 
@@ -252,7 +274,7 @@ function consumeBusinessAction(stressDelta){
   const b = G.finance.business;
   b.actionsThisYear = (b.actionsThisYear||0) + 1;
   if(typeof stressDelta === 'number'){
-    G.stress = clamp((G.stress||35) + stressDelta);
+    G.stress = clamp((G.stress||35) + Math.round(stressDelta*0.55));
   }
 }
 
@@ -281,7 +303,7 @@ function investAsset(bucketId, amount){
   if(G.money<buy){ flash('Not enough cash.','warn'); return; }
   G.money -= buy;
   G.finance.portfolio[bucket.key] = (G.finance.portfolio[bucket.key]||0) + buy;
-  G.stress = clamp((G.stress||35) + rnd(0,2) + bucket.risk);
+  G.stress = clamp((G.stress||35) + rnd(0,1) + Math.floor(bucket.risk/2));
   addEv(`You allocated ${fmt$(buy)} to ${bucket.label}.`, 'good');
   updateHUD();
   renderBusiness();
@@ -314,7 +336,7 @@ function buyCrypto(assetId, amount){
   if(G.money<buy){ flash('Not enough cash.','warn'); return; }
   G.money -= buy;
   G.finance.crypto[asset.id] = (G.finance.crypto[asset.id]||0) + buy;
-  G.stress = clamp((G.stress||35) + rnd(1,4));
+  G.stress = clamp((G.stress||35) + rnd(0,2));
   addEv(`You bought ${fmt$(buy)} of ${asset.label}.`, 'warn');
   updateHUD();
   renderBusiness();
@@ -354,7 +376,7 @@ function buySmallBusiness(optionId){
     volatility:opt.volatility,
     difficulty:opt.difficulty,
   });
-  G.stress = clamp((G.stress||35) + rnd(1,4));
+  G.stress = clamp((G.stress||35) + rnd(0,2));
   addEv(`You acquired ${h.name} for ${fmt$(opt.cost)}. Multi-company empire starts to form.`, 'good');
   updateHUD();
   renderBusiness();
@@ -377,7 +399,7 @@ function buyFranchise(franchiseId){
     volatility:opt.volatility,
     difficulty:opt.difficulty,
   });
-  G.stress = clamp((G.stress||35) + rnd(2,5));
+  G.stress = clamp((G.stress||35) + rnd(0,3));
   addEv(`You purchased a ${opt.name}. Brand systems help, but operations are demanding.`, 'love');
   updateHUD();
   renderBusiness();
@@ -404,7 +426,7 @@ function buyoutMegaCompany(targetId){
     volatility:opt.volatility,
     difficulty:opt.difficulty,
   });
-  G.stress = clamp((G.stress||35) + rnd(6,14));
+  G.stress = clamp((G.stress||35) + rnd(3,8));
   G.career.reputation = clamp((G.career.reputation||50) + rnd(8,16));
   G.sm.totalFame = clamp((G.sm.totalFame||0) + rnd(6,16));
   addEv(`Historic deal: you bought out ${h.name} for ${fmt$(opt.cost)}. The world is watching every move.`, 'love');
@@ -425,7 +447,7 @@ function manageHolding(holdingRef, action){
     G.money -= cost;
     h.baseYield = Math.min(0.22, (h.baseYield||0.1) + rnd(1,3)/100);
     h.volatility = Math.max(0.06, (h.volatility||0.2) - rnd(1,2)/100);
-    G.stress = clamp((G.stress||35) + rnd(1,4));
+    G.stress = clamp((G.stress||35) - rnd(0,2));
     addEv(`You optimized ${h.name}. Margins improved after spending ${fmt$(cost)}.`, 'good');
   } else if(action==='sell'){
     const payout = Math.floor((h.value||0) * (0.88 + rnd(-6,14)/100));
@@ -735,7 +757,7 @@ function dayTrade(assetId, direction, stake){
   if(pnl>=0){
     c.tradesWon += 1;
     c.traderSkill = clamp((c.traderSkill||20) + rnd(1,3));
-    G.stress = clamp((G.stress||35) + rnd(0,2));
+    G.stress = clamp((G.stress||35) - rnd(0,2));
     addEv(`Day trade win on ${asset.label}: +${fmt$(pnl)} (${direction}).`, 'good');
   } else {
     c.tradesLost += 1;
@@ -779,9 +801,9 @@ function processInvestmentAndCryptoYear(ledger){
   let cryptoDelta = 0;
   CRYPTO_COINS_V2.forEach(asset=>{
     const held = c[asset.id]||0;
-    const cycleDrift = c.marketCycle==='bull' ? 0.07 : c.marketCycle==='bear' ? -0.08 : c.marketCycle==='recovery' ? 0.03 : 0;
+    const cycleDrift = c.marketCycle==='bull' ? 0.06 : c.marketCycle==='bear' ? -0.07 : c.marketCycle==='recovery' ? 0.028 : 0;
     const pct = asset.drift + cycleDrift + rnd(-100,100)/100 * asset.vol;
-    const clipped = Math.max(-0.75, Math.min(1.4, pct));
+    const clipped = Math.max(-0.55, Math.min(0.95, pct));
     c.prices[asset.id] = Math.max(5, Math.floor((c.prices[asset.id]||100) * (1 + clipped)));
     if(held>0){
       const delta = Math.floor(held * clipped);
@@ -806,7 +828,7 @@ function processInvestmentAndCryptoYear(ledger){
     ledger.investmentGains += totalDelta;
     if(totalDelta>1200) addEv(`Portfolio + crypto added ${fmt$(totalDelta)} this year.`, 'good');
   } else {
-    G.stress = clamp((G.stress||35) + rnd(1,4));
+    G.stress = clamp((G.stress||35) + rnd(0,2));
     if(Math.abs(totalDelta)>1200) addEv(`Markets pulled back ${fmt$(Math.abs(totalDelta))} this year.`, 'warn');
   }
 }
@@ -830,7 +852,7 @@ function processBusinessYear(ledger){
         ledger.otherIncome += cashflow;
       } else {
         G.money += cashflow;
-        G.stress = clamp((G.stress||35) + rnd(2,5));
+        G.stress = clamp((G.stress||35) + rnd(1,3));
       }
       const valueRate = (h.baseYield||0.1)*0.42 + noise*0.6;
       const valueDelta = Math.floor((h.value||0) * valueRate);
@@ -890,7 +912,7 @@ function processBusinessYear(ledger){
     if(revenue > Math.max(150000, operatingCost*1.5)) b.stage = 'growth';
   } else {
     b.reputation = clamp((b.reputation||50) - rnd(1,3));
-    G.stress = clamp((G.stress||35) + rnd(2,6));
+    G.stress = clamp((G.stress||35) + rnd(1,3));
   }
   b.marketShare = clamp((b.marketShare||12) + Math.floor((grossAdds - churn - rivalSteal)/Math.max(600, (b.customerBase||1))) * 5 + rnd(-1,2));
 
@@ -982,10 +1004,12 @@ function processBusinessYear(ledger){
 
 function sparkBars(values, color){
   if(!values || !values.length) return '<div style="height:44px"></div>';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const clean = values.map(v=>finiteNum(v, 0)).filter(v=>Number.isFinite(v));
+  if(!clean.length) return '<div style="height:44px"></div>';
+  const min = Math.min(...clean);
+  const max = Math.max(...clean);
   const spread = Math.max(1, max-min);
-  return `<div style="display:flex;align-items:flex-end;gap:2px;height:44px">${values.map(v=>{
+  return `<div style="display:flex;align-items:flex-end;gap:2px;height:44px">${clean.map(v=>{
     const h = 8 + Math.round(((v-min)/spread)*36);
     return `<span style="display:block;width:4px;height:${h}px;background:${color};border-radius:2px;opacity:.9"></span>`;
   }).join('')}</div>`;
@@ -994,7 +1018,7 @@ function sparkBars(values, color){
 function cryptoSeries(assetId, take){
   ensureBusinessTabState();
   const hist = G.finance.crypto.history||[];
-  const arr = hist.map(x=>x[assetId]||100);
+  const arr = hist.map(x=>Math.max(5, finiteNum(x[assetId], 100)));
   return arr.slice(Math.max(0, arr.length-(take||24)));
 }
 

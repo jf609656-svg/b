@@ -58,12 +58,42 @@ const MMA_UFC_GYM_EVENTS = [
   { msg:'A sparring war went too hard. Your camp had to dial things back.', good:false },
 ];
 
+const MMA_TRAINING_CAP = 12;
+
+const MMA_BJJ_BELTS = [
+  { min:0,  label:'White Belt',  icon:'⬜' },
+  { min:22, label:'Blue Belt',   icon:'🟦' },
+  { min:42, label:'Purple Belt', icon:'🟪' },
+  { min:62, label:'Brown Belt',  icon:'🟫' },
+  { min:80, label:'Black Belt',  icon:'⬛' },
+];
+
 function mmaClamp(v, min, max){
   return Math.max(min, Math.min(max, v));
 }
 
 function mmaCap(v){
   return mmaClamp(Math.round(v), 0, 100);
+}
+
+function mmaBjjBeltForSkill(skill){
+  let belt = MMA_BJJ_BELTS[0];
+  for(let i=0;i<MMA_BJJ_BELTS.length;i++){
+    if(skill >= MMA_BJJ_BELTS[i].min) belt = MMA_BJJ_BELTS[i];
+  }
+  return belt;
+}
+
+function mmaSyncBjjBelt(announce){
+  const m = G.mma;
+  const next = mmaBjjBeltForSkill(m.discipline.bjj||0);
+  const prev = m.bjjBelt || MMA_BJJ_BELTS[0].label;
+  m.bjjBelt = next.label;
+  if(announce && next.label!==prev){
+    G.happy = mmaCap((G.happy||50) + rnd(3,8));
+    addEv(`BJJ belt promotion: ${next.icon} ${next.label}. Your grappling looked sharper every month.`, 'love');
+    flash(`BJJ promoted: ${next.label}`,'good');
+  }
 }
 
 function ensureMMAState(){
@@ -88,6 +118,7 @@ function ensureMMAState(){
   if(typeof m.sparsThisYear!=='number') m.sparsThisYear = 0;
   if(typeof m.compsThisYear!=='number') m.compsThisYear = 0;
   if(typeof m.officialFightsThisYear!=='number') m.officialFightsThisYear = 0;
+  if(typeof m.bjjBelt!=='string') m.bjjBelt = MMA_BJJ_BELTS[0].label;
   if(!m.amateur) m.amateur = {};
   if(!m.pro) m.pro = {};
   if(!m.pro.ufc) m.pro.ufc = {};
@@ -140,6 +171,7 @@ function ensureMMAState(){
   if(typeof u.doubleChampAttempt!=='boolean') u.doubleChampAttempt = false;
 
   if(typeof m.totalEarned!=='number') m.totalEarned = 0;
+  mmaSyncBjjBelt(false);
 
   mmaRecalcSkill();
 }
@@ -185,7 +217,7 @@ function mmaGymData(){
 function mmaCanTrain(){
   ensureMMAState();
   if(!G.mma.active){ flash('Start training first.','warn'); return false; }
-  if(G.mma.trainingSessionsThisYear>=5){ flash('You already maxed training sessions this year. Age up first.','warn'); return false; }
+  if(G.mma.trainingSessionsThisYear>=MMA_TRAINING_CAP){ flash('You already maxed training sessions this year. Age up first.','warn'); return false; }
   if(G.mma.injured){ flash('You are currently injured. Recover before heavy training.','warn'); return false; }
   return true;
 }
@@ -207,6 +239,7 @@ function mmaTrainDiscipline(id){
   const gym = mmaGymData();
   const trainCost = 70 + m.gymTier*45;
   if(!mmaApplyTrainingCost(trainCost)) return;
+  const prevBjj = m.discipline.bjj||0;
 
   const current = m.discipline[id];
   const damp =
@@ -216,7 +249,7 @@ function mmaTrainDiscipline(id){
     current>=40 ? 0.68 :
     current>=25 ? 0.82 : 1;
   const variance = Math.random()<0.15 ? 1.4 : 1;
-  let gain = Math.round((rnd(1,3) + (m.gymTier>=3?1:0)) * gym.gain * damp * variance);
+  let gain = Math.round((rnd(2,4) + (m.gymTier>=3?1:0)) * gym.gain * damp * variance);
   if(id==='wrestling' && G.age>=14 && G.age<=18){
     gain += 1;
     if(Math.random()<0.5){
@@ -229,6 +262,9 @@ function mmaTrainDiscipline(id){
   m.fightIQ = mmaCap(m.fightIQ + rnd(0, spec.iq));
   m.confidence = mmaCap(m.confidence + rnd(0,2));
   m.trainingSessionsThisYear++;
+  if(id==='bjj' && m.discipline.bjj>prevBjj){
+    mmaSyncBjjBelt(true);
+  }
   mmaRecalcSkill();
 
   addEv(`${spec.icon} ${pick(MMA_DISCIPLINE_EVENTS[id])} (+${gain} ${spec.label})`, 'good');
@@ -243,17 +279,21 @@ function mmaTrainMixed(){
   const gym = mmaGymData();
   const trainCost = 120 + m.gymTier*70;
   if(!mmaApplyTrainingCost(trainCost)) return;
+  const prevBjj = m.discipline.bjj||0;
 
   const keys = Object.keys(MMA_DISCIPLINES);
   const primary = pick(keys);
   const secondary = pick(keys.filter(k=>k!==primary));
-  const pGain = Math.max(1, Math.round((rnd(1,2) + (m.gymTier>=2?1:0)) * gym.gain * (m.discipline[primary]>=70?0.55:0.9)));
-  const sGain = Math.max(1, Math.round((rnd(1,2)) * gym.gain * (m.discipline[secondary]>=70?0.5:0.8)));
+  const pGain = Math.max(1, Math.round((rnd(2,3) + (m.gymTier>=2?1:0)) * gym.gain * (m.discipline[primary]>=70?0.55:0.9)));
+  const sGain = Math.max(1, Math.round((rnd(1,3)) * gym.gain * (m.discipline[secondary]>=70?0.5:0.8)));
   m.discipline[primary] = mmaCap(m.discipline[primary] + pGain);
   m.discipline[secondary] = mmaCap(m.discipline[secondary] + sGain);
   m.fightIQ = mmaCap(m.fightIQ + rnd(1,3));
   m.conditioning = mmaCap(m.conditioning + rnd(1,3));
   m.trainingSessionsThisYear++;
+  if((m.discipline.bjj||0) > prevBjj){
+    mmaSyncBjjBelt(true);
+  }
   mmaRecalcSkill();
   addEv(`You trained pure MMA rounds this year. Transitions looked cleaner under pressure. (+${pGain}/${sGain})`, 'good');
   updateHUD();
@@ -894,12 +934,14 @@ function renderMMA(){
       <div class="card-title">🥋 MMA Profile</div>
       <p style="font-size:.78rem;color:var(--muted2)">Gym: ${gym.icon} ${gym.label} · MMA Skill <strong style="color:var(--accent)">${m.mmaSkill}</strong></p>
       <p style="font-size:.78rem;color:var(--muted2)">Conditioning ${m.conditioning} · Fight IQ ${m.fightIQ} · Confidence ${m.confidence}</p>
+      <p style="font-size:.78rem;color:var(--muted2)">BJJ rank: <strong>${mmaBjjBeltForSkill(m.discipline.bjj||0).icon} ${m.bjjBelt||mmaBjjBeltForSkill(m.discipline.bjj||0).label}</strong></p>
       <p style="font-size:.78rem;color:var(--muted2)">Amateur ${amRec} · Pro ${proRec}${u.inUFC?` · UFC ${ufcRec}`:''}</p>
-      <p style="font-size:.78rem;color:${m.injured?'var(--danger)':'var(--muted2)'}">${m.injured?`Injured (${m.recoveryWeeks} weeks est)`:'Healthy'} · Fights this year: ${m.officialFightsThisYear}/1 · Training sessions: ${m.trainingSessionsThisYear}/5</p>
+      <p style="font-size:.78rem;color:${m.injured?'var(--danger)':'var(--muted2)'}">${m.injured?`Injured (${m.recoveryWeeks} weeks est)`:'Healthy'} · Fights this year: ${m.officialFightsThisYear}/1 · Training sessions: ${m.trainingSessionsThisYear}/${MMA_TRAINING_CAP}</p>
     </div>
 
     <div class="card">
       <div class="card-title">Discipline Training</div>
+      <p style="font-size:.78rem;color:var(--muted2)">BJJ belt path: ${MMA_BJJ_BELTS.map(b=>`${b.icon} ${b.label}`).join(' → ')}</p>
       <div class="choice-grid">${disciplineButtons}</div>
       <div class="choice-grid" style="margin-top:8px">
         <div class="choice" onclick="mmaTrainMixed()">

@@ -89,6 +89,30 @@ function collegeAcademicTier(name){
   return c ? c.tier : 'mid';
 }
 
+function schoolEncodeArg(v){
+  return encodeURIComponent(String(v||''));
+}
+
+function schoolDecodeArg(v){
+  try{
+    return decodeURIComponent(v||'');
+  }catch(_e){
+    return String(v||'');
+  }
+}
+
+function schoolActEncoded(role, action, encodedName){
+  schoolAct(role, action, schoolDecodeArg(encodedName));
+}
+
+function pickCollegeMajorEncoded(encodedCollege){
+  pickCollegeMajor(schoolDecodeArg(encodedCollege));
+}
+
+function enrollCollegeEncoded(encodedCourse, encodedCollege){
+  enrollCollege(schoolDecodeArg(encodedCourse), schoolDecodeArg(encodedCollege));
+}
+
 // Legacy compat shim
 const COLLEGE_TIERS = {
   elite:  { label:'Elite Program', conferences:['SEC','Big Ten','ACC','Big 12'],  prestige:95, scholarshipChance:0.9, draftBoost:0.25, nflBoost:0.3, nbaBoost:0.3 },
@@ -428,9 +452,9 @@ function renderHighSchool(sc){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
         <div><div class="p-name">${t.name}</div><div class="p-role">Teacher · Relation ${t.relation}%</div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('teacher','respect','${t.name}')">Respect</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('teacher','rude','${t.name}')">Be Rude</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('teacher','help','${t.name}')">Ask Help</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('teacher','respect','${schoolEncodeArg(t.name)}')">Respect</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('teacher','rude','${schoolEncodeArg(t.name)}')">Be Rude</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('teacher','help','${schoolEncodeArg(t.name)}')">Ask Help</button>
         </div>
       </div>`).join('')}
     <div style="margin-top:10px"></div>
@@ -438,10 +462,10 @@ function renderHighSchool(sc){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
         <div><div class="p-name">${c.name}</div><div class="p-role">Classmate · Compat ${c.compat}%</div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','study','${c.name}')">Study</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','flirt','${c.name}')">Flirt</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','prank','${c.name}')">Prank</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','befriend','${c.name}')">Befriend</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','study','${schoolEncodeArg(c.name)}')">Study</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','flirt','${schoolEncodeArg(c.name)}')">Flirt</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','prank','${schoolEncodeArg(c.name)}')">Prank</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','befriend','${schoolEncodeArg(c.name)}')">Befriend</button>
         </div>
       </div>`).join('')}
   </div>`;
@@ -872,7 +896,7 @@ function showCollegeMenu(){
     if(!group.length) return;
     html+=`<div class="section-header">${tierLabels[tier]}</div><div class="choice-grid">`;
     group.slice(0,6).forEach(col=>{
-      html+=`<div class="choice" onclick="pickCollegeMajor(${JSON.stringify(col.name).replace(/\"/g,'&quot;')})">
+      html+=`<div class="choice" onclick="pickCollegeMajorEncoded('${schoolEncodeArg(col.name)}')">
         <div class="choice-icon">${col.ivyLeague?'🏛️':col.prestige>=90?'⭐':col.prestige>=75?'🎓':'📚'}</div>
         <div class="choice-name" style="font-size:.8rem">${col.name}</div>
         <div class="choice-desc">${col.conf} · Prestige ${col.prestige}</div>
@@ -909,7 +933,7 @@ function pickCollegeMajor(collegeName){
   Object.entries(UNI_COURSES).forEach(([name, cd])=>{
     const meetsSmarts = eff >= cd.minSmarts;
     const isStrong    = col.strongMajors.includes(name);
-    html+=`<div class="choice${meetsSmarts?'':' disabled'}" onclick="${meetsSmarts?`enrollCollege(${JSON.stringify(name).replace(/\"/g,'&quot;')},${JSON.stringify(collegeName).replace(/\"/g,'&quot;')})`:''}" style="${isStrong?'border-color:rgba(94,234,212,.35)':''}">
+    html+=`<div class="choice${meetsSmarts?'':' disabled'}" onclick="${meetsSmarts?`enrollCollegeEncoded('${schoolEncodeArg(name)}','${schoolEncodeArg(collegeName)}')`:''}" style="${isStrong?'border-color:rgba(94,234,212,.35)':''}">
       <div class="choice-icon">${cd.icon}</div>
       <div class="choice-name" style="font-size:.8rem">${name}${isStrong?' ⭐':''}</div>
       <div class="choice-desc" style="font-size:.68rem">${cd.desc}</div>
@@ -1168,9 +1192,9 @@ function renderUni(sc){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
         <div><div class="p-name">${p.name}</div><div class="p-role">Professor · Relation ${p.relation}%</div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('prof','respect','${p.name}')">Respect</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('prof','rude','${p.name}')">Be Rude</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('prof','office','${p.name}')">Office Hours</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('prof','respect','${schoolEncodeArg(p.name)}')">Respect</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('prof','rude','${schoolEncodeArg(p.name)}')">Be Rude</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('prof','office','${schoolEncodeArg(p.name)}')">Office Hours</button>
         </div>
       </div>`).join('')}
     <div style="margin-top:10px"></div>
@@ -1178,10 +1202,10 @@ function renderUni(sc){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
         <div><div class="p-name">${c.name}</div><div class="p-role">Classmate · Compat ${c.compat}%</div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','study','${c.name}')">Study</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','flirt','${c.name}')">Flirt</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','prank','${c.name}')">Prank</button>
-          <button class="btn btn-ghost btn-sm" onclick="schoolAct('classmate','befriend','${c.name}')">Befriend</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','study','${schoolEncodeArg(c.name)}')">Study</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','flirt','${schoolEncodeArg(c.name)}')">Flirt</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','prank','${schoolEncodeArg(c.name)}')">Prank</button>
+          <button class="btn btn-ghost btn-sm" onclick="schoolActEncoded('classmate','befriend','${schoolEncodeArg(c.name)}')">Befriend</button>
         </div>
       </div>`).join('')}
   </div>
