@@ -176,7 +176,13 @@ function beginLife(){
   G.marriageYears = 0;
   G.divorces    = 0;
   G.assets      = { home:false, homeValue:0, savings:0 };
-  G.finance     = { rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0 };
+  G.finance     = {
+    rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
+    tax:{
+      lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
+      lastStateRate:0, lastYearSummary:null, delinquentYears:0,
+    }
+  };
   G.housing     = { type:'none', comfort:40, neighborhood:50, roommates:0, roommateList:[], upkeep:0, utilities:0 };
   G.relTab      = 'family';
   G.darkScore  = 0;

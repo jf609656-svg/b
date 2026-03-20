@@ -382,6 +382,7 @@ function payDebt(amount){
 }
 
 function renderJobs(){
+  ensureFinanceShape();
   const jc = document.getElementById('jobs-content');
   if(G.age < 16){
     jc.innerHTML = `<div class="notif warn">Jobs unlock at age 16.</div>`; return;
@@ -515,11 +516,22 @@ function renderJobs(){
   }
 
   // Finances
+  const tax = G.finance.tax || {};
+  const effPct = ((tax.lastEffectiveRate||0)*100).toFixed(1);
+  const statePct = ((tax.lastStateRate||0)*100).toFixed(1);
+  const filedLine = tax.lastPaid>0
+    ? `Paid ${fmt$(tax.lastPaid)} · ${effPct}% effective · Federal bracket ${tax.lastBracket||'None'}`
+    : tax.lastRefund>0
+      ? `Refund ${fmt$(tax.lastRefund)} · Federal bracket ${tax.lastBracket||'None'}`
+      : 'No filing yet this life.';
   html += `<div class="card">
     <div class="card-title">Finances</div>
     <p style="font-size:.78rem;color:var(--muted2)">Credit score: <strong style="color:${G.finance.credit>=720?'var(--accent)':G.finance.credit>=660?'var(--gold)':'var(--danger)'}">${G.finance.credit}</strong></p>
     <p style="font-size:.78rem;color:var(--muted2)">Rent: ${G.finance.rent?fmt$(G.finance.rent*12)+'/yr':'None'} · Mortgage: ${G.finance.mortgage?fmt$(G.finance.mortgage)+'/yr':'None'} · Debt: ${fmt$(G.finance.debt)}</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Investments: ${fmt$(G.finance.investments)}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Investments: ${fmt$(G.finance.investments)} · Retirement: ${fmt$(G.finance.retirement||0)}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Last tax filing: ${filedLine}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">State tax estimate: ${statePct}% · Taxable income: ${fmt$(tax.lastTaxableIncome||0)}</p>
+    ${tax.delinquentYears>0?`<div class="notif bad" style="margin-bottom:10px">⚠️ Tax delinquency: ${tax.delinquentYears} year(s) unresolved. Penalties are compounding your debt.</div>`:''}
     <div class="choice-grid">
       ${HOUSING_OPTIONS.map(o=>`<div class="choice" onclick="setRent('${o.id}')">
         <div class="choice-icon">🏠</div><div class="choice-name">${o.label}</div><div class="choice-desc">${fmt$(o.rent*12)}/yr · ${o.minCredit}+ credit</div>
