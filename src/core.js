@@ -450,6 +450,18 @@ function ensureFinanceShape(){
   if(typeof G.stress!=='number') G.stress = 35;
 }
 
+function runYearStepSafe(label, fn){
+  try{
+    return fn();
+  }catch(err){
+    console.error(`Year-step error (${label})`, err);
+    try{
+      addEv(`A ${label} system hiccup occurred this year. The simulation recovered.`, 'warn');
+    }catch(_e){}
+    return null;
+  }
+}
+
 function calcProgressiveTax(income, brackets){
   const inc = Math.max(0, Math.floor(income));
   let tax = 0;
@@ -1170,7 +1182,7 @@ function ageUp(){
   }
 
   // ── Illness roll ─────────────────────────────────────────────
-  rollIllness();
+  runYearStepSafe('health', ()=>rollIllness());
 
   // ── Ongoing condition drain ──────────────────────────────────
   if(G.medical.conditions.includes('depression')) G.happy  = clamp(G.happy-4);
@@ -1382,8 +1394,8 @@ function ageUp(){
     addEv(`Debt interest accrued: ${fmt$(interest)}.`, 'warn');
     G.stress = clamp(G.stress + (G.finance.debt>200000?8:G.finance.debt>75000?5:3));
   }
-  processInvestmentAndCryptoYear(yearLedger);
-  processBusinessYear(yearLedger);
+  runYearStepSafe('investments', ()=>processInvestmentAndCryptoYear(yearLedger));
+  runYearStepSafe('business', ()=>processBusinessYear(yearLedger));
 
   // ── HS sport passive bonus ───────────────────────────────────
   if(G.age>=14 && G.age<=17 && G.school.sport){
@@ -1513,20 +1525,20 @@ function ageUp(){
 
   // ── Passive: Acting — annual events ──────────────────────────
   if(G.acting.active){
-    actingPassive();
+    runYearStepSafe('acting', ()=>actingPassive());
   }
 
   // ── Passive: NFL season ───────────────────────────────────────
   if(G.nfl.active && !G.nfl.retired){
-    nflSeasonPassive();
+    runYearStepSafe('NFL', ()=>nflSeasonPassive());
   }
 
   // ── Passive: NBA season ───────────────────────────────────────
   if(G.nba.active && !G.nba.retired){
-    nbaSeasonPassive();
+    runYearStepSafe('NBA', ()=>nbaSeasonPassive());
   }
   if(G.mma && (G.mma.active || G.mma.pro?.isPro)){
-    mmaSeasonPassive();
+    runYearStepSafe('MMA', ()=>mmaSeasonPassive());
   }
 
   // ── Fame -> Social Media growth ──────────────────────────────
@@ -1682,7 +1694,7 @@ function ageUp(){
 
   // ── Annual tax filing + post-tax credit drift ────────────────
   if(G.age>=18){
-    processAnnualTaxes(yearLedger, moneyAtYearStart, totalsAtYearStart);
+    runYearStepSafe('tax', ()=>processAnnualTaxes(yearLedger, moneyAtYearStart, totalsAtYearStart));
   } else {
     G.finance.tax.lastPaid = 0;
     G.finance.tax.lastRefund = 0;
