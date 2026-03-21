@@ -805,6 +805,13 @@ function ensureGovLegalShape(){
 function ensureSimShape(){
   if(!G.sim) G.sim = {};
   if(typeof G.sim.mode!=='string') G.sim.mode = 'balanced';
+  if(!G.sim.feedback || typeof G.sim.feedback!=='object') G.sim.feedback = {};
+  if(typeof G.sim.feedback.version!=='number') G.sim.feedback.version = 1;
+  if(typeof G.sim.feedback.eventCounter!=='number') G.sim.feedback.eventCounter = 0;
+  if(!Array.isArray(G.sim.feedback.recent)) G.sim.feedback.recent = [];
+  if(typeof G.sim.feedback.lastTone!=='string') G.sim.feedback.lastTone = 'neutral';
+  if(typeof G.sim.feedback.lastSource!=='string') G.sim.feedback.lastSource = '';
+  if(typeof G.sim.feedback.lastLabel!=='string') G.sim.feedback.lastLabel = '';
   if(!G.sim.director) G.sim.director = {};
   const d = G.sim.director;
   if(typeof d.lastPressure!=='number') d.lastPressure = 0;
@@ -1650,6 +1657,130 @@ function statBar(label, val, cls){
     <div class="stat-track"><div class="stat-fill ${cls}" style="width:${v}%"></div></div>
     <div class="stat-num">${v}</div>
   </div>`;
+}
+
+function feedbackToneFromType(type=''){
+  if(type==='love' || type==='good') return 'positive';
+  if(type==='bad') return 'negative';
+  if(type==='warn') return 'awkward';
+  return 'neutral';
+}
+
+function feedbackTypeByTone(tone='neutral'){
+  if(tone==='positive' || tone==='exciting') return 'good';
+  if(tone==='negative' || tone==='humiliating') return 'bad';
+  if(tone==='awkward' || tone==='tense') return 'warn';
+  return '';
+}
+
+function eventFeedback(label, text, opts={}){
+  ensureSimShape();
+  const tone = opts.tone || 'neutral';
+  const type = opts.type || feedbackTypeByTone(tone);
+  const prefix = label ? `[${label}] ` : '';
+  addEv(prefix + text, type);
+  const fb = G.sim.feedback;
+  fb.eventCounter = (fb.eventCounter||0) + 1;
+  fb.lastTone = tone;
+  fb.lastSource = opts.source || '';
+  fb.lastLabel = label || '';
+  fb.recent.push({
+    age:G.age||0,
+    label:label||'',
+    source:opts.source||'',
+    tone,
+    type:type||'',
+    text,
+  });
+  if(fb.recent.length>40) fb.recent.shift();
+  if(opts.popup){
+    const title = opts.popupTitle || (label ? `${label} Event` : 'Event');
+    const body = opts.popupBody || text;
+    const popupTone = opts.popupTone || (tone==='negative' || tone==='humiliating' ? 'dark' : 'normal');
+    const actions = opts.actions || [{ label:'Continue', cls:'btn-primary', onClick:()=>{} }];
+    showPopup(title, body, actions, popupTone);
+  }
+}
+
+function feedbackLabelForSource(source=''){
+  if(!source) return 'Event';
+  const map = {
+    school:'School',
+    school_event:'School',
+    school_social:'School Social',
+    school_dating:'School Dating',
+    school_pattern:'School Pattern',
+    crime:'Crime',
+    business:'Business',
+    politics:'Politics',
+    relationships:'Relationships',
+    health:'Health',
+    jobs:'Career',
+    social:'Social',
+  };
+  if(map[source]) return map[source];
+  return String(source).replace(/[_-]+/g, ' ').replace(/\b\w/g, m=>m.toUpperCase());
+}
+
+function feedbackToneFromMood(mood='neutral'){
+  if(mood==='success' || mood==='positive') return 'positive';
+  if(mood==='failure' || mood==='negative' || mood==='humiliating') return 'negative';
+  if(mood==='awkward' || mood==='tense') return 'awkward';
+  if(mood==='exciting') return 'exciting';
+  return 'neutral';
+}
+
+function applyFeedbackStatDelta(delta={}){
+  const impacts = [];
+  if(!delta || typeof delta!=='object') return impacts;
+  Object.entries(delta).forEach(([k, raw])=>{
+    const v = Number(raw);
+    if(!Number.isFinite(v) || v===0) return;
+    if(k==='health'){ G.health = clamp(G.health + v); impacts.push(`Health ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='happy'){ G.happy = clamp(G.happy + v); impacts.push(`Happy ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='smarts'){ G.smarts = clamp(G.smarts + v); impacts.push(`Smarts ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='looks'){ G.looks = clamp(G.looks + v); impacts.push(`Looks ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='stress'){ G.stress = clamp(G.stress + v); impacts.push(`Stress ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='money'){ G.money += Math.trunc(v); impacts.push(`Money ${v>0?'+':''}${fmt$(Math.abs(Math.trunc(v)))}`); return; }
+    if(k==='reputation'){ G.social.reputation = clamp((G.social.reputation||50) + v); impacts.push(`Social Rep ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='gpa'){ G.school.gpa = Math.max(0, Math.min(4, Number(((G.school.gpa||2.5)+v).toFixed(2)))); impacts.push(`GPA ${v>0?'+':''}${v.toFixed(2)}`); return; }
+    if(k==='popularity'){ if(G.school?.high?.reputation){ G.school.high.reputation.popularity = clamp((G.school.high.reputation.popularity||40) + v); impacts.push(`Popularity ${v>0?'+':''}${Math.trunc(v)}`); } return; }
+    if(k==='academics'){ if(G.school?.high?.reputation){ G.school.high.reputation.academics = clamp((G.school.high.reputation.academics||45) + v); impacts.push(`Academic Rep ${v>0?'+':''}${Math.trunc(v)}`); } return; }
+    if(k==='behavior'){ if(G.school?.high?.reputation){ G.school.high.reputation.behavior = clamp((G.school.high.reputation.behavior||50) + v); impacts.push(`Behavior Rep ${v>0?'+':''}${Math.trunc(v)}`); } return; }
+  });
+  return impacts;
+}
+
+function gameFeedback(payload={}){
+  ensureSimShape();
+  const source = payload.source || '';
+  const label = payload.label || feedbackLabelForSource(source);
+  const tone = payload.tone || feedbackToneFromMood(payload.mood || feedbackToneFromType(payload.eventType||''));
+  const type = payload.eventType || feedbackTypeByTone(tone);
+  const statImpacts = applyFeedbackStatDelta(payload.statDelta||{});
+  const extraImpacts = Array.isArray(payload.impacts) ? payload.impacts.filter(Boolean) : [];
+  const combinedImpacts = [...extraImpacts, ...statImpacts];
+  const popupBody = combinedImpacts.length
+    ? `${payload.text||''}\n\nImpact: ${combinedImpacts.join(' · ')}`
+    : (payload.text||'');
+  eventFeedback(label, payload.text||'', {
+    tone,
+    type,
+    source,
+    popup: payload.popup===true,
+    popupTitle: payload.title || `${label} Update`,
+    popupBody,
+    popupTone: payload.popupTone || (tone==='negative' ? 'dark' : 'normal'),
+    actions: payload.actions,
+  });
+  const fb = G.sim.feedback;
+  if(payload.action) fb.lastAction = String(payload.action);
+  if(payload.relationshipDelta && typeof payload.relationshipDelta==='object'){
+    fb.lastRelationshipDelta = payload.relationshipDelta;
+  }
+  if(combinedImpacts.length){
+    fb.lastImpactSummary = combinedImpacts.join(' · ');
+  }
 }
 
 // ── EVENTS ──────────────────────────────────────────────────────

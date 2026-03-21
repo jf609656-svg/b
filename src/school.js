@@ -526,6 +526,7 @@ function renderHighSchool(sc){
     <div class="choice-grid">
       <div class="choice" onclick="hsPartTime()"><div class="choice-icon">💼</div><div class="choice-name">Part-Time Job</div><div class="choice-desc">Earn money</div></div>
       <div class="choice" onclick="hsDo('volunteer')"><div class="choice-icon">🤲</div><div class="choice-name">Volunteer</div><div class="choice-desc">+GPA +Rep</div></div>
+      <div class="choice" onclick="hsAttendSocialEvent()"><div class="choice-icon">🎉</div><div class="choice-name">School Event</div><div class="choice-desc">Dance, drama, invitations</div></div>
       ${a===17?`<div class="choice" onclick="hsSAT()"><div class="choice-icon">📝</div><div class="choice-name">Take the SAT</div><div class="choice-desc">Affects college apps</div></div>`:''}
     </div>
   </div>`;
@@ -544,6 +545,526 @@ function ensureHSProfiles(){
       c.age = G.age + rnd(-1,1); c.relation = rnd(25,65); c.compat = rnd(30,90); return c;
     });
   }
+  hsEnsureState();
+}
+
+// ── HIGH SCHOOL LIVING SOCIAL STATE ──────────────────────────────
+const HS_PERSONALITY_ARCHETYPES = ['popular','nerd','athlete','rebel','artist','academic'];
+const HS_INTEREST_POOL = ['sports','music','gaming','science','fashion','activism','comedy','art','debate','fitness'];
+const HS_HIDDEN_TRAITS = ['jealous','loyal','fake','insecure','kind','competitive','gossipy','protective'];
+
+function hsEnsureState(){
+  if(!G.school) G.school = {};
+  if(!G.school.high || typeof G.school.high!=='object'){
+    G.school.high = {};
+  }
+  const h = G.school.high;
+  if(!h.reputation || typeof h.reputation!=='object'){
+    h.reputation = { popularity:38, academics:45, behavior:50 };
+  }
+  if(typeof h.reputation.popularity!=='number') h.reputation.popularity = 38;
+  if(typeof h.reputation.academics!=='number') h.reputation.academics = 45;
+  if(typeof h.reputation.behavior!=='number') h.reputation.behavior = 50;
+  if(!Array.isArray(h.memories)) h.memories = [];
+  if(typeof h.lastEventAge!=='number') h.lastEventAge = -1;
+  if(typeof h.lastWeeklyEvent!=='string') h.lastWeeklyEvent = '';
+  if(typeof h.patternRude!=='number') h.patternRude = 0;
+  if(typeof h.patternKind!=='number') h.patternKind = 0;
+  if(typeof h.patternFlirt!=='number') h.patternFlirt = 0;
+  if(typeof h.patternDrama!=='number') h.patternDrama = 0;
+  if(!Array.isArray(h.clubProgress)) h.clubProgress = [];
+  if(!Array.isArray(h.rivals)) h.rivals = [];
+  if(!Array.isArray(h.datingHistory)) h.datingHistory = [];
+  if(typeof h.eventPoints!=='number') h.eventPoints = 0;
+
+  // Initialize classmates richer profile.
+  (G.school.classmates||[]).forEach(c=>hsEnsureNpc(c));
+  (G.school.teachers||[]).forEach(t=>hsEnsureTeacher(t));
+}
+
+function hsEnsureNpc(p){
+  if(!p || typeof p!=='object') return;
+  if(typeof p.relation!=='number') p.relation = rnd(25,65);
+  if(typeof p.compat!=='number') p.compat = rnd(30,90);
+  if(typeof p.attraction!=='number') p.attraction = rnd(15,80);
+  if(typeof p.respect!=='number') p.respect = rnd(25,70);
+  if(typeof p.friendship!=='number') p.friendship = clamp(p.relation);
+  if(typeof p.rivalry!=='number') p.rivalry = rnd(0,20);
+  if(typeof p.personality!=='string') p.personality = pick(HS_PERSONALITY_ARCHETYPES);
+  if(!Array.isArray(p.interests)) p.interests = pick2(HS_INTEREST_POOL, rnd(2,4));
+  if(!Array.isArray(p.hiddenTraits)) p.hiddenTraits = pick2(HS_HIDDEN_TRAITS, rnd(1,2));
+  if(typeof p.mood!=='number') p.mood = rnd(35,70);
+  if(typeof p.socialStatus!=='number') p.socialStatus = rnd(20,80);
+  if(!p.hsMemory || typeof p.hsMemory!=='object'){
+    p.hsMemory = { awkward:0, bonding:0, rejected:0, embarrassed:0, helped:0, last:'none' };
+  }
+  if(typeof p.hsMemory.awkward!=='number') p.hsMemory.awkward = 0;
+  if(typeof p.hsMemory.bonding!=='number') p.hsMemory.bonding = 0;
+  if(typeof p.hsMemory.rejected!=='number') p.hsMemory.rejected = 0;
+  if(typeof p.hsMemory.embarrassed!=='number') p.hsMemory.embarrassed = 0;
+  if(typeof p.hsMemory.helped!=='number') p.hsMemory.helped = 0;
+  if(typeof p.hsMemory.last!=='string') p.hsMemory.last = 'none';
+  if(typeof p.datingStage!=='string') p.datingStage = 'none'; // none|talking|dating|awkward|broken_up
+  if(typeof p.datingSinceAge!=='number') p.datingSinceAge = -1;
+}
+
+function hsEnsureTeacher(t){
+  if(!t || typeof t!=='object') return;
+  if(typeof t.relation!=='number') t.relation = rnd(35,70);
+  if(typeof t.strictness!=='number') t.strictness = rnd(35,80);
+  if(typeof t.favor!=='number') t.favor = rnd(30,65);
+  if(typeof t.patience!=='number') t.patience = rnd(25,75);
+}
+
+function hsEvent(text, mood='neutral', opts={}){
+  const tone = mood==='success' ? 'good' :
+    mood==='failure' ? 'bad' :
+    mood==='awkward' ? 'warn' :
+    mood==='exciting' ? 'love' :
+    mood==='dramatic' ? 'warn' : '';
+  if(typeof gameFeedback==='function'){
+    gameFeedback({
+      title: opts.title || 'High School Moment',
+      text,
+      mood,
+      source: opts.source || 'school',
+      popup: opts.popup!==false,
+      eventType: tone,
+      statDelta: opts.statDelta||{},
+      relationshipDelta: opts.relationshipDelta||{},
+      meta: opts.meta||{},
+    });
+  } else {
+    addEv(text, tone);
+    if(opts.popup!==false && typeof showPopup==='function'){
+      showPopup(opts.title||'High School Moment', text, [{ label:'Continue', cls:'btn-primary', onClick:()=>{} }], mood==='dramatic'?'dark':'normal');
+    }
+  }
+}
+
+function ensureHSDynamicState(){
+  hsEnsureState();
+}
+
+function hsRepShift(delta={}, reason=''){
+  hsEnsureState();
+  const rep = G.school.high.reputation;
+  if(typeof delta.popularity==='number'){
+    rep.popularity = clamp(rep.popularity + delta.popularity);
+    G.social.reputation = clamp((G.social.reputation||50) + Math.floor(delta.popularity*0.7));
+  }
+  if(typeof delta.academic==='number'){
+    rep.academics = clamp(rep.academics + delta.academic);
+  }
+  if(typeof delta.behavior==='number'){
+    rep.behavior = clamp(rep.behavior + delta.behavior);
+  }
+  if(reason) hsReputationPulse();
+}
+
+function addNarrativeEvent(domain, action, text, opts={}){
+  const tone = opts.tone || 'neutral';
+  const impacts = Array.isArray(opts.impacts) ? opts.impacts : [];
+  const impactLine = impacts.length ? `\n\nImpact: ${impacts.join(' · ')}` : '';
+  eventFeedback(
+    (domain||'Event').toUpperCase(),
+    text,
+    {
+      source: `${domain||'system'}:${action||'action'}`,
+      tone,
+      popup:true,
+      popupTitle: opts.popupTitle || 'Action Outcome',
+      popupBody: `${text}${impactLine}`,
+      popupTone: tone==='humiliating' || tone==='negative' ? 'dark' : 'normal',
+    }
+  );
+}
+
+function maybeTriggerHSSchoolEvent(trigger=''){
+  hsEnsureState();
+  if(Math.random()<0.55){
+    hsRunWeeklyEvent();
+  }
+  if((G.age||0)>=16 && Math.random()<0.22){
+    hsSchoolDanceEvent();
+  }
+  if(trigger==='cheat' && Math.random()<0.35){
+    hsEvent('Rumor spread that you bend the rules. Trust with staff dipped.', 'awkward', {
+      source:'school_consequence',
+      popup:true,
+    });
+    hsRepShift({ behavior:-4, popularity:-1 }, 'cheat_rumor');
+  }
+}
+
+function hsAttendSocialEvent(){
+  hsEnsureState();
+  const options = [
+    {
+      label:'Go to dance floor',
+      cls:'btn-primary',
+      onClick:()=>{
+        G.happy = clamp(G.happy + rnd(4,10));
+        G.social.reputation = clamp((G.social.reputation||50) + rnd(1,5));
+        hsEvent('You jumped into the center of the event and people started noticing you more.', 'exciting', {
+          source:'school_social_event',
+          popup:true,
+        });
+        hsRepShift({ popularity:4 }, 'social_event_dance');
+      }
+    },
+    {
+      label:'Talk with classmates',
+      cls:'btn-ghost',
+      onClick:()=>{
+        const p = pick((G.school.classmates||[]));
+        if(!p){
+          hsEvent('You looked for people to talk to, but the night stayed quiet.', 'neutral', { source:'school_social_event', popup:true });
+          return;
+        }
+        hsEnsureNpc(p);
+        const outcome = hsApplyNpcReaction(p, 'casual');
+        const n = hsNarrativeFor('casual', outcome, p);
+        hsEvent(n.text, n.tone, { source:'school_social_event', popup:true });
+        if(outcome==='positive') hsRepShift({ popularity:2, behavior:1 }, 'social_talk_pos');
+        else if(outcome==='negative') hsRepShift({ popularity:-2 }, 'social_talk_neg');
+      }
+    },
+    {
+      label:'Leave early',
+      cls:'btn-ghost',
+      onClick:()=>{
+        G.stress = clamp((G.stress||35) - rnd(2,5));
+        hsEvent('You left early and chose peace over social chaos.', 'neutral', {
+          source:'school_social_event',
+          popup:true,
+        });
+      }
+    }
+  ];
+  showPopup(
+    'School Social Event',
+    'An event is active tonight. Your choices here can shift reputation and relationships.',
+    options,
+    'normal'
+  );
+}
+
+function hsPersonalityMod(p, action){
+  if(!p) return 0;
+  let mod = 0;
+  if(action==='joke' && p.personality==='popular') mod += 10;
+  if(action==='joke' && p.personality==='nerd') mod -= 3;
+  if(action==='insult' && p.personality==='rebel') mod += 6;
+  if(action==='support' && (p.personality==='nerd' || p.personality==='artist')) mod += 10;
+  if(action==='flirt' && p.personality==='athlete') mod += 4;
+  if(action==='casual' && p.personality==='academic') mod += 3;
+  if((p.hiddenTraits||[]).includes('jealous') && action==='flirt') mod -= 10;
+  if((p.hiddenTraits||[]).includes('fake') && action==='casual') mod -= 5;
+  if((p.hiddenTraits||[]).includes('loyal') && action==='support') mod += 9;
+  if((p.hiddenTraits||[]).includes('insecure') && action==='insult') mod -= 8;
+  if((p.hiddenTraits||[]).includes('competitive') && action==='insult') mod += 5;
+  return mod;
+}
+
+function hsMemoryMod(p){
+  if(!p || !p.hsMemory) return 0;
+  const m = p.hsMemory;
+  return Math.floor((m.bonding + m.helped - m.rejected - m.embarrassed - m.awkward)/2);
+}
+
+function hsApplyNpcReaction(p, action){
+  hsEnsureNpc(p);
+  const base = 42 + ((p.relation||50)-50)/2 + ((p.mood||50)-50)/3 + ((p.compat||50)-50)/4;
+  const rep = G.school.high?.reputation || { popularity:40, academics:45, behavior:50 };
+  const repBias =
+    action==='flirt' ? Math.floor((rep.popularity-50)/3) :
+    action==='support' ? Math.floor((rep.behavior-50)/3) :
+    action==='casual' ? Math.floor((rep.popularity-50)/5) :
+    Math.floor((rep.behavior-50)/5);
+  const score = clamp(Math.floor(base + repBias + hsPersonalityMod(p, action) + hsMemoryMod(p) + rnd(-14,14)));
+  const outcome = score>=74 ? 'positive' : score>=45 ? 'neutral' : 'negative';
+
+  if(outcome==='positive'){
+    p.friendship = clamp((p.friendship||50) + rnd(5,11));
+    p.relation = clamp((p.relation||50) + rnd(4,10));
+    p.respect = clamp((p.respect||50) + rnd(2,7));
+    p.mood = clamp((p.mood||50) + rnd(3,9));
+    p.hsMemory.bonding += 1;
+    if(action==='support') p.hsMemory.helped += 1;
+  } else if(outcome==='negative'){
+    p.rivalry = clamp((p.rivalry||0) + rnd(5,12));
+    p.relation = clamp((p.relation||50) - rnd(4,12));
+    p.respect = clamp((p.respect||50) - rnd(2,8));
+    p.mood = clamp((p.mood||50) - rnd(4,10));
+    if(action==='flirt') p.hsMemory.rejected += 1;
+    if(action==='joke' || action==='insult') p.hsMemory.embarrassed += 1;
+    p.hsMemory.awkward += 1;
+  } else {
+    p.relation = clamp((p.relation||50) + rnd(-2,3));
+    p.mood = clamp((p.mood||50) + rnd(-2,3));
+    if(action==='flirt') p.hsMemory.awkward += 1;
+  }
+  p.hsMemory.last = action;
+  return outcome;
+}
+
+function hsNarrativeFor(action, outcome, p){
+  const fn = p?.firstName || p?.name || 'them';
+  const tone = outcome==='positive' ? 'success' : outcome==='negative' ? 'awkward' : 'neutral';
+  if(action==='casual'){
+    return {
+      tone,
+      text: outcome==='positive'
+        ? `You had an unexpectedly good conversation with ${fn}. The vibe was easy and real.`
+        : outcome==='negative'
+          ? `Small talk with ${fn} stalled out and got awkward fast.`
+          : `You chatted with ${fn}. Nothing huge changed, but it mattered.`
+    };
+  }
+  if(action==='joke'){
+    return {
+      tone: outcome==='positive' ? 'exciting' : (outcome==='negative' ? 'awkward' : 'neutral'),
+      text: outcome==='positive'
+        ? `${fn} laughed hard at your joke and people around noticed.`
+        : outcome==='negative'
+          ? `Your joke around ${fn} bombed. You felt the silence immediately.`
+          : `You joked with ${fn}. Mixed reactions, no disaster.`
+    };
+  }
+  if(action==='insult'){
+    return {
+      tone: outcome==='positive' ? 'dramatic' : 'failure',
+      text: outcome==='positive'
+        ? `You threw shade at ${fn}; the room reacted and drama momentum grew.`
+        : outcome==='negative'
+          ? `The insult at ${fn} backfired. You lost social ground and gained heat.`
+          : `You took a shot at ${fn}. It landed, but you created tension.`
+    };
+  }
+  if(action==='support'){
+    return {
+      tone: outcome==='positive' ? 'success' : 'neutral',
+      text: outcome==='positive'
+        ? `You supported ${fn} at the right moment, and they remembered it.`
+        : outcome==='negative'
+          ? `${fn} didn't trust your support attempt and stayed guarded.`
+          : `You offered support to ${fn}. Seeds were planted.`
+    };
+  }
+  if(action==='flirt'){
+    return {
+      tone: outcome==='positive' ? 'exciting' : 'awkward',
+      text: outcome==='positive'
+        ? `Flirting with ${fn} clicked. Chemistry felt obvious.`
+        : outcome==='negative'
+          ? `You flirted with ${fn}, and it got awkward fast.`
+          : `You flirted with ${fn}. It was subtle, uncertain, and not over.`
+    };
+  }
+  return { tone:'neutral', text:`You interacted with ${fn}.` };
+}
+
+function hsTrackPattern(action){
+  hsEnsureState();
+  const h = G.school.high;
+  if(action==='insult' || action==='prank') h.patternDrama += 1;
+  if(action==='insult') h.patternRude += 1;
+  if(action==='support' || action==='befriend') h.patternKind += 1;
+  if(action==='flirt') h.patternFlirt += 1;
+}
+
+function hsReputationPulse(reason=''){
+  hsEnsureState();
+  const h = G.school.high;
+  const rep = h.reputation;
+  rep.academics = clamp(Math.floor(rep.academics*0.65 + (G.school.gpa||2.5)*22*0.35));
+  rep.popularity = clamp(Math.floor(rep.popularity*0.72 + (G.social.reputation||50)*0.28));
+  rep.behavior = clamp(Math.floor(
+    rep.behavior*0.72 +
+    (100-Math.min(100,(G.school.detentions||0)*9 + (G.school.trouble||0)*4))*0.28
+  ));
+  if(h.patternRude>=3){
+    rep.behavior = clamp(rep.behavior - rnd(2,7));
+    if(reason) hsEvent(`Pattern detected: repeated hostile behavior is hurting your school reputation.`, 'failure', { source:'school_pattern', popup:true });
+  }
+  if(h.patternKind>=3){
+    rep.behavior = clamp(rep.behavior + rnd(2,6));
+  }
+  if(h.patternFlirt>=4){
+    rep.popularity = clamp(rep.popularity + rnd(1,4));
+  }
+}
+
+function hsTryAskOut(name){
+  hsEnsureState();
+  const p = (G.school.classmates||[]).find(x=>x.name===name);
+  if(!p){ flash('Could not find them.','warn'); return; }
+  hsEnsureNpc(p);
+  const rep = G.school.high.reputation;
+  const timing = (G.age===17 ? 6 : 0) + (Math.random()<0.5?2:-2);
+  const chance = clamp(
+    Math.floor(
+      (p.attraction||40)*0.42 +
+      (p.relation||40)*0.35 +
+      (rep.popularity||40)*0.2 +
+      timing +
+      hsMemoryMod(p)
+    )
+  );
+  const roll = rnd(0,100);
+  if(roll <= chance-16){
+    p.datingStage = 'dating';
+    p.datingSinceAge = G.age||0;
+    p.hsMemory.bonding += 2;
+    p.rivalry = clamp((p.rivalry||0) - rnd(1,4));
+    p.friendship = clamp((p.friendship||50) + rnd(8,14));
+    p.relation = clamp((p.relation||50) + rnd(10,18));
+    G.social.reputation = clamp((G.social.reputation||50) + rnd(2,6));
+    hsEvent(`${p.firstName} said yes. You're officially dating, and everyone at school heard by lunch.`, 'exciting', {
+      title:'Ask Out Result',
+      source:'school_dating',
+      statDelta:{ happy:+8, reputation:+4 },
+      relationshipDelta:{ [`${p.firstName}`]:'+dating' },
+      popup:true,
+    });
+    G.happy = clamp(G.happy + rnd(8,14));
+  } else if(roll <= chance+12){
+    p.datingStage = 'awkward';
+    p.hsMemory.rejected += 1;
+    p.hsMemory.awkward += 1;
+    p.relation = clamp((p.relation||50) - rnd(2,8));
+    G.social.reputation = clamp((G.social.reputation||50) - rnd(1,4));
+    hsEvent(`${p.firstName} rejected you politely. It still stung, and things feel awkward for now.`, 'awkward', {
+      title:'Ask Out Result',
+      source:'school_dating',
+      popup:true,
+    });
+    G.happy = clamp(G.happy - rnd(3,8));
+  } else {
+    p.datingStage = 'broken_up';
+    p.hsMemory.rejected += 1;
+    p.hsMemory.embarrassed += 1;
+    p.rivalry = clamp((p.rivalry||0) + rnd(6,12));
+    p.relation = clamp((p.relation||50) - rnd(8,16));
+    G.social.reputation = clamp((G.social.reputation||50) - rnd(5,12));
+    hsEvent(`${p.firstName} rejected you harshly in front of others. The embarrassment spread fast.`, 'failure', {
+      title:'Ask Out Result',
+      source:'school_dating',
+      popup:true,
+      statDelta:{ reputation:-8, happy:-10 },
+    });
+    G.happy = clamp(G.happy - rnd(8,14));
+  }
+  hsReputationPulse();
+  updateHUD();
+  renderSchool();
+}
+
+function hsRunWeeklyEvent(){
+  hsEnsureState();
+  const h = G.school.high;
+  if(h.lastEventAge === (G.age||0)) return;
+  h.lastEventAge = G.age||0;
+
+  const pool = [
+    { id:'test', w:24 },
+    { id:'drama', w:20 },
+    { id:'teacher', w:18 },
+    { id:'rumor', w:14 },
+    { id:'fight', w:10 },
+    { id:'invite', w:14 },
+  ];
+  const total = pool.reduce((s,e)=>s+e.w,0);
+  let r = rnd(1,total);
+  let chosen = pool[0].id;
+  for(const e of pool){
+    r -= e.w;
+    if(r<=0){ chosen = e.id; break; }
+  }
+  h.lastWeeklyEvent = chosen;
+
+  if(chosen==='test'){
+    const perf = clamp(Math.floor((G.school.gpa||2.5)*22 + (G.smarts||50)*0.35 + rnd(-12,12)));
+    if(perf>=72){
+      G.school.gpa = Math.min(4.0, parseFloat((G.school.gpa + 0.08).toFixed(2)));
+      hsEvent('Pop test day: you crushed it and got public praise from your teacher.', 'success', { source:'school_event', popup:true });
+    } else {
+      G.school.gpa = Math.max(0, parseFloat((G.school.gpa - 0.07).toFixed(2)));
+      hsEvent('Pop test day: it went badly, and your confidence dipped.', 'awkward', { source:'school_event', popup:true });
+    }
+    return;
+  }
+  if(chosen==='drama'){
+    const target = pick((G.school.classmates||[]));
+    if(target){
+      hsEnsureNpc(target);
+      target.rivalry = clamp((target.rivalry||0) + rnd(2,7));
+      hsEvent(`${target.firstName} dragged you into hallway drama. You had to pick your words carefully.`, 'dramatic', { source:'school_event', popup:true });
+      G.stress = clamp((G.stress||35) + rnd(2,6));
+    }
+    return;
+  }
+  if(chosen==='teacher'){
+    const t = pick((G.school.teachers||[]));
+    if(t){
+      hsEnsureTeacher(t);
+      if((G.school.gpa||2.5)>=3.5){
+        t.relation = clamp((t.relation||50) + rnd(3,8));
+        hsEvent(`${t.firstName} highlighted your work in class. It boosted your academic confidence.`, 'success', { source:'school_event', popup:true });
+      } else {
+        G.school.trouble += rnd(0,2);
+        hsEvent(`${t.firstName} called out your slipping focus and warned you to tighten up.`, 'awkward', { source:'school_event', popup:true });
+      }
+    }
+    return;
+  }
+  if(chosen==='rumor'){
+    G.social.reputation = clamp((G.social.reputation||50) + rnd(-8,8));
+    hsEvent('A rumor about you spread through school. People reacted before asking questions.', 'dramatic', { source:'school_event', popup:true });
+    return;
+  }
+  if(chosen==='fight'){
+    if(Math.random()<0.45){
+      G.school.trouble += rnd(2,5);
+      G.social.reputation = clamp((G.social.reputation||50) + rnd(-8,5));
+      hsEvent('Conflict escalated near your group and administration got involved.', 'failure', { source:'school_event', popup:true });
+    } else {
+      G.social.reputation = clamp((G.social.reputation||50) + rnd(2,7));
+      hsEvent('You defused a tense conflict and people noticed your composure.', 'success', { source:'school_event', popup:true });
+    }
+    return;
+  }
+  // invite
+  hsEvent('You got an invite to a weekend party. Showing up could shift your social standing.', 'exciting', { source:'school_event', popup:true });
+}
+
+function hsSchoolDanceEvent(){
+  hsEnsureState();
+  if((G.age||0)<16) return;
+  if(Math.random()>0.28) return;
+  const classmates = (G.school.classmates||[]).filter(Boolean);
+  if(!classmates.length) return;
+  const p = classmates.sort((a,b)=>(b.relation||50)-(a.relation||50))[0];
+  hsEnsureNpc(p);
+  showPopup(
+    'School Dance Night',
+    `The school dance is tonight. Do you go alone or ask ${p.firstName}?`,
+    [
+      { label:'Go alone', cls:'btn-ghost', onClick:()=>{
+        G.social.reputation = clamp((G.social.reputation||50) + rnd(-2,3));
+        hsEvent('You went solo, met different circles, and learned where you stand socially.', 'neutral', { source:'school_event', popup:true });
+      }},
+      { label:`Ask ${p.firstName}`, cls:'btn-primary', onClick:()=>{
+        hsTryAskOut(p.name);
+      }},
+      { label:'Skip it', cls:'btn-ghost', onClick:()=>{
+        G.happy = clamp(G.happy + rnd(-3,4));
+        hsEvent('You skipped the dance and heard about it second-hand all week.', 'awkward', { source:'school_event', popup:true });
+      }},
+    ],
+    'normal'
+  );
 }
 
 // ── HS FOOTBALL ──────────────────────────────────────────────────
@@ -604,35 +1125,69 @@ function renderHSGenericSport(S, sport, a){
 // ── HS ACADEMIC ACTIONS ──────────────────────────────────────────
 function hsDo(type){
   const S = G.school;
+  ensureHSProfiles();
+  ensureHSDynamicState();
   if(type==='study'){
     const gain = parseFloat((Math.random()*0.35+0.1).toFixed(2));
     S.gpa = parseFloat(Math.min(4.0, S.gpa+gain).toFixed(2));
     G.smarts=clamp(G.smarts+rnd(4,10)); G.happy=clamp(G.happy-rnd(2,5));
-    addEv(`Studied hard. GPA up to ${S.gpa.toFixed(1)}.`);
+    addNarrativeEvent('school', 'study', `Studied hard. GPA up to ${S.gpa.toFixed(1)}.`, {
+      tone:'success',
+      impacts:[`GPA ${S.gpa.toFixed(1)}`, `Smarts ${G.smarts}`],
+    });
+    hsRepShift({ academic:4, behavior:1 }, 'study');
   } else if(type==='coast'){
     S.gpa = parseFloat(Math.max(0, S.gpa-0.05).toFixed(2));
-    addEv('Did the bare minimum. Showed up. That\'s the whole review.');
+    addNarrativeEvent('school', 'coast', 'Did the bare minimum. Showed up. That\'s the whole review.', {
+      tone:'neutral',
+      impacts:[`GPA ${S.gpa.toFixed(1)}`],
+    });
+    hsRepShift({ academic:-1 }, 'coast');
   } else if(type==='cheat'){
     if(Math.random()>.35){
       S.gpa=parseFloat(Math.min(4.0,S.gpa+parseFloat((Math.random()*0.4+0.2).toFixed(2))).toFixed(2));
-      addEv(`Cheated. Worked. GPA: ${S.gpa.toFixed(1)}.`,'warn');
+      addNarrativeEvent('school', 'cheat_success', `Cheated. Worked. GPA: ${S.gpa.toFixed(1)}.`, {
+        tone:'awkward',
+        impacts:[`GPA ${S.gpa.toFixed(1)}`, 'Behavior risk up'],
+      });
+      hsRepShift({ behavior:-5, academic:1 }, 'cheat_success');
     } else {
       S.gpa=parseFloat(Math.max(0,S.gpa-0.3).toFixed(2));
       S.detentions++; G.social.reputation=clamp(G.social.reputation-9);
       G.happy=clamp(G.happy-12); G.darkScore++;
-      addEv('Caught cheating. Detention. Parents called.','bad'); flash('Caught cheating!','bad');
+      addNarrativeEvent('school', 'cheat_fail', 'Caught cheating. Detention. Parents called.', {
+        tone:'humiliating',
+        impacts:[`GPA ${S.gpa.toFixed(1)}`, `Detentions ${S.detentions}`],
+      });
+      hsRepShift({ behavior:-12, academic:-4, popularity:-6 }, 'cheat_fail');
+      flash('Caught cheating!','bad');
     }
   } else if(type==='skip'){
     G.happy=clamp(G.happy+rnd(6,11));
     if(Math.random()>.42){
       S.gpa=parseFloat(Math.max(0,S.gpa-0.15).toFixed(2)); S.detentions++;
-      addEv('Skipped. Got caught. Parents found out.','warn');
-    } else { addEv('Skipped class. Nobody noticed. A perfect crime.'); }
+      addNarrativeEvent('school', 'skip_caught', 'Skipped. Got caught. Parents found out.', {
+        tone:'awkward',
+        impacts:[`Detentions ${S.detentions}`, `GPA ${S.gpa.toFixed(1)}`],
+      });
+      hsRepShift({ behavior:-7, popularity:-3 }, 'skip_caught');
+    } else {
+      addNarrativeEvent('school', 'skip_clean', 'Skipped class. Nobody noticed. A perfect crime.', {
+        tone:'exciting',
+        impacts:['Short-term relief'],
+      });
+      hsRepShift({ behavior:-2, popularity:1 }, 'skip_clean');
+    }
   } else if(type==='volunteer'){
     S.gpa=parseFloat(Math.min(4.0,S.gpa+0.05).toFixed(2));
     G.social.reputation=clamp(G.social.reputation+rnd(4,8));
-    addEv('Volunteered. College app padded. Morally mixed.');
+    addNarrativeEvent('school', 'volunteer', 'Volunteered. College app padded. Morally mixed.', {
+      tone:'success',
+      impacts:[`GPA ${S.gpa.toFixed(1)}`, 'Reputation up'],
+    });
+    hsRepShift({ academic:3, behavior:3, popularity:2 }, 'volunteer');
   }
+  maybeTriggerHSSchoolEvent(type);
   updateHUD(); renderSchool();
 }
 
@@ -794,14 +1349,27 @@ function acceptScholarship(college, sport, fullRide){
 
 function hsPartTime(){
   const earn = rnd(3000,9000); G.money+=earn;
-  addEv(`Part-time job: ${fmt$(earn)} earned. Every dollar smells like french fries.`);
-  flash(`+${fmt$(earn)} 💵`,'good'); updateHUD(); switchTab('life');
+  addNarrativeEvent('school', 'part_time', `Part-time shift done. You earned ${fmt$(earn)} and came home exhausted but proud.`, {
+    tone:'success',
+    impacts:[`Money +${fmt$(earn)}`],
+  });
+  hsRepShift({ behavior:1, popularity:1 }, 'part_time');
+  flash(`+${fmt$(earn)} 💵`,'good');
+  updateHUD();
+  switchTab('life');
 }
 
 function hsSAT(){
   const score=Math.floor(800+(G.smarts/100)*800); G.school.satScore=score;
-  addEv(`SAT score: ${score}/1600. ${score>=1400?'Exceptional.':score>=1200?'Solid.':score>=1000?'Gets the job done.':'Room to grow.'}`);
-  flash(`SAT: ${score}/1600`,'good'); updateHUD(); switchTab('life');
+  const label = score>=1400?'Exceptional result and top-tier options opened.':score>=1200?'Solid score with strong college pathways.':score>=1000?'A workable score, but not elite.':'A tough score. Retaking may be smart.';
+  addNarrativeEvent('school', 'sat_exam', `SAT score: ${score}/1600. ${label}`, {
+    tone: score>=1200 ? 'success' : score>=1000 ? 'neutral' : 'awkward',
+    impacts:[`SAT ${score}`],
+  });
+  hsRepShift({ academic: score>=1300?4:score>=1100?2:-2 }, 'sat_exam');
+  flash(`SAT: ${score}/1600`,'good');
+  updateHUD();
+  switchTab('life');
 }
 
 // ── POST-HS ──────────────────────────────────────────────────────
@@ -1667,6 +2235,7 @@ function uniAcademic(type){
 function schoolAct(kind, action, name){
   const S = G.school;
   const u = S.uni;
+  if(S.stage==='high') ensureHSDynamicState();
   let target = null;
   if(kind==='teacher') target = S.teachers.find(t=>t.name===name);
   if(kind==='prof') target = u.professors.find(t=>t.name===name);
@@ -1681,54 +2250,120 @@ function schoolAct(kind, action, name){
     p.compat = p.compat || rnd(30,90);
     p.relation = clamp(p.relation + rnd(6,12));
     G.friends.push(p);
-    addEv(`${p.firstName} is now your friend.`, 'love');
-    flash(`New friend: ${p.firstName}`,'good');
+    if(S.stage==='high'){
+      hsTrackPattern('befriend');
+      const n = hsNarrativeFor('support','positive',p);
+      hsEvent(n.text, n.tone, { source:'school_social', popup:true, title:'New Friendship' });
+      hsReputationPulse('befriend');
+    } else {
+      addEv(`${p.firstName} is now your friend.`, 'love');
+      flash(`New friend: ${p.firstName}`,'good');
+    }
   }
 
   if(action==='respect'){
     target.relation = clamp(target.relation + rnd(4,9));
-    addEv(`You showed respect to ${target.firstName}. It went noticed.`, 'good');
+    if(S.stage==='high'){
+      hsTrackPattern('support');
+      const n = hsNarrativeFor('support','positive',target);
+      hsEvent(n.text, n.tone, { source:'school_social', popup:true, title:'Class Interaction' });
+      hsReputationPulse('respect');
+    } else {
+      addEv(`You showed respect to ${target.firstName}. It went noticed.`, 'good');
+    }
   } else if(action==='rude'){
     target.relation = clamp(target.relation - rnd(8,16));
     if(S.stage==='high'){ S.trouble += rnd(2,5); }
     if(u.enrolled){ u.discipline += rnd(1,4); }
-    addEv(`You were rude to ${target.firstName}. The class went silent.`, 'bad');
+    if(S.stage==='high'){
+      hsTrackPattern('insult');
+      hsEvent(`You were rude to ${target.firstName}. The class went silent and people remembered it.`, 'failure', { source:'school_social', popup:true, title:'Class Interaction' });
+      hsReputationPulse('rude');
+    } else {
+      addEv(`You were rude to ${target.firstName}. The class went silent.`, 'bad');
+    }
   } else if(action==='help'){
     target.relation = clamp(target.relation + rnd(6,12));
     G.smarts = clamp(G.smarts + rnd(2,6));
-    addEv(`You asked ${target.firstName} for help. It actually helped.`, 'good');
+    if(S.stage==='high'){
+      hsTrackPattern('support');
+      const n = hsNarrativeFor('support','positive',target);
+      hsEvent(n.text, n.tone, { source:'school_social', popup:true, title:'Study Support' });
+      hsReputationPulse('help');
+    } else {
+      addEv(`You asked ${target.firstName} for help. It actually helped.`, 'good');
+    }
   } else if(action==='office'){
     target.relation = clamp(target.relation + rnd(5,10));
     G.school.uni.gpa = Math.min(4.0, G.school.uni.gpa + (rnd(2,6)/100));
     addEv(`Office hours with ${target.firstName}. You left sharper.`, 'good');
   } else if(action==='study'){
-    target.relation = clamp(target.relation + rnd(3,8));
-    G.smarts = clamp(G.smarts + rnd(2,6));
-    addEv(`You studied with ${target.firstName}. Productivity happened.`, 'good');
+    if(S.stage==='high'){
+      hsTrackPattern('casual');
+      const out = hsApplyNpcReaction(target, 'casual');
+      const n = hsNarrativeFor('casual', out, target);
+      G.smarts = clamp(G.smarts + rnd(1,5));
+      hsEvent(n.text, n.tone, { source:'school_social', popup:true, title:'Classmate Interaction' });
+      hsReputationPulse('study');
+    } else {
+      target.relation = clamp(target.relation + rnd(3,8));
+      G.smarts = clamp(G.smarts + rnd(2,6));
+      addEv(`You studied with ${target.firstName}. Productivity happened.`, 'good');
+    }
   } else if(action==='flirt'){
-    if(Math.random()<0.35){
-      target.relation = clamp(target.relation + rnd(6,12));
-      addEv(`You flirted with ${target.firstName}. They flirted back.`, 'love');
-      if(Math.random()<0.2 && G.age>=16){
+    if(S.stage==='high'){
+      hsTrackPattern('flirt');
+      const out = hsApplyNpcReaction(target, 'flirt');
+      const n = hsNarrativeFor('flirt', out, target);
+      hsEvent(n.text, n.tone, { source:'school_social', popup:true, title:'Flirt Attempt' });
+      if(out==='positive' && Math.random()<0.22 && G.age>=16){
         const p = {...target, role:'Lover', age:G.age+rnd(-2,2)};
         p.compat = rnd(30,90);
         G.lovers.push(p);
-        addEv(`You started dating ${target.firstName} from class.`, 'love');
+        hsEvent(`You and ${target.firstName} kept talking after class and started dating.`, 'exciting', { source:'school_dating', popup:true, title:'New Relationship' });
       }
+      hsReputationPulse('flirt');
     } else {
-      addEv(`You flirted with ${target.firstName}. It was awkward.`, 'warn');
+      if(Math.random()<0.35){
+        target.relation = clamp(target.relation + rnd(6,12));
+        addEv(`You flirted with ${target.firstName}. They flirted back.`, 'love');
+        if(Math.random()<0.2 && G.age>=16){
+          const p = {...target, role:'Lover', age:G.age+rnd(-2,2)};
+          p.compat = rnd(30,90);
+          G.lovers.push(p);
+          addEv(`You started dating ${target.firstName} from class.`, 'love');
+        }
+      } else {
+        addEv(`You flirted with ${target.firstName}. It was awkward.`, 'warn');
+      }
     }
   } else if(action==='prank'){
-    if(Math.random()<0.5){
-      addEv(`The prank on ${target.firstName} landed perfectly. People laughed.`, 'warn');
-      G.social.reputation = clamp(G.social.reputation + rnd(3,7));
+    if(S.stage==='high'){
+      hsTrackPattern('prank');
+      if(Math.random()<0.5){
+        G.social.reputation = clamp(G.social.reputation + rnd(3,7));
+        hsEvent(`Your prank on ${target.firstName} landed, and the hallway loved it.`, 'exciting', { source:'school_social', popup:true, title:'Prank Outcome' });
+      } else {
+        if(S.stage==='high'){ S.trouble += rnd(2,5); }
+        hsEvent(`The prank on ${target.firstName} backfired. You got called out and logged by staff.`, 'failure', { source:'school_social', popup:true, title:'Prank Outcome' });
+      }
+      hsReputationPulse('prank');
     } else {
-      addEv(`The prank went wrong. You got called out.`, 'bad');
-      if(S.stage==='high'){ S.trouble += rnd(2,5); }
-      if(u.enrolled){ u.discipline += rnd(1,4); }
+      if(Math.random()<0.5){
+        addEv(`The prank on ${target.firstName} landed perfectly. People laughed.`, 'warn');
+        G.social.reputation = clamp(G.social.reputation + rnd(3,7));
+      } else {
+        addEv(`The prank went wrong. You got called out.`, 'bad');
+        if(S.stage==='high'){ S.trouble += rnd(2,5); }
+        if(u.enrolled){ u.discipline += rnd(1,4); }
+      }
     }
   } else if(action==='befriend'){
     befriend(target);
+  }
+
+  if(S.stage==='high' && Math.random()<0.28){
+    maybeTriggerHSSchoolEvent(action);
   }
 
   // Expulsion checks
@@ -1745,6 +2380,4 @@ function schoolAct(kind, action, name){
 
   updateHUD(); renderSchool();
 }
-
-
 
