@@ -112,6 +112,7 @@ const STREET_RACE_RUNTIME = {
   keys:{},
   onKeyDown:null,
   onKeyUp:null,
+  opponents:[],
 };
 
 function streetRaceClampStat(v, min=0, max=160){
@@ -555,15 +556,58 @@ function streetRaceDrawCar(ctx, x, y, angle, color, label){
   }
 }
 
+function streetRaceDrawAmericanStadium(ctx, canvas){
+  ctx.fillStyle = 'rgba(17,24,39,0.96)';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = 'rgba(191,24,32,0.22)';
+  ctx.fillRect(12,12,canvas.width-24,36);
+  ctx.fillStyle = 'rgba(30,64,175,0.2)';
+  ctx.fillRect(12,canvas.height-48,canvas.width-24,36);
+  ctx.strokeStyle = 'rgba(226,232,240,0.3)';
+  ctx.lineWidth = 2;
+  const poles = 10;
+  for(let i=0;i<poles;i++){
+    const t = (i/poles) * Math.PI * 2;
+    const cx = canvas.width/2 + Math.cos(t)*(canvas.width*0.46);
+    const cy = canvas.height/2 + Math.sin(t)*(canvas.height*0.40);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, cy-16);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(253,224,71,0.52)';
+    ctx.beginPath();
+    ctx.arc(cx, cy-18, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(canvas.width*0.34, canvas.height*0.47, canvas.width*0.32, 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.font = 'bold 12px system-ui';
+  ctx.fillText('AMERICAN STREET SERIES', canvas.width*0.37, canvas.height*0.465);
+}
+
+function streetRaceApplyBarrierCollision(entity, track, proj){
+  const barrierLimit = track.width * 0.60;
+  if(proj.dist <= barrierLimit) return false;
+  const nx = entity.x - proj.px;
+  const ny = entity.y - proj.py;
+  const nLen = Math.hypot(nx, ny) || 1;
+  const ux = nx / nLen;
+  const uy = ny / nLen;
+  entity.x = proj.px + ux * barrierLimit;
+  entity.y = proj.py + uy * barrierLimit;
+  entity.speed = -Math.abs(entity.speed) * 0.34;
+  return true;
+}
+
 function streetRacingDrawMiniRace(runtime){
   const { ctx, canvas, track, path } = runtime;
   const theme = track.theme||{ bg:'#111827', road:'#374151', line:'#a7f3d0' };
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  streetRaceDrawAmericanStadium(ctx, canvas);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  ctx.strokeStyle = '#0b0f18';
+  ctx.strokeStyle = '#111827';
   ctx.lineWidth = track.width + 12;
   ctx.beginPath();
   path.points.forEach((p,idx)=>{
@@ -571,6 +615,17 @@ function streetRacingDrawMiniRace(runtime){
   });
   ctx.closePath();
   ctx.stroke();
+
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6,4]);
+  ctx.beginPath();
+  path.points.forEach((p,idx)=>{
+    if(idx===0) ctx.moveTo(p[0],p[1]); else ctx.lineTo(p[0],p[1]);
+  });
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
 
   ctx.strokeStyle = theme.road;
   ctx.lineWidth = track.width;
@@ -602,7 +657,9 @@ function streetRacingDrawMiniRace(runtime){
   ctx.fillRect(-track.width*0.45, -3, track.width*0.9, 6);
   ctx.restore();
 
-  streetRaceDrawCar(ctx, runtime.ai.x, runtime.ai.y, runtime.ai.angle, '#ef4444', 'Rival');
+  (runtime.opponents||[]).forEach((op, idx)=>{
+    streetRaceDrawCar(ctx, op.x, op.y, op.angle, op.color||'#ef4444', `R${idx+1}`);
+  });
   streetRaceDrawCar(ctx, runtime.player.x, runtime.player.y, runtime.player.angle, '#60a5fa', 'You');
 }
 
@@ -697,6 +754,18 @@ function streetRacingResolveMiniRace(track, entry, winner){
   updateHUD();
 }
 
+function streetRaceLeaderboard(runtime){
+  const racers = [{ key:'you', name:'You', lap:runtime.player.lap, prog:runtime.player.prevProgress }]
+    .concat((runtime.opponents||[]).map((op, idx)=>({
+      key:`op${idx}`, name:`R${idx+1}`, lap:op.lap, prog:op.progress,
+    })));
+  racers.sort((a,b)=>{
+    if(a.lap!==b.lap) return b.lap - a.lap;
+    return b.prog - a.prog;
+  });
+  return racers;
+}
+
 function streetRacingMiniRaceLoop(){
   const rt = STREET_RACE_RUNTIME;
   if(!rt.active || rt.finished) return;
@@ -725,31 +794,33 @@ function streetRacingMiniRaceLoop(){
   p.y += Math.sin(p.angle) * p.speed * ds * p.speedScale;
 
   const proj = streetRaceProjectToPath(p.x, p.y, rt.path);
-  if(proj.dist > rt.track.width*0.58){
-    p.speed *= 0.9;
-    rt.offTrackFrames += 1;
-    if(rt.offTrackFrames%22===0){
-      rt.playerCar.damage = streetRaceClampStat((rt.playerCar.damage||0) + 1, 0, 100);
-    }
+  const hitBarrier = streetRaceApplyBarrierCollision(p, rt.track, proj);
+  if(hitBarrier){
+    rt.offTrackFrames += 2;
+    rt.playerCar.damage = streetRaceClampStat((rt.playerCar.damage||0) + 1, 0, 100);
   }
   if(p.prevProgress > rt.path.total*0.86 && proj.progress < rt.path.total*0.14 && Math.abs(p.speed)>0.6){
     p.lap += 1;
   }
   p.prevProgress = proj.progress;
 
-  rt.ai.progress += rt.ai.speed * ds;
-  if(rt.ai.progress>=rt.path.total){
-    rt.ai.progress -= rt.path.total;
-    rt.ai.lap += 1;
-  }
-  const aiPoint = streetRacePointAtDistance(rt.path, rt.ai.progress);
-  rt.ai.x = aiPoint.x;
-  rt.ai.y = aiPoint.y;
-  rt.ai.angle = aiPoint.angle;
+  (rt.opponents||[]).forEach(op=>{
+    op.progress += op.speed * ds;
+    if(op.progress>=rt.path.total){
+      op.progress -= rt.path.total;
+      op.lap += 1;
+    }
+    const aiPoint = streetRacePointAtDistance(rt.path, op.progress);
+    op.x = aiPoint.x;
+    op.y = aiPoint.y;
+    op.angle = aiPoint.angle;
+  });
 
-  if(p.lap>=rt.track.laps || rt.ai.lap>=rt.track.laps){
+  const maxOppLap = Math.max(0, ...(rt.opponents||[]).map(op=>op.lap||0));
+  if(p.lap>=rt.track.laps || maxOppLap>=rt.track.laps){
     rt.finished = true;
-    const playerWins = p.lap>rt.ai.lap || (p.lap===rt.ai.lap && p.prevProgress>=rt.ai.progress);
+    const leaders = streetRaceLeaderboard(rt);
+    const playerWins = leaders[0]?.key==='you';
     streetRacingMiniRaceCleanup();
     streetRacingResolveMiniRace(rt.track, rt.entry, playerWins?'player':'ai');
     return;
@@ -758,10 +829,11 @@ function streetRacingMiniRaceLoop(){
   streetRacingDrawMiniRace(rt);
   const statusEl = document.getElementById('street-race-status');
   if(statusEl){
+    const leaders = streetRaceLeaderboard(rt).slice(0,5).map((x,idx)=>`${idx+1}. ${x.name}`).join(' · ');
     statusEl.innerHTML = `
       <div><strong>${rt.track.name}</strong> · Lap ${Math.min(rt.track.laps, p.lap+1)}/${rt.track.laps}</div>
-      <div>Time ${streetRaceTimeFmt(now-rt.startTs)} · Speed ${Math.floor(Math.abs(p.speed)*48)} km/h</div>
-      <div>You: ${p.lap+1}/${rt.track.laps} · Rival: ${Math.min(rt.track.laps, rt.ai.lap+1)}/${rt.track.laps} · Off-track ${Math.floor(rt.offTrackFrames/16)}</div>
+      <div>Time ${streetRaceTimeFmt(now-rt.startTs)} · Speed ${Math.floor(Math.abs(p.speed)*76)} km/h</div>
+      <div>Positioning: ${leaders} · Barrier hits ${Math.floor(rt.offTrackFrames/2)}</div>
     `;
   }
   rt.raf = requestAnimationFrame(streetRacingMiniRaceLoop);
@@ -777,7 +849,6 @@ function streetRacingStartMiniRace(track, car, entry){
   }
   const path = streetRaceBuildPathMetrics(track.path);
   const start = streetRacePointAtDistance(path, path.total*0.02);
-  const aiStart = streetRacePointAtDistance(path, path.total*0.12);
   const rt = STREET_RACE_RUNTIME;
   rt.active = true;
   rt.finished = false;
@@ -792,20 +863,30 @@ function streetRacingStartMiniRace(track, car, entry){
   rt.playerCar = car;
   rt.player = {
     x:start.x, y:start.y, angle:start.angle, speed:0,
-    maxSpeed:2.1 + (car.power/68) + (car.accel/92),
-    accelRate:0.045 + (car.accel/3500),
-    brakeRate:0.06 + (car.grip/3600),
-    drag:0.982 - Math.min(0.03, track.difficulty*0.005),
-    turnRate:0.042 + (car.handling/3100) + (car.grip/5200),
-    speedScale:1 + (car.power/260),
+    maxSpeed:3.6 + (car.power/52) + (car.accel/74),
+    accelRate:0.072 + (car.accel/2400),
+    brakeRate:0.075 + (car.grip/3000),
+    drag:0.988 - Math.min(0.022, track.difficulty*0.003),
+    turnRate:0.048 + (car.handling/2600) + (car.grip/4800),
+    speedScale:1.3 + (car.power/190),
     lap:0,
     prevProgress:path.total*0.02,
   };
-  rt.ai = {
-    progress:path.total*0.12,
-    speed:2.0 + track.difficulty*0.22 + Math.max(0, (track.reqLevel - (G.activities.streetRacing.level||1))*0.1),
-    x:aiStart.x, y:aiStart.y, angle:aiStart.angle, lap:0,
-  };
+  const opponentCount = rnd(4,5);
+  const palette = ['#ef4444','#f97316','#22c55e','#a855f7','#eab308'];
+  rt.opponents = [];
+  for(let i=0;i<opponentCount;i++){
+    const startPos = streetRacePointAtDistance(path, path.total*(0.12 + i*0.05));
+    rt.opponents.push({
+      progress:path.total*(0.12 + i*0.05),
+      speed:2.3 + track.difficulty*0.24 + rnd(0,20)/100 + Math.max(0, (track.reqLevel - (G.activities.streetRacing.level||1))*0.12),
+      x:startPos.x,
+      y:startPos.y,
+      angle:startPos.angle,
+      lap:0,
+      color:palette[i%palette.length],
+    });
+  }
   rt.keys = {};
   rt.onKeyDown = (e)=>{
     const k = String(e.key||'').toLowerCase();
@@ -847,6 +928,7 @@ function streetRacingLaunchMiniRace(trackId){
       <div style="font-size:.78rem;color:var(--muted2)">
         Car: <strong>${car.name}</strong> · Stats P${car.power} A${car.accel} G${car.grip} H${car.handling} R${car.reliability}
         <br>Track: <strong>${track.name}</strong> · Difficulty ${track.difficulty} · Laps ${track.laps} · Entry ${fmt$(entry)}
+        <br>Grid: <strong>5-6 total cars</strong> (you + 4-5 rivals) · Barrier walls enabled
       </div>
       <canvas id="street-race-canvas" width="700" height="540" style="width:100%;max-width:700px;border:1px solid var(--border);border-radius:10px;background:#0b0f17"></canvas>
       <div id="street-race-status" style="font-size:.78rem;color:var(--muted2)">Use Arrow keys or WASD to drive. Stay on track.</div>
