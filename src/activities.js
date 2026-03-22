@@ -30,105 +30,149 @@ function runActivity(i){
 }
 
 const STREET_RACING_LEVELS = [
-  { id:1, label:'Rookie', minRep:0, unlockTracks:1 },
-  { id:2, label:'Street Runner', minRep:55, unlockTracks:2 },
-  { id:3, label:'Circuit Predator', minRep:120, unlockTracks:3 },
-  { id:4, label:'Underground Icon', minRep:220, unlockTracks:4 },
-  { id:5, label:'City Legend', minRep:340, unlockTracks:5 },
+  { id:1, label:'Rookie', minRep:0 },
+  { id:2, label:'Street Runner', minRep:55 },
+  { id:3, label:'Circuit Predator', minRep:120 },
+  { id:4, label:'Underground Icon', minRep:220 },
+  { id:5, label:'City Legend', minRep:340 },
 ];
 
 const STREET_RACING_CARS = [
-  { id:'hatch_starter', name:'Raptor S Hatch', class:'D', price:8500, power:32, grip:38, reliability:64 },
-  { id:'old_muscle', name:'Ironbolt 78', class:'D', price:11000, power:45, grip:28, reliability:52 },
-  { id:'turbo_compact', name:'VX Turbo Compact', class:'C', price:22000, power:55, grip:52, reliability:60 },
-  { id:'awd_sedan', name:'Falcon AWD GT', class:'C', price:30000, power:62, grip:58, reliability:70 },
-  { id:'drift_coupe', name:'Nightshade Coupe', class:'B', price:52000, power:74, grip:65, reliability:58 },
-  { id:'track_r', name:'Apex R Track', class:'B', price:76000, power:82, grip:78, reliability:74 },
-  { id:'super_gt', name:'Nova Super GT', class:'A', price:145000, power:96, grip:86, reliability:66 },
-  { id:'hyper_x', name:'Hyperion X', class:'S', price:320000, power:112, grip:95, reliability:72 },
+  { id:'hatch_starter', name:'Raptor S Hatch', class:'D', price:8500, power:34, accel:37, grip:38, handling:36, reliability:66 },
+  { id:'old_muscle', name:'Ironbolt 78', class:'D', price:11000, power:45, accel:43, grip:28, handling:31, reliability:54 },
+  { id:'turbo_compact', name:'VX Turbo Compact', class:'C', price:22000, power:56, accel:53, grip:52, handling:50, reliability:60 },
+  { id:'awd_sedan', name:'Falcon AWD GT', class:'C', price:30000, power:63, accel:57, grip:58, handling:56, reliability:70 },
+  { id:'drift_coupe', name:'Nightshade Coupe', class:'B', price:52000, power:74, accel:67, grip:65, handling:68, reliability:59 },
+  { id:'track_r', name:'Apex R Track', class:'B', price:76000, power:82, accel:76, grip:78, handling:79, reliability:74 },
+  { id:'super_gt', name:'Nova Super GT', class:'A', price:145000, power:96, accel:90, grip:86, handling:85, reliability:67 },
+  { id:'hyper_x', name:'Hyperion X', class:'S', price:320000, power:112, accel:105, grip:95, handling:94, reliability:72 },
 ];
 
+// Three distinct 2D race maps of increasing difficulty.
 const STREET_RACING_TRACKS = [
-  { id:'dock_loop', name:'Dockside Loop', reqLevel:1, entry:[300,1200], payout:[1200,4600], hazard:8, turns:42, straight:48 },
-  { id:'industrial_ring', name:'Industrial Ring', reqLevel:2, entry:[800,2600], payout:[4500,12500], hazard:16, turns:56, straight:44 },
-  { id:'mountain_run', name:'Mountain Midnight Run', reqLevel:3, entry:[1800,6000], payout:[12000,34000], hazard:28, turns:68, straight:36 },
-  { id:'expressway_sprint', name:'Expressway Sprint', reqLevel:4, entry:[3500,11000], payout:[26000,68000], hazard:35, turns:32, straight:72 },
-  { id:'grand_underground', name:'Grand Underground Circuit', reqLevel:5, entry:[9000,22000], payout:[85000,190000], hazard:48, turns:60, straight:66 },
+  {
+    id:'harbor_oval',
+    name:'Harbor Oval',
+    reqLevel:1,
+    difficulty:1,
+    entry:[300,1200],
+    payout:[1800,5600],
+    hazard:9,
+    laps:3,
+    width:42,
+    lengthKm:3.6,
+    theme:{ bg:'#0a1322', road:'#243449', line:'#71d5ff' },
+    path:[[130,95],[560,95],[650,190],[650,350],[560,445],[130,445],[40,350],[40,190]],
+  },
+  {
+    id:'neon_chicane',
+    name:'Neon Chicane Circuit',
+    reqLevel:2,
+    difficulty:2,
+    entry:[900,2600],
+    payout:[5200,14600],
+    hazard:18,
+    laps:3,
+    width:36,
+    lengthKm:5.1,
+    theme:{ bg:'#140d1f', road:'#372047', line:'#ff6af4' },
+    path:[[90,90],[300,70],[470,120],[620,90],[670,200],[580,280],[650,390],[520,455],[350,420],[230,470],[90,420],[40,300],[75,210]],
+  },
+  {
+    id:'mountain_serpent',
+    name:'Mountain Serpent',
+    reqLevel:3,
+    difficulty:3,
+    entry:[2500,6800],
+    payout:[14000,38000],
+    hazard:31,
+    laps:2,
+    width:30,
+    lengthKm:7.8,
+    theme:{ bg:'#0e1a14', road:'#2d3c33', line:'#9cff7b' },
+    path:[[80,430],[150,370],[110,310],[180,250],[120,190],[210,130],[320,95],[420,135],[510,95],[600,145],[650,220],[620,300],[670,380],[600,445],[500,410],[430,465],[320,430],[230,470],[160,430]],
+  },
 ];
 
 const STREET_RACING_MODS = [
-  { id:'ecu', name:'ECU Tune', stat:'power', minCost:1200, maxCost:6800, boost:[4,12], risk:6, desc:'More power, more stress on engine.' },
-  { id:'tires', name:'Semi-Slick Tires', stat:'grip', minCost:900, maxCost:5500, boost:[5,13], risk:3, desc:'Better cornering and launch consistency.' },
-  { id:'suspension', name:'Coilover Suspension', stat:'handling', minCost:1400, maxCost:7200, boost:[4,11], risk:4, desc:'Sharper transitions and stability.' },
-  { id:'weight', name:'Weight Reduction', stat:'handling', minCost:1600, maxCost:9800, boost:[6,14], risk:8, desc:'Faster chassis, harsher mistakes.' },
-  { id:'turbo', name:'Turbo Upgrade', stat:'power', minCost:3000, maxCost:16000, boost:[8,18], risk:12, desc:'Big speed jump, high reliability risk.' },
-  { id:'brakes', name:'Track Brake Kit', stat:'grip', minCost:1200, maxCost:7600, boost:[5,12], risk:2, desc:'Late braking confidence.' },
-  { id:'nitrous', name:'Nitrous Shot', stat:'power', minCost:1800, maxCost:9200, boost:[6,15], risk:14, desc:'Huge bursts, easy to overuse.' },
-  { id:'aero', name:'Aero Package', stat:'handling', minCost:2000, maxCost:10500, boost:[5,13], risk:5, desc:'High-speed stability and downforce.' },
+  { id:'ecu', name:'ECU Tune', minCost:1200, maxCost:6800, effect:{ power:[4,12], accel:[2,6] }, relHit:[1,4], desc:'More power and response, mild reliability hit.' },
+  { id:'tires', name:'Semi-Slick Tires', minCost:900, maxCost:5500, effect:{ grip:[5,13], handling:[2,5] }, relHit:[0,2], desc:'Large grip boost and improved cornering feel.' },
+  { id:'suspension', name:'Coilover Suspension', minCost:1400, maxCost:7200, effect:{ handling:[4,11], grip:[1,4] }, relHit:[1,3], desc:'Sharper turn-in and balance through corners.' },
+  { id:'weight', name:'Weight Reduction', minCost:1600, maxCost:9800, effect:{ accel:[4,10], handling:[3,8] }, relHit:[3,8], desc:'Faster and lighter, but more fragile.' },
+  { id:'turbo', name:'Turbo Upgrade', minCost:3000, maxCost:16000, effect:{ power:[8,18], accel:[5,12] }, relHit:[4,10], desc:'Big top-end and acceleration jump.' },
+  { id:'brakes', name:'Track Brake Kit', minCost:1200, maxCost:7600, effect:{ handling:[3,8], grip:[2,6] }, relHit:[0,2], desc:'More stable late braking and transitions.' },
+  { id:'nitrous', name:'Nitrous Shot', minCost:1800, maxCost:9200, effect:{ power:[6,15], accel:[4,11] }, relHit:[5,12], desc:'Huge short-burst speed at reliability risk.' },
+  { id:'aero', name:'Aero Package', minCost:2000, maxCost:10500, effect:{ handling:[4,10], grip:[3,8] }, relHit:[1,4], desc:'Adds high-speed control and downforce.' },
 ];
 
-const STREET_RACING_EVENTS = [
-  { title:'Grid Start Pressure', prompt:'Launch lights drop and the AWD cars jump hard. What do you do?',
-    choices:[
-      { label:'Aggressive launch, chase holeshot', stat:'skill', base:58, risk:10 },
-      { label:'Controlled launch, save traction', stat:'grip', base:50, risk:4 },
-      { label:'Late launch, avoid wheelspin chaos', stat:'reliability', base:42, risk:1 },
-    ]},
-  { title:'Tight Chicane', prompt:'You enter a rapid left-right chicane two-wide.',
-    choices:[
-      { label:'Attack inside line', stat:'handling', base:56, risk:12 },
-      { label:'Settle and prioritize clean exit', stat:'grip', base:48, risk:4 },
-      { label:'Brake early and survive', stat:'reliability', base:40, risk:1 },
-    ]},
-  { title:'Long Straight Duel', prompt:'Rival pulls alongside on the longest straight.',
-    choices:[
-      { label:'Nitrous and full-send pass', stat:'power', base:60, risk:14 },
-      { label:'Slipstream, then late move', stat:'skill', base:52, risk:8 },
-      { label:'Hold lane and defend position', stat:'reliability', base:46, risk:3 },
-    ]},
-  { title:'Late Braking Zone', prompt:'Final corner braking marker appears too fast.',
-    choices:[
-      { label:'Out-brake everyone', stat:'grip', base:57, risk:12 },
-      { label:'Brake on marker, prioritize traction', stat:'handling', base:50, risk:5 },
-      { label:'Lift early and avoid contact', stat:'reliability', base:43, risk:1 },
-    ]},
-  { title:'Engine Heat Spike', prompt:'Oil temps are rising mid-race.',
-    choices:[
-      { label:'Ignore it, keep full pace', stat:'power', base:54, risk:15 },
-      { label:'Short-shift and cool engine', stat:'reliability', base:50, risk:2 },
-      { label:'Pit for quick check', stat:'skill', base:38, risk:0 },
-    ]},
-  { title:'Police Scanner Alert', prompt:'Spotter calls possible police near exit route.',
-    choices:[
-      { label:'Push now and finish before crackdown', stat:'skill', base:55, risk:13 },
-      { label:'Maintain pace and avoid spotlight', stat:'reliability', base:48, risk:5 },
-      { label:'Abort and pull out early', stat:'reliability', base:35, risk:0 },
-    ]},
-  { title:'Wet Surface Patch', prompt:'Unexpected damp patch appears at corner entry.',
-    choices:[
-      { label:'Trust setup and attack anyway', stat:'handling', base:53, risk:11 },
-      { label:'Adjust line and feather throttle', stat:'skill', base:50, risk:5 },
-      { label:'Back off heavily', stat:'reliability', base:40, risk:1 },
-    ]},
-  { title:'Rival Divebomb', prompt:'A rival divebombs from behind into your lane.',
-    choices:[
-      { label:'Counter-cut and reclaim apex', stat:'skill', base:57, risk:10 },
-      { label:'Yield, set up switchback', stat:'handling', base:49, risk:4 },
-      { label:'Let them go and secure finish', stat:'reliability', base:43, risk:1 },
-    ]},
-  { title:'Tire Degradation', prompt:'Rear grip is fading during final laps.',
-    choices:[
-      { label:'Drift-style rotation, keep speed', stat:'handling', base:54, risk:12 },
-      { label:'Smooth lines, preserve what is left', stat:'grip', base:50, risk:4 },
-      { label:'Defensive driving only', stat:'reliability', base:42, risk:1 },
-    ]},
-  { title:'Final-Lap Gambit', prompt:'Last lap. Podium is one move away.',
-    choices:[
-      { label:'All-in overtaking attempt', stat:'skill', base:60, risk:15 },
-      { label:'Wait for rival mistake', stat:'reliability', base:47, risk:3 },
-      { label:'Bank current place and points', stat:'reliability', base:44, risk:1 },
-    ]},
-];
+const STREET_RACE_RUNTIME = {
+  active:false,
+  finished:false,
+  raf:0,
+  keys:{},
+  onKeyDown:null,
+  onKeyUp:null,
+};
+
+function streetRaceClampStat(v, min=0, max=160){
+  return Math.max(min, Math.min(max, Math.round(v)));
+}
+
+function streetRaceTrackById(id){
+  return STREET_RACING_TRACKS.find(t=>t.id===id) || STREET_RACING_TRACKS[0];
+}
+
+function streetRaceCarMetaByModelId(modelId){
+  return STREET_RACING_CARS.find(c=>c.id===modelId) || STREET_RACING_CARS[0];
+}
+
+function streetRacingRecomputeCarValue(car){
+  const base = Math.max(1200, car.basePrice||car.value||5000);
+  const ageYears = Math.max(0, (G.age||0) - (car.purchasedAge||G.age||0));
+  const agePenalty = Math.min(0.62, ageYears*0.11);
+  const mileagePenalty = Math.min(0.48, (car.mileage||0)/180000);
+  const damagePenalty = Math.min(0.55, (car.damage||0)*0.008);
+  const relBonus = ((car.reliability||50)-50)/240;
+  const modBonus = (car.modBonuses?.power||0)*120 + (car.modBonuses?.accel||0)*115 + (car.modBonuses?.grip||0)*90 + (car.modBonuses?.handling||0)*95;
+  const mult = Math.max(0.12, 1 - agePenalty - mileagePenalty - damagePenalty + relBonus);
+  car.value = Math.max(900, Math.floor(base*mult + modBonus));
+  return car.value;
+}
+
+function streetRacingNormalizeCar(car, idx, r){
+  const modelId = car.modelId || car.baseId || car.id || STREET_RACING_CARS[0].id;
+  const meta = streetRaceCarMetaByModelId(modelId);
+  if(typeof r.nextCarUid!=='number') r.nextCarUid = 1;
+  const uid = typeof car.uid==='string' && car.uid ? car.uid : `car_${modelId}_${r.nextCarUid++}`;
+  const normalized = {
+    uid,
+    modelId,
+    name:car.name || meta.name,
+    class:car.class || meta.class,
+    power:streetRaceClampStat(car.power ?? meta.power),
+    accel:streetRaceClampStat(car.accel ?? car.power ?? meta.accel),
+    grip:streetRaceClampStat(car.grip ?? meta.grip),
+    handling:streetRaceClampStat(car.handling ?? Math.floor(((car.power ?? meta.power)+(car.grip ?? meta.grip))/2)),
+    reliability:streetRaceClampStat(car.reliability ?? meta.reliability, 6, 120),
+    mods:Array.isArray(car.mods)?car.mods:[],
+    modBonuses:{
+      power:streetRaceClampStat(car.modBonuses?.power||0, -99, 99),
+      accel:streetRaceClampStat(car.modBonuses?.accel||0, -99, 99),
+      grip:streetRaceClampStat(car.modBonuses?.grip||0, -99, 99),
+      handling:streetRaceClampStat(car.modBonuses?.handling||0, -99, 99),
+      reliabilityLoss:streetRaceClampStat(car.modBonuses?.reliabilityLoss||0, -99, 99),
+    },
+    value:Math.max(900, Math.floor(car.value ?? meta.price)),
+    basePrice:Math.max(1000, Math.floor(car.basePrice ?? meta.price)),
+    mileage:Math.max(0, Math.floor(car.mileage||0)),
+    damage:streetRaceClampStat(car.damage||0, 0, 100),
+    purchasedAge:typeof car.purchasedAge==='number' ? car.purchasedAge : (G.age||0),
+    races:Math.max(0, Math.floor(car.races||0)),
+    wins:Math.max(0, Math.floor(car.wins||0)),
+  };
+  streetRacingRecomputeCarValue(normalized);
+  return normalized;
+}
 
 function ensureStreetRacingState(){
   if(!G.activities || typeof G.activities!=='object') G.activities = {};
@@ -142,11 +186,13 @@ function ensureStreetRacingState(){
       activeCarId:'',
       races:0,
       wins:0,
+      losses:0,
       podiums:0,
       crashes:0,
       fines:0,
       totalPrize:0,
       maxTrackUnlocked:1,
+      nextCarUid:1,
     };
   }
   const r = G.activities.streetRacing;
@@ -158,34 +204,41 @@ function ensureStreetRacingState(){
   if(typeof r.activeCarId!=='string') r.activeCarId = '';
   if(typeof r.races!=='number') r.races = 0;
   if(typeof r.wins!=='number') r.wins = 0;
+  if(typeof r.losses!=='number') r.losses = 0;
   if(typeof r.podiums!=='number') r.podiums = 0;
   if(typeof r.crashes!=='number') r.crashes = 0;
   if(typeof r.fines!=='number') r.fines = 0;
   if(typeof r.totalPrize!=='number') r.totalPrize = 0;
   if(typeof r.maxTrackUnlocked!=='number') r.maxTrackUnlocked = 1;
+  if(typeof r.nextCarUid!=='number') r.nextCarUid = 1;
+  r.garage = r.garage.map((car,idx)=>streetRacingNormalizeCar(car, idx, r));
   if(!r.garage.length){
-    const starter = STREET_RACING_CARS[0];
-    r.garage.push({
-      id:starter.id,
-      name:starter.name,
-      class:starter.class,
-      power:starter.power,
-      grip:starter.grip,
-      handling:Math.floor((starter.power+starter.grip)/2),
-      reliability:starter.reliability,
-      mods:[],
-      value:starter.price,
-      mileage:0,
-      damage:0,
-    });
-    r.activeCarId = starter.id;
+    const starter = streetRacingNormalizeCar({
+      uid:`car_${STREET_RACING_CARS[0].id}_${r.nextCarUid++}`,
+      modelId:STREET_RACING_CARS[0].id,
+      name:STREET_RACING_CARS[0].name,
+      class:STREET_RACING_CARS[0].class,
+      power:STREET_RACING_CARS[0].power,
+      accel:STREET_RACING_CARS[0].accel,
+      grip:STREET_RACING_CARS[0].grip,
+      handling:STREET_RACING_CARS[0].handling,
+      reliability:STREET_RACING_CARS[0].reliability,
+      value:STREET_RACING_CARS[0].price,
+      basePrice:STREET_RACING_CARS[0].price,
+      purchasedAge:G.age||0,
+    }, 0, r);
+    r.garage.push(starter);
+    r.activeCarId = starter.uid;
   }
-  if(!r.activeCarId && r.garage[0]) r.activeCarId = r.garage[0].id;
+  if(!r.activeCarId || !r.garage.some(c=>c.uid===r.activeCarId)){
+    r.activeCarId = r.garage[0].uid;
+  }
 }
 
-function streetCarById(id){
+function streetCarById(uid){
   ensureStreetRacingState();
-  return G.activities.streetRacing.garage.find(c=>c.id===id) || null;
+  const r = G.activities.streetRacing;
+  return r.garage.find(c=>c.uid===uid) || r.garage.find(c=>c.modelId===uid || c.uid===uid) || null;
 }
 
 function activeStreetCar(){
@@ -194,35 +247,125 @@ function activeStreetCar(){
   return streetCarById(r.activeCarId) || r.garage[0] || null;
 }
 
+function streetRacingCarModSummary(car){
+  const m = car?.modBonuses||{};
+  const parts = [];
+  if((m.power||0)!==0) parts.push(`P ${m.power>=0?'+':''}${m.power}`);
+  if((m.accel||0)!==0) parts.push(`A ${m.accel>=0?'+':''}${m.accel}`);
+  if((m.grip||0)!==0) parts.push(`G ${m.grip>=0?'+':''}${m.grip}`);
+  if((m.handling||0)!==0) parts.push(`H ${m.handling>=0?'+':''}${m.handling}`);
+  if((m.reliabilityLoss||0)!==0) parts.push(`R -${m.reliabilityLoss}`);
+  return parts.length ? parts.join(' · ') : 'No mods';
+}
+
 function streetRacingRecalcLevel(){
   ensureStreetRacingState();
   const r = G.activities.streetRacing;
   let lvl = 1;
-  STREET_RACING_LEVELS.forEach(l=>{
-    if(r.rep>=l.minRep) lvl = l.id;
-  });
+  STREET_RACING_LEVELS.forEach(l=>{ if(r.rep>=l.minRep) lvl = l.id; });
   if(lvl>r.level){
     r.level = lvl;
-    r.maxTrackUnlocked = Math.max(r.maxTrackUnlocked, lvl);
-    addEv(`Street racing level up: ${STREET_RACING_LEVELS[lvl-1].label}. New tracks unlocked.`, 'love');
+    addEv(`Street racing level up: ${STREET_RACING_LEVELS[lvl-1].label}.`, 'love');
     flash(`🏁 Level ${lvl} unlocked`,'good');
   }
+}
+
+function streetRacingOpenGarage(){
+  ensureStreetRacingState();
+  const r = G.activities.streetRacing;
+  const rows = r.garage.map(c=>{
+    const active = c.uid===r.activeCarId;
+    const repairCost = Math.max(250, Math.floor(300 + (c.damage||0)*90 + (100-(c.reliability||50))*35));
+    const sellValue = Math.max(600, Math.floor((c.value||0) * (1 - (c.damage||0)/180)));
+    const ageYears = Math.max(0, (G.age||0) - (c.purchasedAge||G.age||0));
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--surface2)">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <div style="font-weight:700">${active?'✅ ':''}${c.name} · Class ${c.class}</div>
+          <div style="font-size:.75rem;color:var(--muted2)">Value ${fmt$(c.value||0)}</div>
+        </div>
+        <div style="font-size:.74rem;color:var(--muted2);margin:4px 0 7px">
+          P ${c.power} · A ${c.accel} · G ${c.grip} · H ${c.handling} · R ${c.reliability} · Damage ${c.damage||0}%
+          <br>Mileage ${(c.mileage||0).toLocaleString()} km · Owned ${ageYears}y · Mods: ${streetRacingCarModSummary(c)}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button class="btn ${active?'btn-primary':'btn-ghost'}" onclick="streetRacingSetActiveCar('${c.uid}')">${active?'Active':'Set Active'}</button>
+          <button class="btn btn-ghost" onclick="streetRacingRepairCar('${c.uid}')">Repair (${fmt$(repairCost)})</button>
+          <button class="btn btn-ghost" onclick="streetRacingSellCar('${c.uid}')">Sell (${fmt$(sellValue)})</button>
+        </div>
+      </div>`;
+  }).join('') || '<div style="font-size:.78rem;color:var(--muted2)">Garage is empty.</div>';
+  showPopupHTML('Street Garage', `<div style="max-height:58vh;overflow:auto;padding-right:4px">${rows}</div>`, [
+    { label:'Close', cls:'btn-primary', onClick:()=>{} },
+  ], 'dark');
+}
+
+function streetRacingSetActiveCar(uid){
+  ensureStreetRacingState();
+  const r = G.activities.streetRacing;
+  const car = streetCarById(uid);
+  if(!car){ flash('Car not found.','warn'); return; }
+  r.activeCarId = car.uid;
+  flash(`${car.name} is now active.`,'good');
+  streetRacingOpenGarage();
+  renderStreetRacingCard();
+}
+
+function streetRacingRepairCar(uid){
+  ensureStreetRacingState();
+  const car = streetCarById(uid);
+  if(!car){ flash('Car not found.','warn'); return; }
+  const cost = Math.max(250, Math.floor(300 + (car.damage||0)*90 + (100-(car.reliability||50))*35));
+  if((G.money||0)<cost){
+    flash(`Need ${fmt$(cost)} for repairs.`,'warn');
+    return;
+  }
+  G.money -= cost;
+  car.damage = Math.max(0, (car.damage||0) - rnd(35,70));
+  car.reliability = streetRaceClampStat((car.reliability||50) + rnd(12,24), 6, 120);
+  streetRacingRecomputeCarValue(car);
+  addEv(`Repaired ${car.name} for ${fmt$(cost)}.`, 'good');
+  flash('Car repaired','good');
+  streetRacingOpenGarage();
+  renderStreetRacingCard();
+  updateHUD();
+}
+
+function streetRacingSellCar(uid){
+  ensureStreetRacingState();
+  const r = G.activities.streetRacing;
+  const idx = r.garage.findIndex(c=>c.uid===uid);
+  if(idx<0){ flash('Car not found.','warn'); return; }
+  const car = r.garage[idx];
+  const sale = Math.max(600, Math.floor((car.value||0) * (1 - (car.damage||0)/180)));
+  G.money += sale;
+  r.garage.splice(idx,1);
+  if(!r.garage.length){
+    r.activeCarId = '';
+  } else if(r.activeCarId===uid){
+    r.activeCarId = r.garage[0].uid;
+  }
+  addEv(`Sold ${car.name} for ${fmt$(sale)}.`, 'warn');
+  flash(`Sold for ${fmt$(sale)}`,'good');
+  streetRacingOpenGarage();
+  renderStreetRacingCard();
+  updateHUD();
 }
 
 function streetRacingBuyCar(){
   ensureStreetRacingState();
   const r = G.activities.streetRacing;
-  const owned = new Set(r.garage.map(c=>c.id));
-  const market = STREET_RACING_CARS.filter(c=>!owned.has(c.id));
+  const ownedByModel = new Set(r.garage.map(c=>c.modelId));
+  const market = STREET_RACING_CARS.filter(c=>!ownedByModel.has(c.id));
   if(!market.length){
-    flash('You already own all available cars.','warn');
+    flash('You already own all available models.','warn');
     return;
   }
   showPopup(
     'Street Racing Market',
     'Choose a car to add to your garage.',
-    market.slice(0,6).map(c=>({
-      label:`${c.name} · ${c.class} · ${fmt$(c.price)}`,
+    market.slice(0,8).map(c=>({
+      label:`${c.name} · ${c.class} · ${fmt$(c.price)} · P${c.power} A${c.accel} G${c.grip} H${c.handling} R${c.reliability}`,
       cls:'btn-ghost',
       onClick:()=>streetRacingConfirmBuy(c.id),
     })).concat([{ label:'Cancel', cls:'btn-primary', onClick:()=>{} }]),
@@ -230,53 +373,45 @@ function streetRacingBuyCar(){
   );
 }
 
-function streetRacingConfirmBuy(carId){
+function streetRacingConfirmBuy(modelId){
   ensureStreetRacingState();
   const r = G.activities.streetRacing;
-  const base = STREET_RACING_CARS.find(c=>c.id===carId);
-  if(!base) return;
-  if(G.money < base.price){
-    flash(`Need ${fmt$(base.price)} to buy ${base.name}.`,'warn');
+  const meta = streetRaceCarMetaByModelId(modelId);
+  if((G.money||0) < meta.price){
+    flash(`Need ${fmt$(meta.price)} to buy ${meta.name}.`,'warn');
     return;
   }
-  G.money -= base.price;
-  r.garage.push({
-    id:base.id,
-    name:base.name,
-    class:base.class,
-    power:base.power,
-    grip:base.grip,
-    handling:Math.floor((base.power+base.grip)/2),
-    reliability:base.reliability,
-    mods:[],
-    value:base.price,
-    mileage:0,
-    damage:0,
-  });
-  r.activeCarId = base.id;
-  addEv(`Bought ${base.name} for ${fmt$(base.price)}. Garage expanded.`, 'good');
-  flash(`New car: ${base.name}`,'good');
+  G.money -= meta.price;
+  const car = streetRacingNormalizeCar({
+    uid:`car_${meta.id}_${r.nextCarUid++}`,
+    modelId:meta.id,
+    name:meta.name,
+    class:meta.class,
+    power:meta.power,
+    accel:meta.accel,
+    grip:meta.grip,
+    handling:meta.handling,
+    reliability:meta.reliability,
+    value:meta.price,
+    basePrice:meta.price,
+    purchasedAge:G.age||0,
+  }, r.garage.length, r);
+  r.garage.push(car);
+  r.activeCarId = car.uid;
+  addEv(`Bought ${car.name} for ${fmt$(meta.price)}.`, 'good');
+  flash(`New car: ${car.name}`,'good');
   renderStreetRacingCard();
   updateHUD();
 }
 
-function streetRacingSelectCar(){
-  ensureStreetRacingState();
-  const r = G.activities.streetRacing;
-  showPopup(
-    'Select Active Car',
-    'Choose your race car for the next event.',
-    r.garage.map(c=>({
-      label:`${c.name} · P${c.power} G${c.grip} H${c.handling} R${c.reliability}`,
-      cls: c.id===r.activeCarId ? 'btn-primary' : 'btn-ghost',
-      onClick:()=>{
-        r.activeCarId = c.id;
-        addEv(`Set ${c.name} as active race car.`, 'good');
-        renderStreetRacingCard();
-      },
-    })).concat([{ label:'Close', cls:'btn-ghost', onClick:()=>{} }]),
-    'normal'
-  );
+function streetRacingModEffectLabel(mod){
+  const parts = [];
+  Object.keys(mod.effect||{}).forEach(k=>{
+    const range = mod.effect[k];
+    parts.push(`+${k[0].toUpperCase()}${k.slice(1)} ${range[0]}-${range[1]}`);
+  });
+  parts.push(`-Reliability ${mod.relHit[0]}-${mod.relHit[1]}`);
+  return parts.join(' · ');
 }
 
 function streetRacingOpenMods(){
@@ -284,10 +419,10 @@ function streetRacingOpenMods(){
   const car = activeStreetCar();
   if(!car){ flash('No active race car selected.','warn'); return; }
   showPopup(
-    `${car.name} Mods`,
-    'Choose a modification package for your next setup.',
-    STREET_RACING_MODS.slice(0,8).map(m=>({
-      label:`${m.name} · ${fmt$(m.minCost)}-${fmt$(m.maxCost)}`,
+    `${car.name} Mod Shop`,
+    'Pick a mod package. Each mod now clearly shows stat effects.',
+    STREET_RACING_MODS.map(m=>({
+      label:`${m.name} · ${fmt$(m.minCost)}-${fmt$(m.maxCost)} · ${streetRacingModEffectLabel(m)}`,
       cls:'btn-ghost',
       onClick:()=>streetRacingApplyMod(m.id),
     })).concat([{ label:'Cancel', cls:'btn-primary', onClick:()=>{} }]),
@@ -299,22 +434,36 @@ function streetRacingApplyMod(modId){
   ensureStreetRacingState();
   const mod = STREET_RACING_MODS.find(m=>m.id===modId);
   const car = activeStreetCar();
+  const r = G.activities.streetRacing;
   if(!mod || !car) return;
   const cost = rnd(mod.minCost, mod.maxCost);
-  if(G.money<cost){
+  if((G.money||0)<cost){
     flash(`Need ${fmt$(cost)} for ${mod.name}.`,'warn');
     return;
   }
   G.money -= cost;
-  const gain = rnd(mod.boost[0], mod.boost[1]);
-  if(mod.stat==='power') car.power = clamp(car.power + gain);
-  if(mod.stat==='grip') car.grip = clamp(car.grip + gain);
-  if(mod.stat==='handling') car.handling = clamp(car.handling + gain);
-  car.reliability = clamp(car.reliability - rnd(0, mod.risk));
-  car.mods.push({ id:mod.id, name:mod.name, gain, cost });
-  if(car.mods.length>10) car.mods.shift();
-  G.activities.streetRacing.skill = clamp((G.activities.streetRacing.skill||18) + rnd(1,3));
-  addEv(`Installed ${mod.name} on ${car.name} for ${fmt$(cost)} (+${gain} ${mod.stat}).`, 'good');
+  const effectRoll = {};
+  Object.keys(mod.effect||{}).forEach(k=>{
+    const range = mod.effect[k];
+    effectRoll[k] = rnd(range[0], range[1]);
+  });
+  const relLoss = rnd(mod.relHit[0], mod.relHit[1]);
+  car.power = streetRaceClampStat((car.power||0) + (effectRoll.power||0));
+  car.accel = streetRaceClampStat((car.accel||0) + (effectRoll.accel||0));
+  car.grip = streetRaceClampStat((car.grip||0) + (effectRoll.grip||0));
+  car.handling = streetRaceClampStat((car.handling||0) + (effectRoll.handling||0));
+  car.reliability = streetRaceClampStat((car.reliability||0) - relLoss, 6, 120);
+  if(!car.modBonuses) car.modBonuses = { power:0, accel:0, grip:0, handling:0, reliabilityLoss:0 };
+  car.modBonuses.power += effectRoll.power||0;
+  car.modBonuses.accel += effectRoll.accel||0;
+  car.modBonuses.grip += effectRoll.grip||0;
+  car.modBonuses.handling += effectRoll.handling||0;
+  car.modBonuses.reliabilityLoss += relLoss;
+  car.mods.push({ id:mod.id, name:mod.name, effects:effectRoll, relLoss, cost, age:G.age||0 });
+  if(car.mods.length>14) car.mods.shift();
+  r.skill = clamp((r.skill||18) + rnd(1,3));
+  streetRacingRecomputeCarValue(car);
+  addEv(`Installed ${mod.name} on ${car.name} for ${fmt$(cost)} (${streetRacingModEffectLabel(mod)}).`, 'good');
   flash(`Mod installed: ${mod.name}`,'good');
   renderStreetRacingCard();
   updateHUD();
@@ -324,137 +473,388 @@ function streetRacingOpenTrack(){
   ensureStreetRacingState();
   const r = G.activities.streetRacing;
   const unlocked = STREET_RACING_TRACKS.filter(t=>t.reqLevel<=r.level);
+  if(!unlocked.length){
+    flash('No tracks unlocked yet. Earn more rep first.','warn');
+    return;
+  }
   showPopup(
-    'Choose Race Track',
-    'Pick your race location and stakes.',
+    '2D Race Tracks',
+    'Launch an actual playable race map. Arrow keys or WASD to drive.',
     unlocked.map(t=>({
-      label:`${t.name} · Lv${t.reqLevel}+ · Entry ${fmt$(t.entry[0])}-${fmt$(t.entry[1])}`,
+      label:`${t.name} · Difficulty ${t.difficulty} · Laps ${t.laps} · Entry ${fmt$(t.entry[0])}-${fmt$(t.entry[1])}`,
       cls:'btn-ghost',
-      onClick:()=>streetRacingRunRace(t.id),
+      onClick:()=>streetRacingLaunchMiniRace(t.id),
     })).concat([{ label:'Cancel', cls:'btn-primary', onClick:()=>{} }]),
     'normal'
   );
 }
 
-function streetRaceStatForChoice(car, choice, racingSkill){
-  if(choice.stat==='power') return car.power;
-  if(choice.stat==='grip') return car.grip;
-  if(choice.stat==='handling') return car.handling;
-  if(choice.stat==='reliability') return car.reliability;
-  return racingSkill;
+function streetRaceBuildPathMetrics(points){
+  const segs = [];
+  let total = 0;
+  for(let i=0;i<points.length;i++){
+    const a = points[i];
+    const b = points[(i+1)%points.length];
+    const dx = b[0]-a[0];
+    const dy = b[1]-a[1];
+    const len = Math.hypot(dx,dy) || 1;
+    segs.push({ ax:a[0], ay:a[1], bx:b[0], by:b[1], dx, dy, len, cum:total });
+    total += len;
+  }
+  return { points, segs, total:Math.max(1,total) };
 }
 
-function streetRacingRunRace(trackId){
+function streetRaceProjectToPath(x, y, metrics){
+  let best = null;
+  metrics.segs.forEach(s=>{
+    const vx = x - s.ax;
+    const vy = y - s.ay;
+    const t = Math.max(0, Math.min(1, (vx*s.dx + vy*s.dy) / (s.len*s.len)));
+    const px = s.ax + s.dx*t;
+    const py = s.ay + s.dy*t;
+    const dist = Math.hypot(x-px, y-py);
+    if(!best || dist<best.dist){
+      best = { dist, px, py, seg:s, t, progress:s.cum + s.len*t };
+    }
+  });
+  return best;
+}
+
+function streetRacePointAtDistance(metrics, d){
+  const wrapped = ((d%metrics.total)+metrics.total)%metrics.total;
+  const seg = metrics.segs.find(s=>wrapped>=s.cum && wrapped<=s.cum+s.len) || metrics.segs[0];
+  const t = Math.max(0, Math.min(1, (wrapped-seg.cum)/seg.len));
+  return { x:seg.ax + seg.dx*t, y:seg.ay + seg.dy*t, angle:Math.atan2(seg.dy, seg.dx) };
+}
+
+function streetRaceTimeFmt(ms){
+  const sec = Math.max(0, Math.floor(ms/1000));
+  const m = Math.floor(sec/60);
+  const s = String(sec%60).padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+function streetRaceDrawCar(ctx, x, y, angle, color, label){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.fillRect(-11,-7,22,14);
+  ctx.fillStyle = '#dbeafe';
+  ctx.fillRect(0,-5,8,10);
+  ctx.fillStyle = '#0b0f17';
+  ctx.fillRect(-9,-6,3,3);
+  ctx.fillRect(-9,3,3,3);
+  ctx.fillRect(6,-6,3,3);
+  ctx.fillRect(6,3,3,3);
+  ctx.restore();
+  if(label){
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = '11px system-ui';
+    ctx.fillText(label, x-10, y-12);
+  }
+}
+
+function streetRacingDrawMiniRace(runtime){
+  const { ctx, canvas, track, path } = runtime;
+  const theme = track.theme||{ bg:'#111827', road:'#374151', line:'#a7f3d0' };
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.strokeStyle = '#0b0f18';
+  ctx.lineWidth = track.width + 12;
+  ctx.beginPath();
+  path.points.forEach((p,idx)=>{
+    if(idx===0) ctx.moveTo(p[0],p[1]); else ctx.lineTo(p[0],p[1]);
+  });
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.strokeStyle = theme.road;
+  ctx.lineWidth = track.width;
+  ctx.beginPath();
+  path.points.forEach((p,idx)=>{
+    if(idx===0) ctx.moveTo(p[0],p[1]); else ctx.lineTo(p[0],p[1]);
+  });
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.strokeStyle = theme.line;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8,8]);
+  ctx.beginPath();
+  path.points.forEach((p,idx)=>{
+    if(idx===0) ctx.moveTo(p[0],p[1]); else ctx.lineTo(p[0],p[1]);
+  });
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const startA = path.points[0];
+  const startB = path.points[1];
+  const ang = Math.atan2(startB[1]-startA[1], startB[0]-startA[0]) + Math.PI/2;
+  ctx.save();
+  ctx.translate(startA[0], startA[1]);
+  ctx.rotate(ang);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-track.width*0.45, -3, track.width*0.9, 6);
+  ctx.restore();
+
+  streetRaceDrawCar(ctx, runtime.ai.x, runtime.ai.y, runtime.ai.angle, '#ef4444', 'Rival');
+  streetRaceDrawCar(ctx, runtime.player.x, runtime.player.y, runtime.player.angle, '#60a5fa', 'You');
+}
+
+function streetRacingMiniRaceCleanup(){
+  const rt = STREET_RACE_RUNTIME;
+  if(rt.raf) cancelAnimationFrame(rt.raf);
+  rt.raf = 0;
+  if(rt.onKeyDown) window.removeEventListener('keydown', rt.onKeyDown);
+  if(rt.onKeyUp) window.removeEventListener('keyup', rt.onKeyUp);
+  rt.onKeyDown = null;
+  rt.onKeyUp = null;
+  rt.keys = {};
+  rt.active = false;
+}
+
+function streetRacingAbortMiniRace(){
+  const rt = STREET_RACE_RUNTIME;
+  if(!rt.active || rt.finished) return;
+  rt.finished = true;
+  streetRacingMiniRaceCleanup();
   ensureStreetRacingState();
   const r = G.activities.streetRacing;
-  const track = STREET_RACING_TRACKS.find(t=>t.id===trackId);
+  r.races += 1;
+  r.losses += 1;
+  r.rep = Math.max(0, r.rep - rnd(4,10));
+  r.heat = clamp((r.heat||0) + rnd(2,6));
+  addEv('You forfeited the race and took a reputation hit.', 'warn');
+  flash('Race forfeited','warn');
+  renderStreetRacingCard();
+  updateHUD();
+}
+
+function streetRacingResolveMiniRace(track, entry, winner){
+  ensureStreetRacingState();
+  const r = G.activities.streetRacing;
   const car = activeStreetCar();
-  if(!track || !car) return;
+  if(!car) return;
+  const rt = STREET_RACE_RUNTIME;
+  const elapsedMs = Math.max(0, Math.floor(performance.now() - (rt.startTs||performance.now())));
+  const offTrackHits = Math.floor((rt.offTrackFrames||0)/16);
+  r.races += 1;
+  car.races = (car.races||0) + 1;
+  car.mileage = Math.max(0, (car.mileage||0) + Math.floor(track.lengthKm*110) + Math.floor(elapsedMs/500));
+  car.damage = streetRaceClampStat((car.damage||0) + Math.max(0, offTrackHits-rnd(0,3)), 0, 100);
+  r.heat = clamp((r.heat||0) + rnd(1,6) + track.difficulty*2 + Math.floor(offTrackHits/2));
+
+  let payout = 0;
+  if(winner==='player'){
+    payout = rnd(track.payout[0], track.payout[1]) + Math.floor((car.power+car.accel+car.grip+car.handling)/5);
+    G.money += payout;
+    r.totalPrize += payout;
+    r.wins += 1;
+    r.podiums += 1;
+    car.wins = (car.wins||0) + 1;
+    r.rep += rnd(12,22) + track.difficulty*4;
+    r.skill = clamp((r.skill||18) + rnd(2,5));
+    G.happy = clamp((G.happy||50) + rnd(5,11));
+    G.stress = clamp((G.stress||35) - rnd(2,7));
+    addEv(`2D race win at ${track.name}. Prize: ${fmt$(payout)}. Time: ${streetRaceTimeFmt(elapsedMs)}.`, 'love');
+    flash('🏁 You won the race!', 'good');
+  } else {
+    r.losses += 1;
+    r.rep = Math.max(0, r.rep - rnd(3,9));
+    r.skill = clamp((r.skill||18) + rnd(0,2));
+    G.stress = clamp((G.stress||35) + rnd(2,8));
+    if(Math.random()<0.28){
+      const fine = rnd(900,5400);
+      G.money = Math.max(0, (G.money||0) - fine);
+      r.fines += fine;
+      addEv(`Race loss at ${track.name}. Enforcement fine: ${fmt$(fine)}.`, 'bad');
+    } else {
+      addEv(`You lost at ${track.name}. Rival pace and errors cost the run.`, 'warn');
+    }
+    flash('Race lost', 'warn');
+  }
+
+  if((car.damage||0)>=72){
+    const repair = Math.floor(2200 + car.damage*70);
+    if((G.money||0)>=repair && Math.random()<0.6){
+      G.money -= repair;
+      car.damage = Math.max(10, (car.damage||0) - rnd(28,45));
+      addEv(`Post-race repair on ${car.name}: ${fmt$(repair)}.`, 'warn');
+    } else if(Math.random()<0.35){
+      car.reliability = streetRaceClampStat((car.reliability||50) - rnd(5,11), 6, 120);
+      addEv(`${car.name} remains battered. Reliability dropped.`, 'bad');
+    }
+  }
+
+  streetRacingRecomputeCarValue(car);
+  streetRacingRecalcLevel();
+  renderStreetRacingCard();
+  updateHUD();
+}
+
+function streetRacingMiniRaceLoop(){
+  const rt = STREET_RACE_RUNTIME;
+  if(!rt.active || rt.finished) return;
+  if(!document.getElementById('street-race-canvas')){
+    streetRacingMiniRaceCleanup();
+    return;
+  }
+  const now = performance.now();
+  const dt = Math.min(42, Math.max(10, now - (rt.lastTs||now)));
+  rt.lastTs = now;
+  const ds = dt / 16.67;
+  const p = rt.player;
+  const keys = rt.keys;
+  const throttle = !!(keys.arrowup || keys.w);
+  const brake = !!(keys.arrowdown || keys.s);
+  const left = !!(keys.arrowleft || keys.a);
+  const right = !!(keys.arrowright || keys.d);
+  if(throttle) p.speed += p.accelRate*ds;
+  if(brake) p.speed -= p.brakeRate*ds;
+  p.speed *= Math.pow(p.drag, ds);
+  if(Math.abs(p.speed)<0.02) p.speed = 0;
+  const turnInput = (left?-1:0) + (right?1:0);
+  const turnRate = p.turnRate * (0.35 + Math.min(1, Math.abs(p.speed)/Math.max(0.1,p.maxSpeed)));
+  p.angle += turnInput * turnRate * ds * (p.speed>=0 ? 1 : -1);
+  p.x += Math.cos(p.angle) * p.speed * ds * p.speedScale;
+  p.y += Math.sin(p.angle) * p.speed * ds * p.speedScale;
+
+  const proj = streetRaceProjectToPath(p.x, p.y, rt.path);
+  if(proj.dist > rt.track.width*0.58){
+    p.speed *= 0.9;
+    rt.offTrackFrames += 1;
+    if(rt.offTrackFrames%22===0){
+      rt.playerCar.damage = streetRaceClampStat((rt.playerCar.damage||0) + 1, 0, 100);
+    }
+  }
+  if(p.prevProgress > rt.path.total*0.86 && proj.progress < rt.path.total*0.14 && Math.abs(p.speed)>0.6){
+    p.lap += 1;
+  }
+  p.prevProgress = proj.progress;
+
+  rt.ai.progress += rt.ai.speed * ds;
+  if(rt.ai.progress>=rt.path.total){
+    rt.ai.progress -= rt.path.total;
+    rt.ai.lap += 1;
+  }
+  const aiPoint = streetRacePointAtDistance(rt.path, rt.ai.progress);
+  rt.ai.x = aiPoint.x;
+  rt.ai.y = aiPoint.y;
+  rt.ai.angle = aiPoint.angle;
+
+  if(p.lap>=rt.track.laps || rt.ai.lap>=rt.track.laps){
+    rt.finished = true;
+    const playerWins = p.lap>rt.ai.lap || (p.lap===rt.ai.lap && p.prevProgress>=rt.ai.progress);
+    streetRacingMiniRaceCleanup();
+    streetRacingResolveMiniRace(rt.track, rt.entry, playerWins?'player':'ai');
+    return;
+  }
+
+  streetRacingDrawMiniRace(rt);
+  const statusEl = document.getElementById('street-race-status');
+  if(statusEl){
+    statusEl.innerHTML = `
+      <div><strong>${rt.track.name}</strong> · Lap ${Math.min(rt.track.laps, p.lap+1)}/${rt.track.laps}</div>
+      <div>Time ${streetRaceTimeFmt(now-rt.startTs)} · Speed ${Math.floor(Math.abs(p.speed)*48)} km/h</div>
+      <div>You: ${p.lap+1}/${rt.track.laps} · Rival: ${Math.min(rt.track.laps, rt.ai.lap+1)}/${rt.track.laps} · Off-track ${Math.floor(rt.offTrackFrames/16)}</div>
+    `;
+  }
+  rt.raf = requestAnimationFrame(streetRacingMiniRaceLoop);
+}
+
+function streetRacingStartMiniRace(track, car, entry){
+  const canvas = document.getElementById('street-race-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if(!ctx){
+    flash('Canvas race unavailable in this browser.','warn');
+    return;
+  }
+  const path = streetRaceBuildPathMetrics(track.path);
+  const start = streetRacePointAtDistance(path, path.total*0.02);
+  const aiStart = streetRacePointAtDistance(path, path.total*0.12);
+  const rt = STREET_RACE_RUNTIME;
+  rt.active = true;
+  rt.finished = false;
+  rt.track = track;
+  rt.entry = entry;
+  rt.canvas = canvas;
+  rt.ctx = ctx;
+  rt.path = path;
+  rt.startTs = performance.now();
+  rt.lastTs = rt.startTs;
+  rt.offTrackFrames = 0;
+  rt.playerCar = car;
+  rt.player = {
+    x:start.x, y:start.y, angle:start.angle, speed:0,
+    maxSpeed:2.1 + (car.power/68) + (car.accel/92),
+    accelRate:0.045 + (car.accel/3500),
+    brakeRate:0.06 + (car.grip/3600),
+    drag:0.982 - Math.min(0.03, track.difficulty*0.005),
+    turnRate:0.042 + (car.handling/3100) + (car.grip/5200),
+    speedScale:1 + (car.power/260),
+    lap:0,
+    prevProgress:path.total*0.02,
+  };
+  rt.ai = {
+    progress:path.total*0.12,
+    speed:2.0 + track.difficulty*0.22 + Math.max(0, (track.reqLevel - (G.activities.streetRacing.level||1))*0.1),
+    x:aiStart.x, y:aiStart.y, angle:aiStart.angle, lap:0,
+  };
+  rt.keys = {};
+  rt.onKeyDown = (e)=>{
+    const k = String(e.key||'').toLowerCase();
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){
+      rt.keys[k] = true;
+      e.preventDefault();
+    }
+  };
+  rt.onKeyUp = (e)=>{
+    const k = String(e.key||'').toLowerCase();
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){
+      rt.keys[k] = false;
+      e.preventDefault();
+    }
+  };
+  window.addEventListener('keydown', rt.onKeyDown);
+  window.addEventListener('keyup', rt.onKeyUp);
+  streetRacingMiniRaceLoop();
+}
+
+function streetRacingLaunchMiniRace(trackId){
+  ensureStreetRacingState();
+  const r = G.activities.streetRacing;
+  const track = streetRaceTrackById(trackId);
+  const car = activeStreetCar();
+  if(!car){ flash('Buy a car first.','warn'); return; }
+  if((r.level||1) < (track.reqLevel||1)){
+    flash(`Need street racing level ${track.reqLevel} for ${track.name}.`,'warn');
+    return;
+  }
   const entry = rnd(track.entry[0], track.entry[1]);
-  if(G.money<entry){
+  if((G.money||0)<entry){
     flash(`Need ${fmt$(entry)} entry fee for ${track.name}.`,'warn');
     return;
   }
-  const ev = pick(STREET_RACING_EVENTS);
-  showPopup(
-    `${track.name} Race Night`,
-    `${ev.prompt}\n\nCar: ${car.name} · Level ${r.level} · Entry ${fmt$(entry)}`,
-    ev.choices.map(ch=>({
-      label:ch.label,
-      cls:'btn-ghost',
-      onClick:()=>streetRacingResolveRace(track, car, ev, ch, entry),
-    })).concat([{ label:'Cancel', cls:'btn-primary', onClick:()=>{} }]),
-    'normal'
-  );
-}
-
-function streetRacingResolveRace(track, car, ev, choice, entry){
-  ensureStreetRacingState();
-  const r = G.activities.streetRacing;
   G.money -= entry;
-  const raceSkill = r.skill||18;
-  const choiceStat = streetRaceStatForChoice(car, choice, raceSkill);
-  const pace = Math.floor(car.power*0.38 + car.grip*0.31 + car.handling*0.31 + raceSkill*0.8 + r.level*7);
-  const riskPenalty = rnd(0, track.hazard + choice.risk + Math.max(0, 60-car.reliability));
-  const roll = pace + choiceStat + rnd(-20,24) + choice.base - riskPenalty;
-  r.races += 1;
-  car.mileage = (car.mileage||0) + rnd(40,120);
-  let resultType = 'warn';
-  let resultMsg = '';
-  let prize = 0;
-  if(roll>=180){
-    prize = rnd(track.payout[0], track.payout[1]) + rnd(track.payout[0], track.payout[1]);
-    G.money += prize;
-    r.wins += 1;
-    r.podiums += 1;
-    r.rep += rnd(18,32);
-    r.skill = clamp(r.skill + rnd(4,8));
-    G.happy = clamp(G.happy + rnd(8,14));
-    G.social.reputation = clamp((G.social.reputation||50) + rnd(3,8));
-    resultType = 'love';
-    resultMsg = `Dominant win at ${track.name}. ${choice.label} paid off. Prize: ${fmt$(prize)}.`;
-  } else if(roll>=145){
-    prize = rnd(track.payout[0], track.payout[1]);
-    G.money += prize;
-    r.podiums += 1;
-    r.rep += rnd(10,20);
-    r.skill = clamp(r.skill + rnd(2,5));
-    G.happy = clamp(G.happy + rnd(4,9));
-    resultType = 'good';
-    resultMsg = `Strong finish at ${track.name}. You made podium money: ${fmt$(prize)}.`;
-  } else if(roll>=112){
-    r.rep += rnd(3,9);
-    r.skill = clamp(r.skill + rnd(1,3));
-    G.stress = clamp((G.stress||35) + rnd(1,4));
-    resultType = 'warn';
-    resultMsg = `Mid-pack run at ${track.name}. You learned, but profit was thin this round.`;
-  } else if(roll>=84){
-    r.rep = Math.max(0, r.rep - rnd(4,10));
-    r.skill = clamp(r.skill + rnd(0,2));
-    G.stress = clamp((G.stress||35) + rnd(3,8));
-    car.damage = clamp((car.damage||0) + rnd(8,20));
-    resultType = 'bad';
-    resultMsg = `Rough race at ${track.name}. Contact and mistakes cost you position.`;
-  } else {
-    r.rep = Math.max(0, r.rep - rnd(10,22));
-    r.crashes += 1;
-    car.damage = clamp((car.damage||0) + rnd(20,40));
-    G.health = clamp(G.health - rnd(4,12));
-    G.stress = clamp((G.stress||35) + rnd(7,14));
-    resultType = 'bad';
-    resultMsg = `Crash at ${track.name}. ${choice.label} backfired under pressure.`;
-    if(Math.random()<0.45){
-      const fine = rnd(1200,8500);
-      G.money = Math.max(0, G.money - fine);
-      r.fines += fine;
-      r.heat = clamp((r.heat||0) + rnd(8,16));
-      addEv(`Police crackdown after the crash. Fine paid: ${fmt$(fine)}.`, 'bad');
-    }
-  }
-  r.totalPrize += prize;
-  r.heat = clamp((r.heat||0) + rnd(1,6) + Math.floor(track.hazard/12));
-  if(r.heat>65 && Math.random()<0.28){
-    const extraFine = rnd(1800,12000);
-    G.money = Math.max(0, G.money - extraFine);
-    r.fines += extraFine;
-    addEv(`Heat spike triggered extra enforcement. You paid ${fmt$(extraFine)} in penalties.`, 'bad');
-  }
-  if(car.damage>=70){
-    const repair = rnd(3500,16000);
-    if(G.money>=repair){
-      G.money -= repair;
-      car.damage = Math.max(12, car.damage - rnd(35,55));
-      addEv(`Emergency repairs on ${car.name}: ${fmt$(repair)}.`, 'warn');
-    } else if(Math.random()<0.25){
-      car.reliability = Math.max(10, car.reliability - rnd(8,16));
-      addEv(`${car.name} remains heavily damaged. Reliability dropped.`, 'bad');
-    }
-  }
-  streetRacingRecalcLevel();
-  addEv(resultMsg, resultType);
-  flash(resultType==='bad' ? 'Race ended badly' : 'Race completed', resultType==='bad'?'bad':'good');
-  renderStreetRacingCard();
-  updateHUD();
+  const html = `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:.78rem;color:var(--muted2)">
+        Car: <strong>${car.name}</strong> · Stats P${car.power} A${car.accel} G${car.grip} H${car.handling} R${car.reliability}
+        <br>Track: <strong>${track.name}</strong> · Difficulty ${track.difficulty} · Laps ${track.laps} · Entry ${fmt$(entry)}
+      </div>
+      <canvas id="street-race-canvas" width="700" height="540" style="width:100%;max-width:700px;border:1px solid var(--border);border-radius:10px;background:#0b0f17"></canvas>
+      <div id="street-race-status" style="font-size:.78rem;color:var(--muted2)">Use Arrow keys or WASD to drive. Stay on track.</div>
+    </div>`;
+  showPopupHTML(`🏁 2D Race: ${track.name}`, html, [
+    { label:'Forfeit Race', cls:'btn-ghost', onClick:()=>streetRacingAbortMiniRace() },
+  ], 'dark');
+  setTimeout(()=>streetRacingStartMiniRace(track, car, entry), 20);
 }
 
 function renderStreetRacingCard(){
@@ -470,39 +870,42 @@ function renderStreetRacingCard(){
   }
   const r = G.activities.streetRacing;
   const car = activeStreetCar();
-  const lvlMeta = STREET_RACING_LEVELS[Math.max(0, r.level-1)] || STREET_RACING_LEVELS[0];
+  const lvlMeta = STREET_RACING_LEVELS[Math.max(0, (r.level||1)-1)] || STREET_RACING_LEVELS[0];
+  const unlockedCount = STREET_RACING_TRACKS.filter(t=>t.reqLevel<=r.level).length;
   card.innerHTML = `
     <div class="card-title">Street Racing</div>
     <div style="font-size:.78rem;color:var(--muted2);margin-bottom:10px">
       Level: <strong>${lvlMeta.label}</strong> · Rep ${r.rep} · Skill ${r.skill} · Heat ${r.heat}
     </div>
     <div style="margin-bottom:10px;font-size:.76rem;color:var(--muted2)">
-      Active Car: ${car?`${car.name} (P${car.power} G${car.grip} H${car.handling} R${car.reliability} DMG ${car.damage||0})`:'None'}
+      Active Car: ${car?`${car.name} (P${car.power} A${car.accel} G${car.grip} H${car.handling} R${car.reliability} DMG ${car.damage||0}%)`:'None'}
+      ${car?`<br>Mods: ${streetRacingCarModSummary(car)} · Value ${fmt$(car.value||0)} · Mileage ${(car.mileage||0).toLocaleString()} km`:''}
     </div>
     <div class="choice-grid">
+      <div class="choice" onclick="streetRacingOpenGarage()">
+        <div class="choice-icon">🧰</div>
+        <div class="choice-name">Garage</div>
+        <div class="choice-desc">View cars, sell, repair, set active</div>
+      </div>
       <div class="choice" onclick="streetRacingBuyCar()">
         <div class="choice-icon">🚗</div>
         <div class="choice-name">Buy Car</div>
-        <div class="choice-desc">Expand your garage</div>
-      </div>
-      <div class="choice" onclick="streetRacingSelectCar()">
-        <div class="choice-icon">🛞</div>
-        <div class="choice-name">Choose Car</div>
-        <div class="choice-desc">Set active racer</div>
+        <div class="choice-desc">Add a new model to your garage</div>
       </div>
       <div class="choice" onclick="streetRacingOpenMods()">
         <div class="choice-icon">🔧</div>
-        <div class="choice-name">Install Mods</div>
-        <div class="choice-desc">Popup mod choices</div>
+        <div class="choice-name">Mod Shop</div>
+        <div class="choice-desc">See exact stat effects before buying</div>
       </div>
       <div class="choice" onclick="streetRacingOpenTrack()">
-        <div class="choice-icon">🏁</div>
-        <div class="choice-name">Race Track</div>
-        <div class="choice-desc">Choose level + track</div>
+        <div class="choice-icon">🗺️</div>
+        <div class="choice-name">2D Race Tracks</div>
+        <div class="choice-desc">${unlockedCount}/3 maps unlocked · playable mini-game</div>
       </div>
     </div>
     <div style="margin-top:10px;font-size:.74rem;color:var(--muted2)">
-      Races ${r.races} · Wins ${r.wins} · Podiums ${r.podiums} · Crashes ${r.crashes} · Fines ${fmt$(r.fines)} · Total Prize ${fmt$(r.totalPrize)}
+      Races ${r.races} · Wins ${r.wins} · Losses ${r.losses} · Podiums ${r.podiums} · Crashes ${r.crashes}
+      · Fines ${fmt$(r.fines)} · Total Prize ${fmt$(r.totalPrize)}
     </div>
   `;
 }
@@ -514,7 +917,20 @@ function streetRacingHeatCooldownYear(){
   if((r.heat||0)>=70 && Math.random()<0.2){
     const fine = rnd(800,5200);
     G.money = Math.max(0, (G.money||0) - fine);
+    r.fines += fine;
     addEv(`Street racing heat drew enforcement attention. Fine paid: ${fmt$(fine)}.`, 'warn');
+  }
+  let depreciationEvents = 0;
+  (r.garage||[]).forEach(car=>{
+    const before = car.value||0;
+    const wear = rnd(0,2) + Math.floor((car.mileage||0)/24000);
+    car.reliability = streetRaceClampStat((car.reliability||50) - wear, 6, 120);
+    if(Math.random()<0.22) car.damage = streetRaceClampStat((car.damage||0) + rnd(1,4), 0, 100);
+    streetRacingRecomputeCarValue(car);
+    if(before - (car.value||0) > 1200) depreciationEvents += 1;
+  });
+  if(depreciationEvents>0){
+    addEv(`Your garage depreciated over time (${depreciationEvents} car${depreciationEvents>1?'s':''} dropped in value).`, 'warn');
   }
 }
 
