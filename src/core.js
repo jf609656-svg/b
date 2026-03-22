@@ -945,6 +945,65 @@ function ensureBioShape(){
   if(typeof G.repro.dueAge!=='number') G.repro.dueAge = 0;
   if(typeof G.repro.partnerName!=='string') G.repro.partnerName = '';
   if(typeof G.repro.source!=='string') G.repro.source = '';
+  if(!G.skills || typeof G.skills!=='object') G.skills = {};
+  if(!G.skills.instruments || typeof G.skills.instruments!=='object') G.skills.instruments = {};
+  if(!G.clubs || typeof G.clubs!=='object'){
+    G.clubs = {
+      orchestra:{
+        joined:false,
+        rank:0,
+        years:0,
+        centerTierUnlocked:1,
+        performances:0,
+        bestReview:0,
+        warnings:0,
+        kickedOut:false,
+      },
+    };
+  }
+  if(!G.clubs.orchestra || typeof G.clubs.orchestra!=='object'){
+    G.clubs.orchestra = {
+      joined:false,
+      rank:0,
+      years:0,
+      centerTierUnlocked:1,
+      performances:0,
+      bestReview:0,
+      warnings:0,
+      kickedOut:false,
+    };
+  }
+  const o = G.clubs.orchestra;
+  if(typeof o.joined!=='boolean') o.joined = false;
+  if(typeof o.rank!=='number') o.rank = 0;
+  if(typeof o.years!=='number') o.years = 0;
+  if(typeof o.centerTierUnlocked!=='number') o.centerTierUnlocked = 1;
+  if(typeof o.performances!=='number') o.performances = 0;
+  if(typeof o.bestReview!=='number') o.bestReview = 0;
+  if(typeof o.warnings!=='number') o.warnings = 0;
+  if(typeof o.kickedOut!=='boolean') o.kickedOut = false;
+  if(!G.streetRacing || typeof G.streetRacing!=='object'){
+    G.streetRacing = {
+      level:1, xp:0, rep:0, cashWon:0,
+      garage:[], activeCarId:null, wins:0, losses:0, races:0,
+      unlockedTracks:['dockyard_loop'], unlockedTiers:1,
+      busted:false, cooldown:0,
+    };
+  }
+  const sr = G.streetRacing;
+  if(typeof sr.level!=='number') sr.level = 1;
+  if(typeof sr.xp!=='number') sr.xp = 0;
+  if(typeof sr.rep!=='number') sr.rep = 0;
+  if(typeof sr.cashWon!=='number') sr.cashWon = 0;
+  if(!Array.isArray(sr.garage)) sr.garage = [];
+  if(typeof sr.activeCarId!=='string') sr.activeCarId = null;
+  if(typeof sr.wins!=='number') sr.wins = 0;
+  if(typeof sr.losses!=='number') sr.losses = 0;
+  if(typeof sr.races!=='number') sr.races = 0;
+  if(!Array.isArray(sr.unlockedTracks)) sr.unlockedTracks = ['dockyard_loop'];
+  if(typeof sr.unlockedTiers!=='number') sr.unlockedTiers = 1;
+  if(typeof sr.busted!=='boolean') sr.busted = false;
+  if(typeof sr.cooldown!=='number') sr.cooldown = 0;
 }
 
 function runDirectorYearPass(){
@@ -2749,6 +2808,13 @@ function ageUp(){
         acc.followers = Math.max(0, acc.followers - loss);
       });
     }
+  }
+
+  if(typeof orchestraYearlyProgress==='function'){
+    runYearStepSafe('clubs_orchestra', ()=>orchestraYearlyProgress());
+  }
+  if(typeof streetRacingHeatCooldownYear==='function'){
+    runYearStepSafe('street_racing_heat', ()=>streetRacingHeatCooldownYear());
   }
 
   // ── Crime: heat decay & retaliation ─────────────────────────
