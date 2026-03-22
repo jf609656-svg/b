@@ -7,8 +7,12 @@
 const G = {
   // identity
   gender:'', firstname:'', lastname:'', state:'', age:0,
+  sportsBoostChoice:'none',
+  sportsBoost:0,
+  fertilityBase:null,
+  repro:{ pregnant:false, dueAge:0, partnerName:'', source:'' },
   // stats (0-100)
-  health:80, happy:70, smarts:50, looks:50,
+  health:80, happy:70, smarts:50, looks:50, stress:35,
   // money (raw dollars)
   money:0,
   // relationships extended
@@ -19,6 +23,26 @@ const G = {
   assets: { home:false, homeValue:0, savings:0 },   // shared assets tracked for divorce
   finance:{
     rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
+    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0, growthEtf:0, dividendFund:0, commodities:0, treasuries:0 },
+    crypto:{
+      btc:0, eth:0, sol:0, meme:0,
+      marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'',
+      prices:{ btc:100, eth:100, sol:100, meme:100 }, history:[],
+      dayTradesThisYear:0, traderSkill:20, tradesWon:0, tradesLost:0,
+    },
+    business:{
+      active:false, name:'', sector:'', stage:'idea',
+      employees:0, reputation:50, product:45, operations:45, marketing:40,
+      burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+      startupId:'', difficulty:1, complexity:20, managementSkill:24, founderExp:0,
+      customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
+    },
+    empire:{
+      holdings:[], nextHoldingId:1,
+      totalAcquisitions:0, totalFranchises:0, totalSmallBiz:0,
+      lastYearCashflow:0, lastYearValueDelta:0,
+    },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
       lastStateRate:0, lastYearSummary:null, delinquentYears:0,
@@ -28,11 +52,24 @@ const G = {
   relTab: 'family',     // which sub-tab is active
   // relationships
   family:[], friends:[], lovers:[],
+  pets:[],
   traits:[],
   familyFlags:{ parentsDivorced:false, stepFamilyAdded:false },
   // history
   lifeEvents:[], yearEvents:[],
   travel:{ log:[], visited:[] },
+  // simulation director telemetry
+  sim:{
+    mode:'balanced',
+    director:{
+      lastPressure:0,
+      lastRecovery:0,
+      lastNet:0,
+      lastStressDelta:0,
+      lastAge:0,
+      history:[],
+    },
+  },
   // school
   school:{
     stage:'none',
@@ -110,6 +147,7 @@ const G = {
     reputation:50,
     drugFlags:{},     // { substanceId: true/false, substanceId_hooked: true/false }
     dramaFlags:{},
+    exLovers:[],
   },
   // health
   medical:{
@@ -173,9 +211,41 @@ const G = {
     stockValue:0,
     benefits:{ healthPlan:false, retirement:false },
     milestones:[],
+    track:'specialist',
+    influence:45,
+    burnout:12,
+    layoffShield:20,
+    certifications:[],
+    careerActionsUsed:0,
+    trackCooldown:0,
     medSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false },
     lawSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false },
     licenses:{ medical:false, law:false },
+    medicalCareer:{
+      active:false,
+      stage:'none', // none|junior_doctor|specialist_training|consultant
+      specialization:null, // surgery|psychiatry|general_practice
+      yearsInStage:0,
+      yearsTotal:0,
+      hospitalId:'county_general',
+      policy:'balanced', // care_first|balanced|profit_first
+      suspendedYears:0,
+      stats:{ knowledge:40, skill:34, stress:28, reputation:42, ethics:62, burnout:14 },
+      annual:{
+        actionsUsed:0, timeUsed:0, shifts:0, rest:0,
+        patientsSeen:0, diagnosed:0, correctDx:0, uncertainDx:0, misDx:0,
+        outcomes:{ success:0, partial:0, failure:0, critical:0 },
+        lawsuits:0, bonuses:0, penalties:0,
+      },
+      insurance:{ active:true, coverage:65, premium:4500, deductible:12000 },
+      hospital:{ quality:58, funding:52, volume:55, type:'public' },
+      patientQueue:[],
+      resolvedCases:[],
+      nextCaseId:1,
+      underInvestigation:false,
+      investigationRisk:0,
+      pendingSpecialization:false,
+    },
   },
   // acting
   acting:{
@@ -298,6 +368,7 @@ const G = {
     injuries:[],
     injured:false,
     recoveryWeeks:0,
+    bjjBelt:'White Belt',
     trainingSessionsThisYear:0,
     sparsThisYear:0,
     compsThisYear:0,
@@ -350,12 +421,109 @@ const G = {
     skills:{ scam:0, hack:0, violence:0 },
     crew:[],
     currentHeist:null,
+    heists:{
+      active:null,
+      history:[],
+      market:{},
+      planningQuality:0,
+      crewEfficiency:0,
+      betrayalRisk:0,
+      cooldown:0,
+      totalTake:0,
+      setupPopupSeen:[],
+    },
     police:{ closeness:0, arrested:false, sentence:0, inPrison:false },
     prison:{ respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } },
-    gang:{ joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 },
-    drugs:{ active:false, tier:'low', supply:0, model:'street', heatMult:1.0, income:0, risk:0 },
+    gang:{
+      joined:false, type:null, name:null, colors:'', symbol:'', style:'',
+      territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0,
+      members:[],
+      hierarchy:{ shotCaller:'', core:[], young:[] },
+      beef:{ rival:'', level:0, score:0, lastTrigger:'', yearsAtWar:0 },
+      relationships:{ cohesion:55, internalConflict:0, powerStruggle:0 },
+      retaliations:0,
+      recentViolence:0,
+    },
+    drugs:{
+      active:false,
+      route:'independent',       // independent | gang | mafia
+      tradeDrug:'marijuana',
+      inventory:{},
+      supplyQuality:45,
+      instability:20,
+      zones:[],
+      dealers:{ independent:1, gang:0, mafia:0 },
+      income:0,
+      lastIncome:0,
+      addictionScore:0,
+      addictionLevel:'None',
+      inRecovery:false,
+      relapseRisk:8,
+      junkie:{ active:false, years:0, housing:'none', isolation:0 },
+      trip:{ active:false, label:'', expiresAge:0, rebound:{ happy:0, smarts:0, stress:0 } },
+      familyCases:[],
+      recentViolence:0,
+      useCount:{},
+    },
     mafia:{ joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0,
       rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 }
+  },
+  legal:{
+    lawsuits:[],                 // { id, title, amount, severity, yearsOpen, kind }
+    finesDue:0,
+    probationYears:0,
+    criminalStrikes:0,
+    lawyer:{
+      casesWon:0,
+      settlements:0,
+      profile:20,
+      campaignWins:0,
+      electedOffice:null,        // 'District Attorney' | 'Attorney General' | 'Governor'
+      officeYears:0,
+    },
+  },
+  gov:{
+    approval:50,
+    party:'Centrist',
+    cycleYear:0,
+    popularity:35,
+    funding:0,
+    trust:50,
+    scandalRisk:12,
+    politicalCapital:38,
+    control:44,
+    stability:55,
+    economy:52,
+    activism:8,
+    campaigningSkill:20,
+    governingSkill:20,
+    survivalSkill:20,
+    policiesPassed:0,
+    legacyScore:0,
+    legacyRank:'Unproven',
+    legacyHistory:[],
+    policyStack:[],
+    office:{ level:'none', label:'Citizen', inOffice:false, termYear:0, termsWon:0, termLimit:2, removed:false, nextElectionIn:0 },
+    campaign:{
+      active:false, office:'', entryPath:'', focus:'economy', demographic:'working', tone:'unity',
+      popularity:35, funding:0, trust:50, scandalRisk:12, momentum:0,
+      speeches:0, ads:0, debates:0, travel:0, nextRunAge:0, events:[],
+      regions:{ urban:50, suburban:50, rural:50 },
+    },
+    legislature:{ upper:48, lower:49, opposition:52, gridlock:40 },
+    world:{ allies:6, rivals:3, neutral:12, tension:38, tradeDeals:0, sanctions:0, wars:0, diplomacyWins:0 },
+    media:{ bias:0, heat:34, lastNarrative:'Normal cycle' },
+    ethics:{ corruption:8, investigations:0, impeachmentRisk:4, dirtyMoney:0, coverups:0, removedByImpeachment:false },
+    crisis:{ active:null, resolved:0, mishandled:0, lastOutcome:'none' },
+    policy:{
+      taxShift:0,                // basis points-ish in local model
+      policing:50,
+      justice:50,
+      businessClimate:50,
+      healthcare:50,
+      education:50,
+    },
+    activeLaw:'Status Quo',
   },
 };
 
@@ -363,6 +531,8 @@ const G = {
 const rnd   = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
 const pick  = a => a[Math.floor(Math.random()*a.length)];
 const clamp = v => Math.min(100, Math.max(0, Math.round(v)));
+const SAVE_KEY = 'lifesim_save_v2';
+const SAVE_VERSION = 2;
 const fmt$  = n => {
   if(n<0)      return `-$${Math.abs(n).toLocaleString()}`;
   if(n>=1e6)   return `$${(n/1e6).toFixed(2)}M`;
@@ -371,6 +541,132 @@ const fmt$  = n => {
 };
 const relLabel = r => r>=85?'Inseparable':r>=70?'Very Close':r>=55?'Good':r>=40?'Decent':r>=25?'Distant':'Strained';
 const relColor = r => r>=65?'rel-color-good':r>=40?'rel-color-ok':'rel-color-bad';
+const sportsBoostMult = () => 1 + ((G.sportsBoost||0) * 0.12);
+const sportsBoostFlat = (max=8) => (G.sportsBoost ? rnd(1, max) : 0);
+
+function randomFertilityBase(){
+  let base = rnd(90,99);
+  if(Math.random()<0.22) base = rnd(78,92);
+  if(Math.random()<0.08) base = rnd(52,77);
+  return base;
+}
+function isMainCharacterPerson(person){
+  return !person || person===G;
+}
+function personAge(person){
+  return isMainCharacterPerson(person) ? (G.age||0) : (person.age||0);
+}
+function personGender(person){
+  return isMainCharacterPerson(person) ? G.gender : person.gender;
+}
+function personFertilityBase(person){
+  return isMainCharacterPerson(person) ? G.fertilityBase : person.fertilityBase;
+}
+function setPersonFertilityBase(person, base){
+  if(isMainCharacterPerson(person)) G.fertilityBase = base;
+  else person.fertilityBase = base;
+}
+function isPersonPregnant(person){
+  return isMainCharacterPerson(person) ? !!(G.repro && G.repro.pregnant) : !!person.pregnant;
+}
+function setPersonPregnancyState(person, pregnant, dueAge=0, partnerName='', source=''){
+  if(isMainCharacterPerson(person)){
+    ensureBioShape();
+    G.repro.pregnant = !!pregnant;
+    G.repro.dueAge = pregnant ? dueAge : 0;
+    G.repro.partnerName = pregnant ? (partnerName||'') : '';
+    G.repro.source = pregnant ? (source||'') : '';
+    return;
+  }
+  person.pregnant = !!pregnant;
+  person.pregnantDueAge = pregnant ? dueAge : 0;
+  person.pregnancyPartnerName = pregnant ? (partnerName||'') : '';
+  person.pregnancySource = pregnant ? (source||'') : '';
+}
+function fertilityForPerson(person, ageOverride=null){
+  const g = personGender(person);
+  if(g!=='female') return 0;
+  let base = personFertilityBase(person);
+  if(typeof base!=='number' || !Number.isFinite(base)){
+    base = randomFertilityBase();
+    setPersonFertilityBase(person, base);
+  }
+  const age = typeof ageOverride==='number' ? ageOverride : personAge(person);
+  let fert = base;
+  if(age>=35) fert -= (Math.min(age,44)-34) * 1.2;
+  if(age>=45) fert -= (Math.min(age,50)-44) * 6;
+  if(age>50) fert -= (age-50) * 12;
+  return Math.max(0, Math.min(100, Math.round(fert)));
+}
+function personCanGetPregnant(person){
+  if(personGender(person)!=='female') return false;
+  if(personAge(person)<18) return false;
+  if(isPersonPregnant(person)) return false;
+  return fertilityForPerson(person) > 0;
+}
+function pregnancyChanceForPerson(person, opts={}){
+  const fert = fertilityForPerson(person);
+  if(fert<=0) return 0;
+  if(opts.annual) return fert>=75 ? 0.20 : 0;
+  let chance = fert<50 ? 0.05 : 0.50;
+  if(opts.condom) chance = Math.min(chance, 0.10);
+  return chance;
+}
+function startPregnancy(person, partnerName='', source=''){
+  if(!personCanGetPregnant(person)) return false;
+  const dueAge = personAge(person) + 1;
+  setPersonPregnancyState(person, true, dueAge, partnerName, source);
+  const who = isMainCharacterPerson(person) ? 'You are' : `${person.firstName||'Your partner'} is`;
+  const by = partnerName ? ` with ${partnerName}` : '';
+  addEv(`${who} pregnant${by}.`, 'love');
+  flash('🍼 Pregnancy started','good');
+  return true;
+}
+function pregnancyDiscoveryDrama(partner, source=''){
+  if(!G.spouse || !G.spouse.alive) return;
+  if(partner && G.spouse.name===partner.name) return;
+  if(source==='annual_partner' || source==='try_for_baby' || source==='spouse_intimacy') return;
+  const findOutChance = 0.48 + Math.min(0.2, (G.sm?.controversies||0)/28);
+  if(Math.random() >= findOutChance) return;
+  const name = G.spouse.firstName || 'Your partner';
+  G.spouse.relation = clamp((G.spouse.relation||50) - rnd(18,34));
+  G.happy = clamp(G.happy - rnd(6,13));
+  G.stress = clamp((G.stress||35) + rnd(8,16));
+  addEv(`${name} found out about the pregnancy and is furious.`, 'bad');
+  if((G.spouse.relation||50)<=22 && Math.random()<0.35){
+    const split = Math.floor(Math.max(0, G.money) * 0.3);
+    G.money = Math.max(0, G.money - split);
+    G.divorces = (G.divorces||0) + 1;
+    addEv(`${name} left after the fallout. Settlement cost: ${fmt$(split)}.`, 'bad');
+    G.spouse = null;
+    G.marriageYears = 0;
+  }
+}
+function attemptRelationshipPregnancy(partner, opts={}){
+  if((G.age||0)<18) return { attempted:false, pregnant:false, reason:'underage' };
+  const candidates = [];
+  if(personCanGetPregnant(G)) candidates.push(G);
+  if(partner && personCanGetPregnant(partner)) candidates.push(partner);
+  if(!candidates.length) return { attempted:false, pregnant:false, reason:'no_female_candidate' };
+
+  let target = candidates[0];
+  if(candidates.length===2){
+    const a = fertilityForPerson(candidates[0]);
+    const b = fertilityForPerson(candidates[1]);
+    const total = Math.max(1, a+b);
+    target = Math.random() < (a/total) ? candidates[0] : candidates[1];
+  }
+  const chance = pregnancyChanceForPerson(target, opts);
+  if(chance<=0) return { attempted:true, pregnant:false, chance };
+  if(Math.random() >= chance) return { attempted:true, pregnant:false, chance };
+
+  const partnerName = (target===G)
+    ? (partner?.firstName || partner?.name || 'your partner')
+    : (G.firstname || 'you');
+  const ok = startPregnancy(target, partnerName, opts.source||'intimacy');
+  if(ok) pregnancyDiscoveryDrama(partner, opts.source||'intimacy');
+  return { attempted:true, pregnant:ok, chance, target };
+}
 
 const FEDERAL_BRACKETS_SINGLE = [
   [11600, 0.10], [47150, 0.12], [100525, 0.22], [191950, 0.24],
@@ -382,6 +678,12 @@ const FEDERAL_BRACKETS_MARRIED = [
 ];
 const NO_STATE_INCOME_TAX = new Set(['Alaska','Florida','Nevada','South Dakota','Tennessee','Texas','Washington','Wyoming','New Hampshire']);
 const SOCIAL_SECURITY_WAGE_CAP = 168600;
+const CRYPTO_COIN_META = {
+  btc:  { label:'BTC',  vol:0.32, drift:0.12 },
+  eth:  { label:'ETH',  vol:0.42, drift:0.14 },
+  sol:  { label:'SOL',  vol:0.58, drift:0.16 },
+  meme: { label:'MEME', vol:0.9,  drift:0.08 },
+};
 
 function ensureFinanceShape(){
   if(!G.finance) G.finance = {};
@@ -392,6 +694,74 @@ function ensureFinanceShape(){
   if(typeof G.finance.credit!=='number') G.finance.credit = 680;
   if(typeof G.finance.investments!=='number') G.finance.investments = 0;
   if(typeof G.finance.retirement!=='number') G.finance.retirement = 0;
+  if(!G.finance.portfolio) G.finance.portfolio = {};
+  if(typeof G.finance.portfolio.indexFund!=='number') G.finance.portfolio.indexFund = 0;
+  if(typeof G.finance.portfolio.bonds!=='number') G.finance.portfolio.bonds = 0;
+  if(typeof G.finance.portfolio.realEstateFund!=='number') G.finance.portfolio.realEstateFund = 0;
+  if(typeof G.finance.portfolio.ventureFund!=='number') G.finance.portfolio.ventureFund = 0;
+  if(typeof G.finance.portfolio.growthEtf!=='number') G.finance.portfolio.growthEtf = 0;
+  if(typeof G.finance.portfolio.dividendFund!=='number') G.finance.portfolio.dividendFund = 0;
+  if(typeof G.finance.portfolio.commodities!=='number') G.finance.portfolio.commodities = 0;
+  if(typeof G.finance.portfolio.treasuries!=='number') G.finance.portfolio.treasuries = 0;
+  if(!G.finance.crypto) G.finance.crypto = {};
+  if(typeof G.finance.crypto.btc!=='number') G.finance.crypto.btc = 0;
+  if(typeof G.finance.crypto.eth!=='number') G.finance.crypto.eth = 0;
+  if(typeof G.finance.crypto.sol!=='number') G.finance.crypto.sol = 0;
+  if(typeof G.finance.crypto.meme!=='number') G.finance.crypto.meme = 0;
+  if(typeof G.finance.crypto.marketCycle!=='string') G.finance.crypto.marketCycle = 'neutral';
+  if(typeof G.finance.crypto.marketMomentum!=='number') G.finance.crypto.marketMomentum = 0;
+  if(typeof G.finance.crypto.lastYearPnl!=='number') G.finance.crypto.lastYearPnl = 0;
+  if(typeof G.finance.crypto.lastEvent!=='string') G.finance.crypto.lastEvent = '';
+  if(!G.finance.crypto.prices) G.finance.crypto.prices = { btc:100, eth:100, sol:100, meme:100 };
+  if(!Array.isArray(G.finance.crypto.history)) G.finance.crypto.history = [];
+  if(typeof G.finance.crypto.dayTradesThisYear!=='number') G.finance.crypto.dayTradesThisYear = 0;
+  if(typeof G.finance.crypto.traderSkill!=='number') G.finance.crypto.traderSkill = 20;
+  if(typeof G.finance.crypto.tradesWon!=='number') G.finance.crypto.tradesWon = 0;
+  if(typeof G.finance.crypto.tradesLost!=='number') G.finance.crypto.tradesLost = 0;
+  if(!G.finance.business) G.finance.business = {};
+  if(typeof G.finance.business.active!=='boolean') G.finance.business.active = false;
+  if(typeof G.finance.business.name!=='string') G.finance.business.name = '';
+  if(typeof G.finance.business.sector!=='string') G.finance.business.sector = '';
+  if(typeof G.finance.business.stage!=='string') G.finance.business.stage = 'idea';
+  if(typeof G.finance.business.employees!=='number') G.finance.business.employees = 0;
+  if(typeof G.finance.business.reputation!=='number') G.finance.business.reputation = 50;
+  if(typeof G.finance.business.product!=='number') G.finance.business.product = 45;
+  if(typeof G.finance.business.operations!=='number') G.finance.business.operations = 45;
+  if(typeof G.finance.business.marketing!=='number') G.finance.business.marketing = 40;
+  if(typeof G.finance.business.burn!=='number') G.finance.business.burn = 0;
+  if(typeof G.finance.business.cashReserve!=='number') G.finance.business.cashReserve = 0;
+  if(typeof G.finance.business.valuation!=='number') G.finance.business.valuation = 0;
+  if(typeof G.finance.business.years!=='number') G.finance.business.years = 0;
+  if(typeof G.finance.business.lastProfit!=='number') G.finance.business.lastProfit = 0;
+  if(typeof G.finance.business.hasInvestor!=='boolean') G.finance.business.hasInvestor = false;
+  if(typeof G.finance.business.startupId!=='string') G.finance.business.startupId = '';
+  if(typeof G.finance.business.difficulty!=='number') G.finance.business.difficulty = 1;
+  if(typeof G.finance.business.complexity!=='number') G.finance.business.complexity = 20;
+  if(typeof G.finance.business.managementSkill!=='number') G.finance.business.managementSkill = 24;
+  if(typeof G.finance.business.founderExp!=='number') G.finance.business.founderExp = 0;
+  if(typeof G.finance.business.customerBase!=='number') G.finance.business.customerBase = 0;
+  if(typeof G.finance.business.equitySold!=='number') G.finance.business.equitySold = 0;
+  if(typeof G.finance.business.investorTier!=='number') G.finance.business.investorTier = 0;
+  if(typeof G.finance.business.investorName!=='string') G.finance.business.investorName = '';
+  if(typeof G.finance.business.actionsThisYear!=='number') G.finance.business.actionsThisYear = 0;
+  if(typeof G.finance.business.negativeYears!=='number') G.finance.business.negativeYears = 0;
+  if(typeof G.finance.business.marketShare!=='number') G.finance.business.marketShare = 12;
+  if(typeof G.finance.business.moat!=='number') G.finance.business.moat = 24;
+  if(typeof G.finance.business.warReadiness!=='number') G.finance.business.warReadiness = 28;
+  if(typeof G.finance.business.priceWar!=='boolean') G.finance.business.priceWar = false;
+  if(typeof G.finance.business.espionageRisk!=='number') G.finance.business.espionageRisk = 8;
+  if(typeof G.finance.business.prHeat!=='number') G.finance.business.prHeat = 12;
+  if(typeof G.finance.business.openDisputes!=='number') G.finance.business.openDisputes = 0;
+  if(!Array.isArray(G.finance.business.rivals)) G.finance.business.rivals = [];
+  if(!Array.isArray(G.finance.business.timeline)) G.finance.business.timeline = [];
+  if(!G.finance.empire) G.finance.empire = {};
+  if(!Array.isArray(G.finance.empire.holdings)) G.finance.empire.holdings = [];
+  if(typeof G.finance.empire.nextHoldingId!=='number') G.finance.empire.nextHoldingId = 1;
+  if(typeof G.finance.empire.totalAcquisitions!=='number') G.finance.empire.totalAcquisitions = 0;
+  if(typeof G.finance.empire.totalFranchises!=='number') G.finance.empire.totalFranchises = 0;
+  if(typeof G.finance.empire.totalSmallBiz!=='number') G.finance.empire.totalSmallBiz = 0;
+  if(typeof G.finance.empire.lastYearCashflow!=='number') G.finance.empire.lastYearCashflow = 0;
+  if(typeof G.finance.empire.lastYearValueDelta!=='number') G.finance.empire.lastYearValueDelta = 0;
   if(!G.finance.tax) G.finance.tax = {};
   if(typeof G.finance.tax.lastPaid!=='number') G.finance.tax.lastPaid = 0;
   if(typeof G.finance.tax.lastRefund!=='number') G.finance.tax.lastRefund = 0;
@@ -401,6 +771,406 @@ function ensureFinanceShape(){
   if(typeof G.finance.tax.lastStateRate!=='number') G.finance.tax.lastStateRate = 0;
   if(typeof G.finance.tax.delinquentYears!=='number') G.finance.tax.delinquentYears = 0;
   if(!G.finance.tax.lastYearSummary) G.finance.tax.lastYearSummary = null;
+  if(typeof G.stress!=='number') G.stress = 35;
+}
+
+function ensureGovLegalShape(){
+  if(!G.legal) G.legal = {};
+  if(!Array.isArray(G.legal.lawsuits)) G.legal.lawsuits = [];
+  if(typeof G.legal.finesDue!=='number') G.legal.finesDue = 0;
+  if(typeof G.legal.probationYears!=='number') G.legal.probationYears = 0;
+  if(typeof G.legal.criminalStrikes!=='number') G.legal.criminalStrikes = 0;
+  if(!G.legal.lawyer) G.legal.lawyer = {};
+  if(typeof G.legal.lawyer.casesWon!=='number') G.legal.lawyer.casesWon = 0;
+  if(typeof G.legal.lawyer.settlements!=='number') G.legal.lawyer.settlements = 0;
+  if(typeof G.legal.lawyer.profile!=='number') G.legal.lawyer.profile = 20;
+  if(typeof G.legal.lawyer.campaignWins!=='number') G.legal.lawyer.campaignWins = 0;
+  if(typeof G.legal.lawyer.electedOffice!=='string') G.legal.lawyer.electedOffice = null;
+  if(typeof G.legal.lawyer.officeYears!=='number') G.legal.lawyer.officeYears = 0;
+
+  if(!G.gov) G.gov = {};
+  if(typeof G.gov.approval!=='number') G.gov.approval = 50;
+  if(typeof G.gov.party!=='string') G.gov.party = 'Centrist';
+  if(typeof G.gov.cycleYear!=='number') G.gov.cycleYear = 0;
+  if(!G.gov.policy) G.gov.policy = {};
+  if(typeof G.gov.policy.taxShift!=='number') G.gov.policy.taxShift = 0;
+  if(typeof G.gov.policy.policing!=='number') G.gov.policy.policing = 50;
+  if(typeof G.gov.policy.justice!=='number') G.gov.policy.justice = 50;
+  if(typeof G.gov.policy.businessClimate!=='number') G.gov.policy.businessClimate = 50;
+  if(typeof G.gov.policy.healthcare!=='number') G.gov.policy.healthcare = 50;
+  if(typeof G.gov.policy.education!=='number') G.gov.policy.education = 50;
+  if(typeof G.gov.activeLaw!=='string') G.gov.activeLaw = 'Status Quo';
+}
+
+function ensureSimShape(){
+  if(!G.sim) G.sim = {};
+  if(typeof G.sim.mode!=='string') G.sim.mode = 'balanced';
+  if(!G.sim.feedback || typeof G.sim.feedback!=='object') G.sim.feedback = {};
+  if(typeof G.sim.feedback.version!=='number') G.sim.feedback.version = 1;
+  if(typeof G.sim.feedback.eventCounter!=='number') G.sim.feedback.eventCounter = 0;
+  if(!Array.isArray(G.sim.feedback.recent)) G.sim.feedback.recent = [];
+  if(typeof G.sim.feedback.lastTone!=='string') G.sim.feedback.lastTone = 'neutral';
+  if(typeof G.sim.feedback.lastSource!=='string') G.sim.feedback.lastSource = '';
+  if(typeof G.sim.feedback.lastLabel!=='string') G.sim.feedback.lastLabel = '';
+  if(!G.sim.director) G.sim.director = {};
+  const d = G.sim.director;
+  if(typeof d.lastPressure!=='number') d.lastPressure = 0;
+  if(typeof d.lastRecovery!=='number') d.lastRecovery = 0;
+  if(typeof d.lastNet!=='number') d.lastNet = 0;
+  if(typeof d.lastStressDelta!=='number') d.lastStressDelta = 0;
+  if(typeof d.lastAge!=='number') d.lastAge = 0;
+  if(!Array.isArray(d.history)) d.history = [];
+}
+
+function ensureCareerShape(){
+  if(!G.career) G.career = {};
+  if(typeof G.career.employed!=='boolean') G.career.employed = false;
+  if(typeof G.career.jobId!=='string') G.career.jobId = null;
+  if(typeof G.career.title!=='string') G.career.title = '';
+  if(typeof G.career.company!=='string') G.career.company = '';
+  if(typeof G.career.salary!=='number') G.career.salary = 0;
+  if(typeof G.career.level!=='number') G.career.level = 0;
+  if(typeof G.career.years!=='number') G.career.years = 0;
+  if(typeof G.career.performance!=='number') G.career.performance = 50;
+  if(typeof G.career.reputation!=='number') G.career.reputation = 50;
+  if(typeof G.career.hrRisk!=='number') G.career.hrRisk = 0;
+  if(typeof G.career.fired!=='boolean') G.career.fired = false;
+  if(typeof G.career.bonusRate!=='number') G.career.bonusRate = 0;
+  if(typeof G.career.stockUnits!=='number') G.career.stockUnits = 0;
+  if(typeof G.career.stockValue!=='number') G.career.stockValue = 0;
+  if(!G.career.benefits) G.career.benefits = { healthPlan:false, retirement:false };
+  if(typeof G.career.benefits.healthPlan!=='boolean') G.career.benefits.healthPlan = false;
+  if(typeof G.career.benefits.retirement!=='boolean') G.career.benefits.retirement = false;
+  if(!Array.isArray(G.career.milestones)) G.career.milestones = [];
+  if(typeof G.career.track!=='string') G.career.track = 'specialist';
+  if(typeof G.career.influence!=='number') G.career.influence = 45;
+  if(typeof G.career.burnout!=='number') G.career.burnout = 12;
+  if(typeof G.career.layoffShield!=='number') G.career.layoffShield = 20;
+  if(!Array.isArray(G.career.certifications)) G.career.certifications = [];
+  if(typeof G.career.careerActionsUsed!=='number') G.career.careerActionsUsed = 0;
+  if(typeof G.career.trackCooldown!=='number') G.career.trackCooldown = 0;
+  if(!Array.isArray(G.career.coworkers)) G.career.coworkers = [];
+  if(!G.career.medSchool) G.career.medSchool = { enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false };
+  if(!G.career.lawSchool) G.career.lawSchool = { enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false };
+  if(!G.career.licenses) G.career.licenses = { medical:false, law:false };
+  if(!G.career.medicalCareer || typeof G.career.medicalCareer!=='object'){
+    G.career.medicalCareer = {
+      active:false, stage:'none', specialization:null, yearsInStage:0, yearsTotal:0,
+      hospitalId:'county_general', policy:'balanced', suspendedYears:0,
+      stats:{ knowledge:40, skill:34, stress:28, reputation:42, ethics:62, burnout:14 },
+      annual:{
+        actionsUsed:0, timeUsed:0, shifts:0, rest:0,
+        patientsSeen:0, diagnosed:0, correctDx:0, uncertainDx:0, misDx:0,
+        outcomes:{ success:0, partial:0, failure:0, critical:0 },
+        lawsuits:0, bonuses:0, penalties:0,
+      },
+      insurance:{ active:true, coverage:65, premium:4500, deductible:12000 },
+      hospital:{ quality:58, funding:52, volume:55, type:'public' },
+      patientQueue:[], resolvedCases:[], nextCaseId:1,
+      underInvestigation:false, investigationRisk:0, pendingSpecialization:false,
+    };
+  }
+  const mc = G.career.medicalCareer;
+  if(typeof mc.active!=='boolean') mc.active = false;
+  if(typeof mc.stage!=='string') mc.stage = 'none';
+  if(typeof mc.specialization!=='string' && mc.specialization!==null) mc.specialization = null;
+  if(typeof mc.yearsInStage!=='number') mc.yearsInStage = 0;
+  if(typeof mc.yearsTotal!=='number') mc.yearsTotal = 0;
+  if(typeof mc.hospitalId!=='string') mc.hospitalId = 'county_general';
+  if(typeof mc.policy!=='string') mc.policy = 'balanced';
+  if(typeof mc.suspendedYears!=='number') mc.suspendedYears = 0;
+  if(!mc.stats || typeof mc.stats!=='object') mc.stats = {};
+  if(typeof mc.stats.knowledge!=='number') mc.stats.knowledge = 40;
+  if(typeof mc.stats.skill!=='number') mc.stats.skill = 34;
+  if(typeof mc.stats.stress!=='number') mc.stats.stress = 28;
+  if(typeof mc.stats.reputation!=='number') mc.stats.reputation = 42;
+  if(typeof mc.stats.ethics!=='number') mc.stats.ethics = 62;
+  if(typeof mc.stats.burnout!=='number') mc.stats.burnout = 14;
+  if(!mc.annual || typeof mc.annual!=='object'){
+    mc.annual = {
+      actionsUsed:0, timeUsed:0, shifts:0, rest:0,
+      patientsSeen:0, diagnosed:0, correctDx:0, uncertainDx:0, misDx:0,
+      outcomes:{ success:0, partial:0, failure:0, critical:0 },
+      lawsuits:0, bonuses:0, penalties:0,
+    };
+  }
+  if(typeof mc.annual.actionsUsed!=='number') mc.annual.actionsUsed = 0;
+  if(typeof mc.annual.timeUsed!=='number') mc.annual.timeUsed = 0;
+  if(typeof mc.annual.shifts!=='number') mc.annual.shifts = 0;
+  if(typeof mc.annual.rest!=='number') mc.annual.rest = 0;
+  if(typeof mc.annual.patientsSeen!=='number') mc.annual.patientsSeen = 0;
+  if(typeof mc.annual.diagnosed!=='number') mc.annual.diagnosed = 0;
+  if(typeof mc.annual.correctDx!=='number') mc.annual.correctDx = 0;
+  if(typeof mc.annual.uncertainDx!=='number') mc.annual.uncertainDx = 0;
+  if(typeof mc.annual.misDx!=='number') mc.annual.misDx = 0;
+  if(!mc.annual.outcomes || typeof mc.annual.outcomes!=='object') mc.annual.outcomes = {};
+  if(typeof mc.annual.outcomes.success!=='number') mc.annual.outcomes.success = 0;
+  if(typeof mc.annual.outcomes.partial!=='number') mc.annual.outcomes.partial = 0;
+  if(typeof mc.annual.outcomes.failure!=='number') mc.annual.outcomes.failure = 0;
+  if(typeof mc.annual.outcomes.critical!=='number') mc.annual.outcomes.critical = 0;
+  if(typeof mc.annual.lawsuits!=='number') mc.annual.lawsuits = 0;
+  if(typeof mc.annual.bonuses!=='number') mc.annual.bonuses = 0;
+  if(typeof mc.annual.penalties!=='number') mc.annual.penalties = 0;
+  if(!mc.insurance || typeof mc.insurance!=='object') mc.insurance = {};
+  if(typeof mc.insurance.active!=='boolean') mc.insurance.active = true;
+  if(typeof mc.insurance.coverage!=='number') mc.insurance.coverage = 65;
+  if(typeof mc.insurance.premium!=='number') mc.insurance.premium = 4500;
+  if(typeof mc.insurance.deductible!=='number') mc.insurance.deductible = 12000;
+  if(!mc.hospital || typeof mc.hospital!=='object') mc.hospital = {};
+  if(typeof mc.hospital.quality!=='number') mc.hospital.quality = 58;
+  if(typeof mc.hospital.funding!=='number') mc.hospital.funding = 52;
+  if(typeof mc.hospital.volume!=='number') mc.hospital.volume = 55;
+  if(typeof mc.hospital.type!=='string') mc.hospital.type = 'public';
+  if(!Array.isArray(mc.patientQueue)) mc.patientQueue = [];
+  if(!Array.isArray(mc.resolvedCases)) mc.resolvedCases = [];
+  if(typeof mc.nextCaseId!=='number') mc.nextCaseId = 1;
+  if(typeof mc.underInvestigation!=='boolean') mc.underInvestigation = false;
+  if(typeof mc.investigationRisk!=='number') mc.investigationRisk = 0;
+  if(typeof mc.pendingSpecialization!=='boolean') mc.pendingSpecialization = false;
+  G.career.influence = clamp(G.career.influence);
+  G.career.burnout = clamp(G.career.burnout);
+  G.career.layoffShield = clamp(G.career.layoffShield);
+}
+
+function ensureBioShape(){
+  if(typeof G.sportsBoostChoice!=='string') G.sportsBoostChoice = (G.sportsBoost ? 'athlete' : 'none');
+  G.sportsBoost = G.sportsBoostChoice==='athlete' ? 1 : 0;
+  if(typeof G.fertilityBase!=='number' && G.fertilityBase!==null) G.fertilityBase = null;
+  if(G.gender==='female' && (typeof G.fertilityBase!=='number' || !Number.isFinite(G.fertilityBase))){
+    G.fertilityBase = randomFertilityBase();
+  }
+  if(G.gender!=='female') G.fertilityBase = null;
+  if(!G.repro || typeof G.repro!=='object') G.repro = {};
+  if(typeof G.repro.pregnant!=='boolean') G.repro.pregnant = false;
+  if(typeof G.repro.dueAge!=='number') G.repro.dueAge = 0;
+  if(typeof G.repro.partnerName!=='string') G.repro.partnerName = '';
+  if(typeof G.repro.source!=='string') G.repro.source = '';
+  if(!G.skills || typeof G.skills!=='object') G.skills = {};
+  if(!G.skills.instruments || typeof G.skills.instruments!=='object') G.skills.instruments = {};
+  if(!G.clubs || typeof G.clubs!=='object'){
+    G.clubs = {
+      orchestra:{
+        joined:false,
+        rank:0,
+        years:0,
+        centerTierUnlocked:1,
+        performances:0,
+        bestReview:0,
+        warnings:0,
+        kickedOut:false,
+      },
+    };
+  }
+  if(!G.clubs.orchestra || typeof G.clubs.orchestra!=='object'){
+    G.clubs.orchestra = {
+      joined:false,
+      rank:0,
+      years:0,
+      centerTierUnlocked:1,
+      performances:0,
+      bestReview:0,
+      warnings:0,
+      kickedOut:false,
+    };
+  }
+  const o = G.clubs.orchestra;
+  if(typeof o.joined!=='boolean') o.joined = false;
+  if(typeof o.rank!=='number') o.rank = 0;
+  if(typeof o.years!=='number') o.years = 0;
+  if(typeof o.centerTierUnlocked!=='number') o.centerTierUnlocked = 1;
+  if(typeof o.performances!=='number') o.performances = 0;
+  if(typeof o.bestReview!=='number') o.bestReview = 0;
+  if(typeof o.warnings!=='number') o.warnings = 0;
+  if(typeof o.kickedOut!=='boolean') o.kickedOut = false;
+  if(!G.streetRacing || typeof G.streetRacing!=='object'){
+    G.streetRacing = {
+      level:1, xp:0, rep:0, cashWon:0,
+      garage:[], activeCarId:null, wins:0, losses:0, races:0,
+      unlockedTracks:['dockyard_loop'], unlockedTiers:1,
+      busted:false, cooldown:0,
+    };
+  }
+  const sr = G.streetRacing;
+  if(typeof sr.level!=='number') sr.level = 1;
+  if(typeof sr.xp!=='number') sr.xp = 0;
+  if(typeof sr.rep!=='number') sr.rep = 0;
+  if(typeof sr.cashWon!=='number') sr.cashWon = 0;
+  if(!Array.isArray(sr.garage)) sr.garage = [];
+  if(typeof sr.activeCarId!=='string') sr.activeCarId = null;
+  if(typeof sr.wins!=='number') sr.wins = 0;
+  if(typeof sr.losses!=='number') sr.losses = 0;
+  if(typeof sr.races!=='number') sr.races = 0;
+  if(!Array.isArray(sr.unlockedTracks)) sr.unlockedTracks = ['dockyard_loop'];
+  if(typeof sr.unlockedTiers!=='number') sr.unlockedTiers = 1;
+  if(typeof sr.busted!=='boolean') sr.busted = false;
+  if(typeof sr.cooldown!=='number') sr.cooldown = 0;
+}
+
+function runDirectorYearPass(){
+  ensureSimShape();
+  const d = G.sim.director;
+  const pressure =
+    (G.money<0 ? 3.5 : G.money<5000 ? 1.2 : 0) +
+    (G.finance.debt>200000 ? 4 : G.finance.debt>75000 ? 2.4 : G.finance.debt>0 ? 1 : 0) +
+    (G.spouse && (G.spouse.relation||50)<40 ? 1.8 : 0) +
+    ((G.children?.length||0)>=3 ? 1 : 0) +
+    ((G.crime?.heat||0)>=70 ? 2.2 : (G.crime?.heat||0)>=50 ? 1 : 0) +
+    ((G.sm?.controversies||0)>=3 ? 1.6 : (G.sm?.controversies||0)>0 ? 0.6 : 0) +
+    ((G.medical?.conditions?.length||0)>=2 ? 1.4 : 0) +
+    ((G.legal?.finesDue||0)>0 ? 0.8 : 0);
+
+  const recovery =
+    ((G.happy||50)>=88 ? 4 : (G.happy||50)>=72 ? 2.6 : (G.happy||50)>=58 ? 1.2 : 0) +
+    ((G.health||50)>=80 ? 1.4 : (G.health||50)>=65 ? 0.7 : 0) +
+    ((G.housing?.comfort||40)>=75 ? 2.1 : (G.housing?.comfort||40)>=60 ? 1.1 : 0) +
+    ((G.friends||[]).length>=4 ? 0.8 : (G.friends||[]).length>=2 ? 0.4 : 0) +
+    ((G.lovers||[]).length>0 ? 0.35 : 0) +
+    ((G.social?.partyCount||0)>=8 ? 0.5 : 0);
+
+  const net = pressure - recovery;
+  const before = G.stress||35;
+  const target = clamp(36 + net*8 + (G.age>=50?3:0));
+  let delta = Math.round((target - before) * 0.38) + rnd(-2,2);
+  delta = Math.max(-14, Math.min(14, delta));
+  G.stress = clamp(before + delta);
+
+  d.lastPressure = Math.round(pressure*10)/10;
+  d.lastRecovery = Math.round(recovery*10)/10;
+  d.lastNet = Math.round(net*10)/10;
+  d.lastStressDelta = delta;
+  d.lastAge = G.age;
+  d.history.push({ age:G.age, pressure:d.lastPressure, recovery:d.lastRecovery, net:d.lastNet, stress:G.stress });
+  if(d.history.length>10) d.history.shift();
+
+  if(d.lastNet>=2.8){
+    addEv('This year felt overloaded: too many pressure sources stacked at once.', 'warn');
+  } else if(d.lastNet<=-2.2){
+    addEv('This year felt grounded and manageable. Your routines are stabilizing.', 'good');
+  }
+}
+
+function runYearStepSafe(label, fn){
+  try{
+    return fn();
+  }catch(err){
+    console.error(`Year-step error (${label})`, err);
+    try{
+      addEv(`A ${label} system hiccup occurred this year. The simulation recovered.`, 'warn');
+    }catch(_e){}
+    return null;
+  }
+}
+
+function hasLocalStorage(){
+  try{
+    return typeof localStorage !== 'undefined';
+  }catch(_e){
+    return false;
+  }
+}
+
+function snapshotGameState(){
+  return JSON.parse(JSON.stringify(G));
+}
+
+function replaceGameState(state){
+  if(!state || typeof state!=='object') return false;
+  Object.keys(G).forEach(k=>delete G[k]);
+  Object.assign(G, state);
+  ensureFinanceShape();
+  ensureGovLegalShape();
+  ensureSimShape();
+  ensureCareerShape();
+  ensureBioShape();
+  if(typeof ensurePoliticsState==='function') ensurePoliticsState();
+  if(typeof ensureCrimeShape==='function') ensureCrimeShape();
+  if(typeof ensureMMAState==='function') ensureMMAState();
+  if(typeof ensurePetState==='function') ensurePetState();
+  if(!Array.isArray(G.pets)) G.pets = [];
+  if(!G.relTab) G.relTab = 'family';
+  if(typeof G.stress!=='number') G.stress = 35;
+  return true;
+}
+
+function refreshSaveUI(){
+  if(!hasLocalStorage()) return;
+  let hasSave = false;
+  try{
+    hasSave = !!localStorage.getItem(SAVE_KEY);
+  }catch(_e){}
+  const cont = document.getElementById('btn-continue');
+  const del = document.getElementById('btn-delete-save');
+  if(cont){
+    cont.style.display = hasSave ? 'inline-flex' : 'none';
+  }
+  if(del){
+    del.style.display = hasSave ? 'inline-flex' : 'none';
+  }
+}
+
+function saveGame(quiet=false){
+  if(!hasLocalStorage()) return false;
+  if(!G.firstname || !G.lastname) return false;
+  const payload = {
+    version: SAVE_VERSION,
+    savedAt: Date.now(),
+    name: `${G.firstname} ${G.lastname}`,
+    age: G.age||0,
+    state: snapshotGameState(),
+  };
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    refreshSaveUI();
+    if(!quiet) flash('Game saved 💾','good');
+    return true;
+  }catch(err){
+    console.error('Save failed', err);
+    if(!quiet) flash('Save failed (storage issue).','bad');
+    return false;
+  }
+}
+
+function loadGame(){
+  if(!hasLocalStorage()){ flash('Local storage unavailable.','bad'); return false; }
+  let raw = null;
+  try{
+    raw = localStorage.getItem(SAVE_KEY);
+  }catch(_e){}
+  if(!raw){ flash('No saved game found.','warn'); return false; }
+  let payload = null;
+  try{
+    payload = JSON.parse(raw);
+  }catch(err){
+    console.error('Bad save JSON', err);
+    flash('Save file is corrupted.','bad');
+    return false;
+  }
+  if(!payload || !payload.state){
+    flash('Invalid save data.','bad');
+    return false;
+  }
+  const ok = replaceGameState(payload.state);
+  if(!ok){
+    flash('Could not load save.','bad');
+    return false;
+  }
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('tab-bar').style.display = 'flex';
+  updateHUD();
+  switchTab('life');
+  flash(`Loaded ${payload.name||'save'} (age ${payload.age??G.age})`,'good');
+  return true;
+}
+
+function deleteGameSave(){
+  if(!hasLocalStorage()){ flash('Local storage unavailable.','bad'); return; }
+  try{
+    localStorage.removeItem(SAVE_KEY);
+    refreshSaveUI();
+    flash('Saved game deleted.','warn');
+  }catch(_e){
+    flash('Could not delete save.','bad');
+  }
 }
 
 function calcProgressiveTax(income, brackets){
@@ -467,9 +1237,11 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
   const fedBrackets = married ? FEDERAL_BRACKETS_MARRIED : FEDERAL_BRACKETS_SINGLE;
   const federalTax = calcProgressiveTax(taxableOrdinary, fedBrackets);
   const stateRate = estimateStateIncomeTaxRate();
+  const govTaxAdj = (G.gov?.policy?.taxShift||0) / 1000;
   const stateTax = Math.floor(taxableOrdinary * stateRate);
-  const payrollTax = Math.floor(Math.min(SOCIAL_SECURITY_WAGE_CAP, ledger.wages + ledger.bonuses) * 0.0765);
+  const payrollTax = Math.floor(Math.min(SOCIAL_SECURITY_WAGE_CAP, ledger.wages + ledger.bonuses) * (0.0765 + Math.max(-0.01, Math.min(0.01, govTaxAdj/3))));
   const capitalGainsTax = Math.floor(Math.max(0, ledger.investmentGains) * 0.15);
+  const surtax = Math.floor(Math.max(0, taxableOrdinary) * Math.max(-0.02, Math.min(0.03, govTaxAdj)));
 
   const dependents = (G.children||[]).filter(ch=>ch && ch.alive!==false && ch.age<17).length;
   const childCredit = dependents * 1200;
@@ -477,7 +1249,7 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
   const lowIncomeCredit = grossIncome>0 && grossIncome<26000 ? 450 : 0;
   const totalCredits = childCredit + educationCredit + lowIncomeCredit;
 
-  const totalBeforeCredits = federalTax + stateTax + payrollTax + capitalGainsTax;
+  const totalBeforeCredits = federalTax + stateTax + payrollTax + capitalGainsTax + surtax;
   const totalTax = Math.max(0, totalBeforeCredits - totalCredits);
   let refund = 0;
   let taxDebtLoaded = 0;
@@ -521,6 +1293,7 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
     stateTax,
     payrollTax,
     capitalGainsTax,
+    surtax,
     propertyTax:ledger.propertyTax,
     credits:totalCredits,
     paid:totalTax,
@@ -528,6 +1301,274 @@ function processAnnualTaxes(ledger, moneyAtYearStart, totalsAtYearStart){
     taxDebtLoaded,
     effectiveRate:grossIncome>0 ? totalTax/grossIncome : 0,
   };
+}
+
+function portfolioPrincipal(){
+  ensureFinanceShape();
+  const p = G.finance.portfolio;
+  return (G.finance.investments||0) + (p.indexFund||0) + (p.bonds||0) + (p.realEstateFund||0) + (p.ventureFund||0);
+}
+
+function processInvestmentAndCryptoYear(ledger){
+  ensureFinanceShape();
+  const p = G.finance.portfolio;
+  // Legacy bucket stays as a simple broad market fund.
+  if(G.finance.investments>0){
+    const pct = rnd(-5,12)/100;
+    const delta = Math.floor(G.finance.investments * pct);
+    G.finance.investments = Math.max(0, G.finance.investments + delta);
+    if(delta>=0){
+      ledger.investmentGains += delta;
+      addEv(`Investments gained ${fmt$(delta)} this year.`, 'good');
+    } else {
+      addEv(`Investments lost ${fmt$(Math.abs(delta))} this year.`, 'warn');
+      G.stress = clamp(G.stress + rnd(1,3));
+    }
+  }
+
+  const buckets = [
+    { key:'indexFund', label:'Index fund', min:-0.08, max:0.14, stress:1 },
+    { key:'bonds', label:'Bond fund', min:-0.02, max:0.07, stress:0 },
+    { key:'realEstateFund', label:'REIT fund', min:-0.12, max:0.18, stress:2 },
+    { key:'ventureFund', label:'Venture fund', min:-0.35, max:0.45, stress:4 },
+  ];
+  buckets.forEach(b=>{
+    const value = p[b.key]||0;
+    if(value<=0) return;
+    const pct = rnd(Math.floor(b.min*100), Math.floor(b.max*100))/100;
+    const delta = Math.floor(value * pct);
+    p[b.key] = Math.max(0, value + delta);
+    if(delta>=0){
+      ledger.investmentGains += delta;
+      if(delta>500) addEv(`${b.label} returned ${fmt$(delta)} this year.`, 'good');
+    } else if(Math.abs(delta)>500){
+      addEv(`${b.label} fell ${fmt$(Math.abs(delta))} this year.`, 'warn');
+      G.stress = clamp(G.stress + b.stress);
+    }
+  });
+
+  const c = G.finance.crypto;
+  const momentumShift = rnd(-28,28)/100;
+  c.marketMomentum = Math.max(-0.65, Math.min(0.75, (c.marketMomentum||0)*0.45 + momentumShift*0.55));
+  c.marketCycle = c.marketMomentum>0.28?'bull':c.marketMomentum<-0.28?'bear':Math.abs(c.marketMomentum)<0.09?'neutral':c.marketMomentum>0?'recovery':'cooldown';
+  let cryptoPnl = 0;
+  Object.keys(CRYPTO_COIN_META).forEach(id=>{
+    const val = c[id]||0;
+    if(val<=0) return;
+    const m = CRYPTO_COIN_META[id];
+    const cyc = c.marketCycle==='bull'?0.25:c.marketCycle==='recovery'?0.12:c.marketCycle==='bear'?-0.27:c.marketCycle==='cooldown'?-0.11:0;
+    const pct = Math.max(-0.88, m.drift + cyc + c.marketMomentum + (rnd(-100,100)/100)*m.vol);
+    const delta = Math.floor(val * pct);
+    c[id] = Math.max(0, val + delta);
+    cryptoPnl += delta;
+  });
+  c.lastYearPnl = cryptoPnl;
+  if(cryptoPnl>0){
+    ledger.investmentGains += cryptoPnl;
+    if(cryptoPnl>2000) addEv(`Crypto portfolio rallied in a ${c.marketCycle} market: +${fmt$(cryptoPnl)}.`, 'good');
+  } else if(cryptoPnl<0){
+    addEv(`Crypto drawdown this year: ${fmt$(Math.abs(cryptoPnl))}. Market regime: ${c.marketCycle}.`, Math.abs(cryptoPnl)>6000?'bad':'warn');
+    G.stress = clamp(G.stress + (Math.abs(cryptoPnl)>6000 ? rnd(6,12) : rnd(2,6)));
+  }
+}
+
+function processBusinessYear(ledger){
+  ensureFinanceShape();
+  const b = G.finance.business;
+  if(!b.active) return;
+  b.years++;
+  const scale = 1 + b.employees*0.14 + Math.max(0,b.reputation-50)/130 + Math.max(0,b.product-45)/120 + Math.max(0,b.marketing-40)/160;
+  const sectorMul =
+    b.sector==='SaaS' ? 1.18 :
+    b.sector==='E-commerce' ? 1.1 :
+    (b.sector==='Fintech' || b.sector==='FinTech') ? 1.14 :
+    (b.sector==='Media' || b.sector==='Media Brand') ? 1.06 :
+    (b.sector==='Consumer' || b.sector==='Consumer Goods') ? 1.04 : 1;
+  const revenue = Math.floor(rnd(30000,120000) * scale * sectorMul);
+  const opex = Math.floor(12000 + b.burn + b.employees*rnd(7000,19000) + rnd(5000,24000));
+  let profit = revenue - opex;
+  if(Math.random()<0.14){
+    const shock = Math.floor(revenue * rnd(10,28)/100);
+    profit -= shock;
+    addEv(`${b.name||'Your company'} had a rough quarter and unexpected costs of ${fmt$(shock)}.`, 'warn');
+    G.stress = clamp(G.stress + rnd(3,7));
+  }
+  if(Math.random()<0.11){
+    const boost = Math.floor(revenue * rnd(8,22)/100);
+    profit += boost;
+    addEv(`${b.name||'Your company'} landed a strong growth push worth ${fmt$(boost)}.`, 'good');
+  }
+  b.cashReserve += profit;
+  b.lastProfit = profit;
+  b.operations = clamp(b.operations + rnd(-2,3));
+  b.product = clamp(b.product + rnd(-1,2));
+  b.marketing = clamp(b.marketing + rnd(-2,3));
+  b.reputation = clamp(b.reputation + rnd(-2,4) + (profit>0?1:-1));
+  b.stage = b.cashReserve>2000000?'scale':b.cashReserve>500000?'growth':b.cashReserve>120000?'early traction':'idea';
+  b.valuation = Math.max(0, Math.floor((Math.max(0,revenue) * (2.2 + b.reputation/80)) + b.cashReserve * 1.4));
+
+  if(profit>0){
+    const founderPay = Math.floor(profit * (b.hasInvestor?0.18:0.26));
+    G.money += founderPay;
+    ledger.otherIncome += founderPay;
+    if(founderPay>0) addEv(`${b.name||'Your company'} paid you ${fmt$(founderPay)} this year.`, 'good');
+    G.stress = clamp(G.stress - rnd(1,4));
+  } else {
+    G.stress = clamp(G.stress + rnd(4,9));
+  }
+
+  if(b.cashReserve < -120000){
+    const bailout = Math.floor(Math.abs(b.cashReserve) * 1.12);
+    G.finance.debt += bailout;
+    b.active = false;
+    b.cashReserve = 0;
+    b.employees = 0;
+    addEv(`${b.name||'Your company'} ran out of runway. It shut down and left ${fmt$(bailout)} in debt obligations.`, 'bad');
+  }
+}
+
+function processGovernmentYear(){
+  ensureGovLegalShape();
+  const g = G.gov;
+  const p = g.policy;
+  const L = G.legal;
+  g.cycleYear++;
+
+  // Sitting office bonuses/risks
+  if(L.lawyer.electedOffice){
+    L.lawyer.officeYears++;
+    const officePay =
+      L.lawyer.electedOffice==='Governor' ? rnd(140000,230000) :
+      L.lawyer.electedOffice==='Attorney General' ? rnd(120000,190000) :
+      rnd(90000,160000);
+    G.money += officePay;
+    if(Math.random()<0.14){
+      g.approval = clamp(g.approval - rnd(6,14));
+      G.stress = clamp((G.stress||35) + rnd(3,8));
+      addEv(`A political controversy hit your office. Approval dropped sharply.`, 'warn');
+    } else {
+      g.approval = clamp(g.approval + rnd(1,5));
+    }
+  }
+
+  // Election cycle every 4 years
+  if(g.cycleYear%4===0){
+    const parties = ['Centrist','Progressive','Conservative'];
+    const winRoll = Math.random();
+    if(winRoll<0.35) g.party = 'Progressive';
+    else if(winRoll<0.7) g.party = 'Centrist';
+    else g.party = 'Conservative';
+
+    if(g.party==='Progressive'){
+      p.taxShift = Math.max(-25, Math.min(25, p.taxShift + rnd(2,8)));
+      p.policing = clamp(p.policing - rnd(2,6));
+      p.justice = clamp(p.justice + rnd(3,8));
+      p.businessClimate = clamp(p.businessClimate - rnd(1,4));
+      p.healthcare = clamp(p.healthcare + rnd(4,9));
+      p.education = clamp(p.education + rnd(3,8));
+      g.activeLaw = pick(['Justice Reform Act','Consumer Protection Expansion','Public Healthcare Boost']);
+    } else if(g.party==='Conservative'){
+      p.taxShift = Math.max(-25, Math.min(25, p.taxShift - rnd(2,8)));
+      p.policing = clamp(p.policing + rnd(3,9));
+      p.justice = clamp(p.justice - rnd(2,7));
+      p.businessClimate = clamp(p.businessClimate + rnd(3,8));
+      p.healthcare = clamp(p.healthcare - rnd(2,6));
+      p.education = clamp(p.education - rnd(1,5));
+      g.activeLaw = pick(['Business Incentive Package','Mandatory Minimum Expansion','Tax Relief Bill']);
+    } else {
+      p.taxShift = Math.max(-25, Math.min(25, p.taxShift + rnd(-3,3)));
+      p.policing = clamp(p.policing + rnd(-3,3));
+      p.justice = clamp(p.justice + rnd(-3,3));
+      p.businessClimate = clamp(p.businessClimate + rnd(-3,3));
+      p.healthcare = clamp(p.healthcare + rnd(-3,3));
+      p.education = clamp(p.education + rnd(-3,3));
+      g.activeLaw = pick(['Bipartisan Budget Deal','Infrastructure & Services Act','Administrative Reform Bill']);
+    }
+
+    addEv(`Election year: ${g.party} coalition took power. New law passed: ${g.activeLaw}.`, 'warn');
+    if(g.party==='Conservative' && L.lawyer.electedOffice && Math.random()<0.22){
+      g.approval = clamp(g.approval - rnd(5,11));
+    }
+  }
+}
+
+function processLegalYear(){
+  ensureGovLegalShape();
+  const L = G.legal;
+  const p = G.gov.policy;
+
+  // Build legal risk from crime/business/controversy
+  let legalRisk = 0;
+  legalRisk += (G.crime.heat||0) / 120;
+  legalRisk += (G.finance.business?.active ? 0.08 : 0);
+  legalRisk += Math.min(0.18, (G.sm.controversies||0) * 0.02);
+  legalRisk += (p.policing-50) / 420;
+  legalRisk = Math.max(0, legalRisk);
+
+  if(Math.random() < legalRisk){
+    const demand = rnd(5000, 120000);
+    const sev = rnd(1,5);
+    const kind = pick(['Civil suit','Contract dispute','Regulatory action','Defamation claim']);
+    L.lawsuits.push({
+      id:`lawsuit_${G.age}_${Math.random().toString(36).slice(2,7)}`,
+      title:kind,
+      amount:demand,
+      severity:sev,
+      yearsOpen:0,
+      kind,
+    });
+    addEv(`Legal trouble: ${kind} filed against you (${fmt$(demand)} exposure).`, 'warn');
+  }
+
+  // Process open lawsuits
+  L.lawsuits = (L.lawsuits||[]).filter(s=>s && s.amount>0);
+  const stillOpen = [];
+  L.lawsuits.forEach(s=>{
+    s.yearsOpen = (s.yearsOpen||0)+1;
+    const lawyerBoost = (G.career.licenses?.law ? 0.1 : 0) + Math.min(0.18, (L.lawyer.casesWon||0)*0.01);
+    const settleChance = Math.max(0.14, 0.3 + lawyerBoost - s.severity*0.03);
+    if(Math.random()<settleChance){
+      const payout = Math.floor(s.amount * rnd(45,95)/100);
+      if(G.money>=payout){
+        G.money -= payout;
+      } else {
+        const short = payout - Math.max(0,G.money);
+        G.money = 0;
+        G.finance.debt += Math.floor(short * 1.12);
+      }
+      addEv(`Resolved ${s.kind} for ${fmt$(payout)}.`, payout>50000?'bad':'warn');
+      G.stress = clamp((G.stress||35) + rnd(2,7));
+    } else if(s.yearsOpen>=3){
+      const fine = Math.floor(s.amount * rnd(70,120)/100);
+      L.finesDue += fine;
+      addEv(`${s.kind} escalated to judgment. Fine imposed: ${fmt$(fine)}.`, 'bad');
+      G.stress = clamp((G.stress||35) + rnd(6,12));
+    } else {
+      stillOpen.push(s);
+    }
+  });
+  L.lawsuits = stillOpen;
+
+  // Fines/probation mechanics
+  if(L.finesDue>0){
+    const payment = Math.min(L.finesDue, Math.max(0, Math.floor(G.money*0.35)));
+    if(payment>0){
+      G.money -= payment;
+      L.finesDue -= payment;
+      addEv(`Court-ordered fine payment: ${fmt$(payment)}. Remaining: ${fmt$(L.finesDue)}.`, 'warn');
+    } else {
+      L.probationYears += 1;
+      addEv('Unpaid legal fines triggered an added year of probation.', 'bad');
+    }
+  }
+  if(L.probationYears>0){
+    L.probationYears = Math.max(0, L.probationYears-1);
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    if(Math.random()<0.2){
+      G.happy = clamp(G.happy - rnd(2,6));
+      addEv('Probation restrictions made this year harder.', 'warn');
+    }
+  }
 }
 
 // ── FLASH TOAST ─────────────────────────────────────────────────
@@ -630,6 +1671,8 @@ function switchTab(t){
     media:         'screen-media',
     crime:         'screen-crime',
     jobs:          'screen-jobs',
+    business:      'screen-business',
+    politics:      'screen-politics',
     acting:        'screen-acting',
     prosports:     'screen-prosports',
     activities:    'screen-activities',
@@ -643,6 +1686,8 @@ function switchTab(t){
   if(t==='media')         renderMedia();
   if(t==='crime')         renderCrime();
   if(t==='jobs')          renderJobs();
+  if(t==='business')      renderBusiness();
+  if(t==='politics' && typeof renderPolitics==='function') renderPolitics();
   if(t==='acting')        renderActing();
   if(t==='prosports')     renderProSports();
   if(t==='activities')    renderActivities();
@@ -660,7 +1705,8 @@ function updateHUD(){
     statBar('Health', G.health, 'bar-h') +
     statBar('Happy',  G.happy,  'bar-p') +
     statBar('Smarts', G.smarts, 'bar-s') +
-    statBar('Looks',  G.looks,  'bar-l');
+    statBar('Looks',  G.looks,  'bar-l') +
+    statBar('Stress', G.stress, 'bar-stress');
 }
 
 function statBar(label, val, cls){
@@ -672,11 +1718,141 @@ function statBar(label, val, cls){
   </div>`;
 }
 
+function feedbackToneFromType(type=''){
+  if(type==='love' || type==='good') return 'positive';
+  if(type==='bad') return 'negative';
+  if(type==='warn') return 'awkward';
+  return 'neutral';
+}
+
+function feedbackTypeByTone(tone='neutral'){
+  if(tone==='positive' || tone==='exciting') return 'good';
+  if(tone==='negative' || tone==='humiliating') return 'bad';
+  if(tone==='awkward' || tone==='tense') return 'warn';
+  return '';
+}
+
+function eventFeedback(label, text, opts={}){
+  ensureSimShape();
+  const tone = opts.tone || 'neutral';
+  const type = opts.type || feedbackTypeByTone(tone);
+  const prefix = label ? `[${label}] ` : '';
+  addEv(prefix + text, type);
+  const fb = G.sim.feedback;
+  fb.eventCounter = (fb.eventCounter||0) + 1;
+  fb.lastTone = tone;
+  fb.lastSource = opts.source || '';
+  fb.lastLabel = label || '';
+  fb.recent.push({
+    age:G.age||0,
+    label:label||'',
+    source:opts.source||'',
+    tone,
+    type:type||'',
+    text,
+  });
+  if(fb.recent.length>40) fb.recent.shift();
+  if(opts.popup){
+    const title = opts.popupTitle || (label ? `${label} Event` : 'Event');
+    const body = opts.popupBody || text;
+    const popupTone = opts.popupTone || (tone==='negative' || tone==='humiliating' ? 'dark' : 'normal');
+    const actions = opts.actions || [{ label:'Continue', cls:'btn-primary', onClick:()=>{} }];
+    showPopup(title, body, actions, popupTone);
+  }
+}
+
+function feedbackLabelForSource(source=''){
+  if(!source) return 'Event';
+  const map = {
+    school:'School',
+    school_event:'School',
+    school_social:'School Social',
+    school_dating:'School Dating',
+    school_pattern:'School Pattern',
+    crime:'Crime',
+    business:'Business',
+    politics:'Politics',
+    relationships:'Relationships',
+    health:'Health',
+    jobs:'Career',
+    social:'Social',
+  };
+  if(map[source]) return map[source];
+  return String(source).replace(/[_-]+/g, ' ').replace(/\b\w/g, m=>m.toUpperCase());
+}
+
+function feedbackToneFromMood(mood='neutral'){
+  if(mood==='success' || mood==='positive') return 'positive';
+  if(mood==='failure' || mood==='negative' || mood==='humiliating') return 'negative';
+  if(mood==='awkward' || mood==='tense') return 'awkward';
+  if(mood==='exciting') return 'exciting';
+  return 'neutral';
+}
+
+function applyFeedbackStatDelta(delta={}){
+  const impacts = [];
+  if(!delta || typeof delta!=='object') return impacts;
+  Object.entries(delta).forEach(([k, raw])=>{
+    const v = Number(raw);
+    if(!Number.isFinite(v) || v===0) return;
+    if(k==='health'){ G.health = clamp(G.health + v); impacts.push(`Health ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='happy'){ G.happy = clamp(G.happy + v); impacts.push(`Happy ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='smarts'){ G.smarts = clamp(G.smarts + v); impacts.push(`Smarts ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='looks'){ G.looks = clamp(G.looks + v); impacts.push(`Looks ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='stress'){ G.stress = clamp(G.stress + v); impacts.push(`Stress ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='money'){ G.money += Math.trunc(v); impacts.push(`Money ${v>0?'+':''}${fmt$(Math.abs(Math.trunc(v)))}`); return; }
+    if(k==='reputation'){ G.social.reputation = clamp((G.social.reputation||50) + v); impacts.push(`Social Rep ${v>0?'+':''}${Math.trunc(v)}`); return; }
+    if(k==='gpa'){ G.school.gpa = Math.max(0, Math.min(4, Number(((G.school.gpa||2.5)+v).toFixed(2)))); impacts.push(`GPA ${v>0?'+':''}${v.toFixed(2)}`); return; }
+    if(k==='popularity'){ if(G.school?.high?.reputation){ G.school.high.reputation.popularity = clamp((G.school.high.reputation.popularity||40) + v); impacts.push(`Popularity ${v>0?'+':''}${Math.trunc(v)}`); } return; }
+    if(k==='academics'){ if(G.school?.high?.reputation){ G.school.high.reputation.academics = clamp((G.school.high.reputation.academics||45) + v); impacts.push(`Academic Rep ${v>0?'+':''}${Math.trunc(v)}`); } return; }
+    if(k==='behavior'){ if(G.school?.high?.reputation){ G.school.high.reputation.behavior = clamp((G.school.high.reputation.behavior||50) + v); impacts.push(`Behavior Rep ${v>0?'+':''}${Math.trunc(v)}`); } return; }
+  });
+  return impacts;
+}
+
+function gameFeedback(payload={}){
+  ensureSimShape();
+  const source = payload.source || '';
+  const label = payload.label || feedbackLabelForSource(source);
+  const tone = payload.tone || feedbackToneFromMood(payload.mood || feedbackToneFromType(payload.eventType||''));
+  const type = payload.eventType || feedbackTypeByTone(tone);
+  const statImpacts = applyFeedbackStatDelta(payload.statDelta||{});
+  const extraImpacts = Array.isArray(payload.impacts) ? payload.impacts.filter(Boolean) : [];
+  const combinedImpacts = [...extraImpacts, ...statImpacts];
+  const popupBody = combinedImpacts.length
+    ? `${payload.text||''}\n\nImpact: ${combinedImpacts.join(' · ')}`
+    : (payload.text||'');
+  eventFeedback(label, payload.text||'', {
+    tone,
+    type,
+    source,
+    popup: payload.popup===true,
+    popupTitle: payload.title || `${label} Update`,
+    popupBody,
+    popupTone: payload.popupTone || (tone==='negative' ? 'dark' : 'normal'),
+    actions: payload.actions,
+  });
+  const fb = G.sim.feedback;
+  if(payload.action) fb.lastAction = String(payload.action);
+  if(payload.relationshipDelta && typeof payload.relationshipDelta==='object'){
+    fb.lastRelationshipDelta = payload.relationshipDelta;
+  }
+  if(combinedImpacts.length){
+    fb.lastImpactSummary = combinedImpacts.join(' · ');
+  }
+}
+
 // ── EVENTS ──────────────────────────────────────────────────────
 function addEv(text, type=''){
   const ev = {text, type};
   G.lifeEvents.push(ev);
   G.yearEvents.push(ev);
+  if(typeof G.stress==='number'){
+    if(type==='love') G.stress = clamp(G.stress - rnd(2,5));
+    else if(type==='good') G.stress = clamp(G.stress - rnd(1,2));
+    else if(type==='warn' && Math.random()<0.28) G.stress = clamp(G.stress + 1);
+    else if(type==='bad') G.stress = clamp(G.stress + rnd(1,2));
+  }
   // Track darkness
   if(type==='bad') G.darkScore++;
 }
@@ -737,20 +1913,40 @@ function assignAdultCareer(p){
 function makePerson(role, gender){
   const g  = gender || pick(['male','female']);
   const fn = g==='male' ? pick(NM) : pick(NF);
+  const relation = rnd(40,80);
+  const compat = rnd(30,90);
+  const fertilityBase = g==='female'
+    ? (Math.random()<0.18 ? rnd(76,92) : Math.random()<0.08 ? rnd(50,75) : rnd(90,99))
+    : null;
   return {
     name: `${fn} ${pick(NS)}`,
     firstName: fn,
     gender: g,
     role,
-    relation: rnd(40,80),
+    relation,
     alive: true,
     age: 0,
     career: null,
     uniEnrolled: false,
     uniCourse: '',
     anniversaryYear: null,   // for spouse
+    fertilityBase,
+    pregnant:false,
+    pregnantDueAge:0,
+    pregnancyPartnerName:'',
+    pregnancySource:'',
     traits: [],
-    compat: rnd(30,90),
+    compat,
+    relMemory:{
+      trust: clamp(relation + Math.floor((compat-50)/6)),
+      resentment: Math.max(0, Math.floor((50-relation)/3)),
+      promisesKept:0,
+      promisesBroken:0,
+      conflicts:0,
+      supportMoments:0,
+      lastMeaningfulYear:0,
+      history:[],
+    },
   };
 }
 
@@ -821,9 +2017,78 @@ function genFamily(){
   return fam;
 }
 
+function processPregnancyYear(){
+  ensureBioShape();
+  const deliver = (person, partnerName='', source='')=>{
+    let child = null;
+    if(typeof haveChild==='function'){
+      child = haveChild(isMainCharacterPerson(person) ? null : person);
+    } else {
+      const gender = pick(['male','female']);
+      const fn = gender==='male' ? pick(NM) : pick(NF);
+      child = {
+        name: `${fn} ${G.lastname}`,
+        firstName: fn,
+        gender,
+        role: 'Child',
+        relation: rnd(70,90),
+        alive: true,
+        age: 0,
+        career: null,
+        uniEnrolled: false,
+        uniCourse: '',
+        uniYear: 0,
+        adopted: false,
+        custody: 'you',
+      };
+      G.children.push(child);
+    }
+    const by = partnerName ? ` with ${partnerName}` : '';
+    if(isMainCharacterPerson(person)){
+      addEv(`You gave birth to ${child.firstName}${by}.`, 'love');
+      setPersonPregnancyState(G, false);
+    } else {
+      addEv(`${person.firstName} gave birth to ${child.firstName}${by}.`, 'love');
+      setPersonPregnancyState(person, false);
+    }
+    G.happy = clamp(G.happy + rnd(8,16));
+    G.stress = clamp((G.stress||35) + rnd(2,7));
+    flash(`🍼 ${child.firstName} was born`,'good');
+  };
+
+  if(G.gender==='female' && G.repro.pregnant && G.repro.dueAge<=G.age){
+    deliver(G, G.repro.partnerName, G.repro.source);
+  }
+  if(G.spouse && G.spouse.alive && G.spouse.gender==='female' && G.spouse.pregnant && (G.spouse.pregnantDueAge||0)<=G.age){
+    deliver(G.spouse, G.spouse.pregnancyPartnerName, G.spouse.pregnancySource||'relationship');
+  }
+  (G.lovers||[]).forEach(l=>{
+    if(l && l.alive!==false && l.gender==='female' && l.pregnant && (l.pregnantDueAge||0)<=G.age){
+      deliver(l, l.pregnancyPartnerName, l.pregnancySource||'relationship');
+    }
+  });
+
+  const primaryPartner = (G.spouse && G.spouse.alive)
+    ? G.spouse
+    : (G.lovers||[]).filter(l=>l && l.alive!==false).sort((a,b)=>(b.relation||0)-(a.relation||0))[0];
+  if(!primaryPartner || G.age<18) return;
+
+  if(personCanGetPregnant(G) && fertilityForPerson(G)>=75 && Math.random()<0.2){
+    startPregnancy(G, primaryPartner.firstName||primaryPartner.name||'your partner', 'annual_partner');
+  }
+  if(personCanGetPregnant(primaryPartner) && fertilityForPerson(primaryPartner)>=75 && Math.random()<0.2){
+    startPregnancy(primaryPartner, G.firstname||'you', 'annual_partner');
+  }
+}
+
 // ── AGE UP ENGINE ────────────────────────────────────────────────
 function ageUp(){
   ensureFinanceShape();
+  ensureGovLegalShape();
+  ensureSimShape();
+  ensureCareerShape();
+  ensureBioShape();
+  if(typeof ensurePoliticsState==='function') ensurePoliticsState();
   if(typeof ensureMMAState==='function') ensureMMAState();
   G.age++;
   G.yearEvents = [];
@@ -843,12 +2108,16 @@ function ageUp(){
     rentPaid:0, mortgagePaid:0, utilitiesPaid:0, upkeepPaid:0, debtInterest:0, propertyTax:0,
     retirementContrib:0,
   };
+  if((G.career.trackCooldown||0)>0) G.career.trackCooldown = Math.max(0, G.career.trackCooldown-1);
 
   // ── Passive stat drift ───────────────────────────────────────
   if(a>40) G.health = clamp(G.health - rnd(0,2));
   if(a>60) G.health = clamp(G.health - rnd(0,3));
   G.happy  = clamp(G.happy  + rnd(-4,5));
   G.smarts = clamp(G.smarts + rnd(-1,2));
+  G.stress = clamp((G.stress||35) + rnd(-8,0));
+  if((G.happy||50)>=70) G.stress = clamp((G.stress||35) - rnd(3,7));
+  else if((G.happy||50)>=58) G.stress = clamp((G.stress||35) - rnd(2,4));
   if(a<25)      G.looks = clamp(G.looks + rnd(0,2));
   else if(a>32) G.looks = clamp(G.looks - rnd(0,2));
 
@@ -940,6 +2209,62 @@ function ageUp(){
     }
   });
 
+  // ── Pets aging, care costs, companionship ─────────────────────
+  if(!Array.isArray(G.pets)) G.pets = [];
+  G.pets.forEach(p=>{
+    if(!p || !p.alive) return;
+    p.age = (p.age||0) + 1;
+    p.health = clamp((p.health??70) + rnd(-3,2));
+    p.happiness = clamp((p.happiness??65) + rnd(-4,3));
+    p.bond = clamp((p.bond??55) + (p.happiness>=60 ? rnd(0,2) : rnd(-2,1)));
+
+    const annualCare = p.annualCost||0;
+    if(G.age>=18 && annualCare>0){
+      if(G.money>=annualCare){
+        G.money -= annualCare;
+      } else {
+        const deficit = annualCare - Math.max(0, G.money);
+        G.money = 0;
+        G.finance.debt += Math.floor(deficit * 1.08);
+        p.happiness = clamp(p.happiness - rnd(6,12));
+        G.stress = clamp((G.stress||35) + rnd(4,8));
+        addEv(`${p.name}'s care costs were hard to cover this year. Debt increased by ${fmt$(Math.floor(deficit*1.08))}.`, 'warn');
+      }
+    }
+
+    if(p.happiness>=70 && p.bond>=70){
+      G.happy = clamp(G.happy + rnd(1,3));
+      G.stress = clamp((G.stress||35) - rnd(2,5));
+    } else if(p.happiness<=30){
+      G.happy = clamp(G.happy - rnd(1,3));
+      G.stress = clamp((G.stress||35) + rnd(2,4));
+    }
+
+    const lifespan = p.lifespan||14;
+    if(p.health<35 && Math.random()<0.2){
+      const vetBill = rnd(250,1400);
+      if(G.age>=18 && G.money>=vetBill){
+        G.money -= vetBill;
+        p.health = clamp(p.health + rnd(8,16));
+        addEv(`${p.name} needed urgent vet care. You paid ${fmt$(vetBill)} and they recovered.`, 'warn');
+      } else if(G.age>=18){
+        p.health = clamp(p.health - rnd(5,12));
+        addEv(`${p.name} needed veterinary care, but finances were tight.`, 'bad');
+      } else if(Math.random()<0.6){
+        p.health = clamp(p.health + rnd(6,12));
+        addEv(`Your family took ${p.name} to the vet and covered the bill.`, 'good');
+      }
+    }
+
+    const oldAgeRisk = p.age>lifespan ? Math.min(0.75, 0.16 + (p.age-lifespan)*0.08) : 0;
+    if(oldAgeRisk>0 && Math.random()<oldAgeRisk){
+      p.alive = false;
+      G.happy = clamp(G.happy - rnd(12,26));
+      G.stress = clamp((G.stress||35) + rnd(6,14));
+      addEv(`${p.name} passed away peacefully at age ${p.age}. You miss them deeply.`, 'bad');
+    }
+  });
+
   // ── Spouse aging & marriage anniversary ─────────────────────
   if(G.spouse && G.spouse.alive){
     G.spouse.age++;
@@ -975,6 +2300,10 @@ function ageUp(){
       G.lovers = G.lovers.filter(x=>x.name!==l.name);
     }
   });
+  if(typeof relationshipYearPulse==='function'){
+    runYearStepSafe('relationships', ()=>relationshipYearPulse());
+  }
+  runYearStepSafe('pregnancy', ()=>processPregnancyYear());
 
   // ── Random life event pool ───────────────────────────────────
   const eligible = LIFE_EVENTS.filter(e => a>=e[0] && a<=e[1]);
@@ -997,7 +2326,7 @@ function ageUp(){
   }
 
   // ── Illness roll ─────────────────────────────────────────────
-  rollIllness();
+  runYearStepSafe('health', ()=>rollIllness());
 
   // ── Ongoing condition drain ──────────────────────────────────
   if(G.medical.conditions.includes('depression')) G.happy  = clamp(G.happy-4);
@@ -1038,6 +2367,9 @@ function ageUp(){
       flash('🩺 Medical license earned','good');
     }
   }
+  if(typeof processMedicalCareerYear==='function'){
+    runYearStepSafe('medical_career', ()=>processMedicalCareerYear(yearLedger));
+  }
 
   if(G.career.lawSchool.enrolled){
     const ls = G.career.lawSchool;
@@ -1073,6 +2405,11 @@ function ageUp(){
     }
   }
 
+  // ── Deep medical career yearly simulation ───────────────────
+  if(typeof medicalProgressYear==='function'){
+    runYearStepSafe('medical_career', ()=>medicalProgressYear());
+  }
+
   // ── Careers: salary + promotions + HR risk ──────────────────
   if(G.career.employed){
     const c = G.career;
@@ -1081,29 +2418,74 @@ function ageUp(){
     c.years++;
     c.performance = clamp(c.performance + rnd(-4,6));
     c.reputation = clamp(c.reputation + rnd(-2,3));
+    c.influence = clamp((c.influence||45) + rnd(-3,5));
+    c.burnout = clamp((c.burnout||12) + rnd(2,7));
+    c.careerActionsUsed = 0;
     if(c.salary>0) addEv(`Annual salary received: ${fmt$(c.salary)} from ${c.company}.`, 'good');
+    G.stress = clamp(G.stress + rnd(1,4) + (c.hrRisk>=60?2:0) + ((c.burnout||12)>=70?2:0) - (c.performance>=78?1:0));
 
     // coworker drift
     c.coworkers.forEach(w=>{ w.relation = clamp(w.relation + rnd(-2,4)); });
+    const avgCoworkerRel = c.coworkers.length ? c.coworkers.reduce((acc,w)=>acc + (w.relation||50),0)/c.coworkers.length : 50;
+    c.influence = clamp(c.influence + Math.floor((avgCoworkerRel-50)/20));
+    c.layoffShield = clamp(
+      (c.layoffShield||20)
+      + (c.performance>=75 ? rnd(1,3) : c.performance<45 ? -rnd(1,3) : 0)
+      + (c.certifications?.length||0)
+    );
+
+    // Layoff waves are separate from HR issues.
+    const layoffWave = Math.random()<0.18 ? rnd(55,95) : rnd(6,48);
+    const layoffRiskScore = clamp(
+      layoffWave
+      + Math.floor((c.burnout||12)/4)
+      + Math.floor(c.hrRisk/2)
+      - Math.floor(c.performance/2)
+      - Math.floor((c.influence||45)/2.2)
+      - Math.floor((c.layoffShield||20)/1.7)
+    );
+    if(layoffWave>=70 && Math.random()<0.35){
+      addEv(`Layoff wave hit ${c.company}. Teams were cut aggressively.`, 'warn');
+    }
+    if(layoffRiskScore>=65 && Math.random()<Math.min(0.45, layoffRiskScore/180)){
+      addEv(`Restructuring at ${c.company} eliminated your role. You were laid off.`, 'bad');
+      flash('Laid off in restructuring.','bad');
+      c.employed = false; c.fired = true; c.jobId=null; c.title=''; c.company=''; c.salary=0; c.level=0; c.years=0;
+      c.coworkers=[]; c.boss=null; c.hrRisk=18; c.burnout = clamp((c.burnout||12) - rnd(6,14));
+    }
 
     // Promotion chance
-    const nextLevel = JOB_LEVELS[c.level+1];
-    if(nextLevel && c.years >= nextLevel.minYears && c.performance>=70 && Math.random()<0.35){
-      c.level++;
-      const old = c.salary;
-      c.salary = Math.floor(c.salary * (nextLevel.payMult/JOB_LEVELS[c.level-1].payMult));
-      c.milestones.push({ year:G.age, text:`Promoted to ${JOB_LEVELS[c.level].label}` });
-      addEv(`Promotion! You advanced to ${JOB_LEVELS[c.level].label} level. Salary: ${fmt$(c.salary)}/yr.`, 'good');
-      flash('📈 Promoted!','good');
+    const nextLevel = c.employed ? JOB_LEVELS[c.level+1] : null;
+    if(nextLevel){
+      const certBonus = Math.min(3, (c.certifications?.length||0));
+      const requiredYears = Math.max(1, nextLevel.minYears - certBonus - (c.track==='managerial'?1:0));
+      let promoChance = 0.16
+        + (c.performance-65)/220
+        + (c.reputation-50)/280
+        + (c.influence-45)/240
+        + certBonus*0.02;
+      if(c.track==='managerial') promoChance += 0.05;
+      if(c.track==='specialist' && ['senior','lead'].includes(nextLevel.id)) promoChance += 0.05;
+      if(c.track==='executive' && nextLevel.id==='exec') promoChance += 0.08;
+      promoChance = Math.max(0.05, Math.min(0.62, promoChance));
+      if(c.years >= requiredYears && c.performance>=68 && Math.random()<promoChance){
+        c.level++;
+        c.salary = Math.floor(c.salary * (nextLevel.payMult/JOB_LEVELS[c.level-1].payMult));
+        c.milestones.push({ year:G.age, text:`Promoted to ${JOB_LEVELS[c.level].label}` });
+        c.influence = clamp((c.influence||45) + rnd(4,10));
+        c.layoffShield = clamp((c.layoffShield||20) + rnd(2,6));
+        addEv(`Promotion! You advanced to ${JOB_LEVELS[c.level].label} level. Salary: ${fmt$(c.salary)}/yr.`, 'good');
+        flash('📈 Promoted!','good');
+      }
     }
 
     // HR risk consequences
-    if(c.hrRisk>75 && Math.random()<0.35){
+    if(c.employed && c.hrRisk>75 && Math.random()<0.35){
       addEv(`HR opened an investigation at ${c.company}. It did not go well. You were fired.`, 'bad');
       flash('Fired. HR investigation.','bad');
       c.employed = false; c.fired = true; c.jobId=null; c.title=''; c.company=''; c.salary=0; c.level=0; c.years=0;
-      c.coworkers=[]; c.boss=null; c.hrRisk=30;
-    } else if(c.hrRisk>55 && Math.random()<0.25){
+      c.coworkers=[]; c.boss=null; c.hrRisk=30; c.burnout = clamp((c.burnout||12) - rnd(6,14));
+    } else if(c.employed && c.hrRisk>55 && Math.random()<0.25){
       c.hrRisk = clamp(c.hrRisk - rnd(8,16));
       addEv('HR gave you a formal warning. You toed the line. For now.', 'warn');
     }
@@ -1118,6 +2500,7 @@ function ageUp(){
       addEv(`Annual bonus: ${fmt$(bonus)} from ${G.career.company}.`, 'good');
     }
     if(G.career.benefits.healthPlan) G.health = clamp(G.health + rnd(1,3));
+    if(G.career.benefits.healthPlan && Math.random()<0.3) G.stress = clamp(G.stress - 1);
     if(G.career.stockUnits>0 && G.career.stockValue>0){
       const drift = rnd(-8,12) / 100;
       G.career.stockValue = Math.max(5, Math.floor(G.career.stockValue * (1+drift)));
@@ -1205,17 +2588,12 @@ function ageUp(){
     G.finance.debt += interest;
     yearLedger.debtInterest += interest;
     addEv(`Debt interest accrued: ${fmt$(interest)}.`, 'warn');
+    G.stress = clamp(G.stress + (G.finance.debt>200000?5:G.finance.debt>75000?3:2));
   }
-  if(G.finance.investments>0){
-    const pct = rnd(-5,12)/100;
-    const delta = Math.floor(G.finance.investments * pct);
-    G.finance.investments = Math.max(0, G.finance.investments + delta);
-    if(delta>=0){
-      yearLedger.investmentGains += delta;
-      addEv(`Investments gained ${fmt$(delta)} this year.`, 'good');
-    }
-    else addEv(`Investments lost ${fmt$(Math.abs(delta))} this year.`, 'warn');
-  }
+  runYearStepSafe('investments', ()=>processInvestmentAndCryptoYear(yearLedger));
+  runYearStepSafe('business', ()=>processBusinessYear(yearLedger));
+  runYearStepSafe('government', ()=>processGovernmentYear());
+  runYearStepSafe('legal', ()=>processLegalYear());
 
   // ── HS sport passive bonus ───────────────────────────────────
   if(G.age>=14 && G.age<=17 && G.school.sport){
@@ -1245,7 +2623,8 @@ function ageUp(){
     const newStreams = Math.floor((mus.streams * rnd(3,12)/100 + mus.tracks * rnd(100,800)) * opinionMult * instBonus);
     mus.streams += newStreams;
     // Rate per stream (label gives better rate)
-    const streamRate = mus.labelTier>=3 ? 0.006 : mus.labelTier>=2 ? 0.005 : 0.004;
+    const fameMoneyMult = 1 + Math.min(1.4, (G.sm.totalFame||0)/95);
+    const streamRate = (mus.labelTier>=3 ? 0.006 : mus.labelTier>=2 ? 0.005 : 0.004) * fameMoneyMult;
     const musicRev = Math.floor(newStreams * streamRate);
     // Producer royalties
     const prodRev = mus.isProducer ? Math.floor(mus.producerCredits * rnd(500,3000)) : 0;
@@ -1345,20 +2724,20 @@ function ageUp(){
 
   // ── Passive: Acting — annual events ──────────────────────────
   if(G.acting.active){
-    actingPassive();
+    runYearStepSafe('acting', ()=>actingPassive());
   }
 
   // ── Passive: NFL season ───────────────────────────────────────
   if(G.nfl.active && !G.nfl.retired){
-    nflSeasonPassive();
+    runYearStepSafe('NFL', ()=>nflSeasonPassive());
   }
 
   // ── Passive: NBA season ───────────────────────────────────────
   if(G.nba.active && !G.nba.retired){
-    nbaSeasonPassive();
+    runYearStepSafe('NBA', ()=>nbaSeasonPassive());
   }
   if(G.mma && (G.mma.active || G.mma.pro?.isPro)){
-    mmaSeasonPassive();
+    runYearStepSafe('MMA', ()=>mmaSeasonPassive());
   }
 
   // ── Fame -> Social Media growth ──────────────────────────────
@@ -1376,8 +2755,12 @@ function ageUp(){
       activePlatforms.forEach(pid=>{
         const acc = G.sm.platforms[pid];
         const base = Math.floor((acc.followers*0.05 + rnd(200,2000)) * fameBoost);
+        const fameMonetization = 1 + Math.min(1.15, (G.sm.totalFame||0)/90);
+        const passiveRev = Math.floor(base * 0.002 * (SM_PLATFORMS[pid].revenueMulti||1) * fameMonetization);
         acc.followers += base;
-        acc.revenue += Math.floor(base * 0.002 * (SM_PLATFORMS[pid].revenueMulti||1));
+        acc.revenue += passiveRev;
+        G.sm.totalRevenue += passiveRev;
+        G.money += passiveRev;
       });
     }
   }
@@ -1400,6 +2783,7 @@ function ageUp(){
     if(tier){
       let pay = tier.pay;
       if(G.sm.sponsor.exclusive) pay = Math.floor(pay*1.2);
+      pay = Math.floor(pay * (1 + Math.min(1.2, (G.sm.totalFame||0)/100)));
       G.money += pay; G.sm.totalRevenue += pay;
       addEv(`Sponsor payout from ${G.sm.sponsor.brand||'your sponsor'}: ${fmt$(pay)}.`, 'good');
       if(G.sm.controversies>=3 && Math.random()<0.2){
@@ -1426,9 +2810,28 @@ function ageUp(){
     }
   }
 
+  if(typeof orchestraYearlyProgress==='function'){
+    runYearStepSafe('clubs_orchestra', ()=>orchestraYearlyProgress());
+  }
+  if(typeof streetRacingHeatCooldownYear==='function'){
+    runYearStepSafe('street_racing_heat', ()=>streetRacingHeatCooldownYear());
+  }
+
   // ── Crime: heat decay & retaliation ─────────────────────────
+  if(typeof processDrugEcosystemYear==='function'){
+    runYearStepSafe('drug_ecosystem', ()=>processDrugEcosystemYear());
+  }
+  if(typeof processGangYear==='function'){
+    runYearStepSafe('gang', ()=>processGangYear());
+  }
   if(G.crime.heat>0){
     G.crime.heat = Math.max(0, G.crime.heat - rnd(3,8));
+  }
+  if(G.crime.heists && typeof G.crime.heists.cooldown==='number' && G.crime.heists.cooldown>0){
+    G.crime.heists.cooldown = Math.max(0, G.crime.heists.cooldown - 1);
+    if(G.crime.heists.cooldown===0){
+      addEv('The city cooled off. New heist windows opened.', 'warn');
+    }
   }
   if(G.crime.heat>=70 && Math.random()<0.2){
     const loss = rnd(200,2000);
@@ -1481,9 +2884,31 @@ function ageUp(){
     });
   }
 
+  // ── Stress system: director pass + consequences ────────────────
+  runDirectorYearPass();
+
+  if(G.stress>=90){
+    G.health = clamp(G.health - rnd(5,11));
+    G.happy = clamp(G.happy - rnd(6,12));
+    G.smarts = clamp(G.smarts - rnd(1,3));
+    if(!G.medical.conditions.includes('burnout') && Math.random()<0.35){
+      G.medical.conditions.push('burnout');
+      addEv('Chronic stress tipped into burnout. Everything feels heavier.', 'bad');
+    } else {
+      addEv('Extreme stress hit your body hard this year.', 'bad');
+    }
+  } else if(G.stress>=72){
+    G.happy = clamp(G.happy - rnd(3,7));
+    G.health = clamp(G.health - rnd(1,4));
+    addEv('High stress made this year harder than it needed to be.', 'warn');
+  } else if(G.stress<=28){
+    G.happy = clamp(G.happy + rnd(1,4));
+    if(Math.random()<0.4) G.health = clamp(G.health + rnd(1,3));
+  }
+
   // ── Annual tax filing + post-tax credit drift ────────────────
   if(G.age>=18){
-    processAnnualTaxes(yearLedger, moneyAtYearStart, totalsAtYearStart);
+    runYearStepSafe('tax', ()=>processAnnualTaxes(yearLedger, moneyAtYearStart, totalsAtYearStart));
   } else {
     G.finance.tax.lastPaid = 0;
     G.finance.tax.lastRefund = 0;
@@ -1505,22 +2930,51 @@ function ageUp(){
   updateHUD();
   switchTab('life');
   renderLife();
+  saveGame(true);
 }
+
+// Safety wrapper: never let one runtime error permanently block Age Up.
+const __ageUpImpl = ageUp;
+ageUp = function(){
+  try{
+    __ageUpImpl();
+  }catch(err){
+    console.error('Fatal ageUp error', err);
+    try{
+      addEv('A simulation error occurred this year. The game recovered automatically.', 'warn');
+      flash('Recovered from age-up error. Try again.','warn');
+      updateHUD();
+      switchTab('life');
+      renderLife();
+    }catch(_e){}
+  }
+};
+
+// Refresh title-screen continue button once scripts are loaded.
+setTimeout(()=>{ try{ refreshSaveUI(); }catch(_e){} }, 0);
 
 // ── LIFE TAB ────────────────────────────────────────────────────
 function renderLife(){
   document.getElementById('life-year-label').textContent = `Age ${G.age} — This Year`;
+  ensureSimShape();
+  const director = G.sim.director||{};
   const recent = [...G.yearEvents].reverse().slice(0,8);
+  const directorLine = (director.lastAge===G.age)
+    ? `<li class="event-item">
+        <div class="ev-pip-wrap"><span class="edot good"></span></div>
+        <span class="ev-text" style="color:var(--muted2)">Director review → Pressure ${director.lastPressure||0} · Recovery ${director.lastRecovery||0} · Net ${director.lastNet>=0?'+':''}${director.lastNet||0} · Stress ${director.lastStressDelta>=0?'+':''}${director.lastStressDelta||0}</span>
+      </li>`
+    : '';
   document.getElementById('event-log').innerHTML = recent.length
     ? recent.map(e=>`
         <li class="event-item ${e.type||''}">
           <div class="ev-pip-wrap"><span class="edot ${e.type||''}"></span></div>
           <span class="ev-text">${e.text}</span>
-        </li>`).join('')
+        </li>`).join('') + directorLine
     : `<li class="event-item">
         <div class="ev-pip-wrap"><span class="edot"></span></div>
         <span class="ev-text" style="color:var(--muted2)">A quiet year. Nothing much happened. Sometimes that's okay.</span>
-       </li>`;
+       </li>${directorLine}`;
 
   const aa = document.getElementById('age-up-area');
   if(G.age>=90){

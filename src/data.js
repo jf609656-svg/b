@@ -305,29 +305,29 @@ const ILLNESSES = [
 // ── ACTIVITIES ─────────────────────────────────────────────────
 const ACTIVITIES = [
   { icon:'🏋️', name:'Work Out',        desc:'+Health +Looks',          minAge:10,
-    fn(){ G.health=clamp(G.health+rnd(5,12)); G.looks=clamp(G.looks+rnd(2,7)); addEv('You hit the gym consistently. Feeling it.'); flash('+Health +Looks 💪'); }},
+    fn(){ G.health=clamp(G.health+rnd(5,12)); G.looks=clamp(G.looks+rnd(2,7)); G.stress=clamp((G.stress||35)-rnd(5,10)); addEv('You hit the gym consistently. Feeling it.'); flash('+Health +Looks 💪'); }},
   { icon:'📚', name:'Read',            desc:'+Smarts',                  minAge:5,
-    fn(){ G.smarts=clamp(G.smarts+rnd(5,12)); addEv('You read widely. Something shifted in how you think.'); flash('+Smarts 📚'); }},
+    fn(){ G.smarts=clamp(G.smarts+rnd(5,12)); G.stress=clamp((G.stress||35)-rnd(2,6)); addEv('You read widely. Something shifted in how you think.'); flash('+Smarts 📚'); }},
   { icon:'✈️', name:'Travel the World', desc:'Plan a trip anywhere',    minAge:16,
     fn(){ openTravelPlanner(); }},
   { icon:'🎉', name:'Party Hard',      desc:'+Happy / -Health',         minAge:16,
-    fn(){ G.happy=clamp(G.happy+rnd(8,14)); G.health=clamp(G.health-rnd(3,7)); addEv('You partied hard. Great memories, questionable choices.'); flash('+Happy 🎉'); }},
+    fn(){ G.happy=clamp(G.happy+rnd(8,14)); G.health=clamp(G.health-rnd(3,7)); G.stress=clamp((G.stress||35)-rnd(3,7)); addEv('You partied hard. Great memories, questionable choices.'); flash('+Happy 🎉'); }},
   { icon:'🧘', name:'Meditate',        desc:'+Health +Happy',           minAge:12,
-    fn(){ G.health=clamp(G.health+rnd(5,12)); G.happy=clamp(G.happy+rnd(4,9)); addEv('You prioritised your wellness. Mind and body in sync.'); flash('+Health +Happy 🧘'); }},
+    fn(){ G.health=clamp(G.health+rnd(5,12)); G.happy=clamp(G.happy+rnd(4,9)); G.stress=clamp((G.stress||35)-rnd(8,15)); addEv('You prioritised your wellness. Mind and body in sync.'); flash('+Health +Happy 🧘'); }},
   { icon:'💰', name:'Side Hustle',     desc:'Earn money · 16+',         minAge:16,
-    fn(){ if(G.age<16){flash('Too young to work.','warn');return;} const e=rnd(300,1400); G.money+=e; addEv(`Side hustle paid $${e}.`); flash(`+$${e} 💰`); }},
+    fn(){ if(G.age<16){flash('Too young to work.','warn');return;} const e=rnd(300,1400); G.money+=e; G.stress=clamp((G.stress||35)-rnd(0,3)); addEv(`Side hustle paid $${e}.`); flash(`+$${e} 💰`); }},
   { icon:'🍎', name:'Eat Healthy',     desc:'+Health',                  minAge:5,
-    fn(){ G.health=clamp(G.health+rnd(4,10)); addEv('Clean eating. You feel annoyingly virtuous.'); flash('+Health 🍎'); }},
+    fn(){ G.health=clamp(G.health+rnd(4,10)); G.stress=clamp((G.stress||35)-rnd(2,5)); addEv('Clean eating. You feel annoyingly virtuous.'); flash('+Health 🍎'); }},
   { icon:'🎸', name:'Learn Instrument',desc:'+Smarts +Happy',           minAge:8,
-    fn(){ G.smarts=clamp(G.smarts+rnd(3,7)); G.happy=clamp(G.happy+rnd(4,9)); addEv('You practiced an instrument. Creative outlet found.'); flash('+Smarts +Happy 🎸'); }},
+    fn(){ G.smarts=clamp(G.smarts+rnd(3,7)); G.happy=clamp(G.happy+rnd(4,9)); G.stress=clamp((G.stress||35)-rnd(3,8)); addEv('You practiced an instrument. Creative outlet found.'); flash('+Smarts +Happy 🎸'); }},
   { icon:'🏃', name:'Go for a Run',    desc:'+Health',                  minAge:8,
-    fn(){ G.health=clamp(G.health+rnd(6,13)); G.looks=clamp(G.looks+rnd(1,4)); addEv('You ran. Every step was suffering. You feel great.'); flash('+Health 🏃'); }},
+    fn(){ G.health=clamp(G.health+rnd(6,13)); G.looks=clamp(G.looks+rnd(1,4)); G.stress=clamp((G.stress||35)-rnd(5,10)); addEv('You ran. Every step was suffering. You feel great.'); flash('+Health 🏃'); }},
   { icon:'🎨', name:'Create Art',      desc:'+Happy +Smarts',           minAge:5,
-    fn(){ G.happy=clamp(G.happy+rnd(5,10)); G.smarts=clamp(G.smarts+rnd(2,6)); addEv('You made something. The process mattered more than the result.'); flash('+Happy +Smarts 🎨'); }},
+    fn(){ G.happy=clamp(G.happy+rnd(5,10)); G.smarts=clamp(G.smarts+rnd(2,6)); G.stress=clamp((G.stress||35)-rnd(3,8)); addEv('You made something. The process mattered more than the result.'); flash('+Happy +Smarts 🎨'); }},
   { icon:'🍳', name:'Cook a Meal',     desc:'+Happy +Health',           minAge:12,
-    fn(){ G.happy=clamp(G.happy+rnd(5,9)); G.health=clamp(G.health+rnd(3,7)); addEv('You cooked from scratch. Actually tasted good. Dangerous confidence building.'); flash('+Happy +Health 🍳'); }},
+    fn(){ G.happy=clamp(G.happy+rnd(5,9)); G.health=clamp(G.health+rnd(3,7)); G.stress=clamp((G.stress||35)-rnd(2,6)); addEv('You cooked from scratch. Actually tasted good. Dangerous confidence building.'); flash('+Happy +Health 🍳'); }},
   { icon:'🎬', name:'Watch Movies',    desc:'+Happy (guilty pleasure)',  minAge:5,
-    fn(){ G.happy=clamp(G.happy+rnd(4,8)); addEv('Movie marathon. You stayed up too late. Worth it.'); flash('+Happy 🎬'); }},
+    fn(){ G.happy=clamp(G.happy+rnd(4,8)); G.stress=clamp((G.stress||35)-rnd(2,6)); addEv('Movie marathon. You stayed up too late. Worth it.'); flash('+Happy 🎬'); }},
 ];
 
 // ── TRAVEL ─────────────────────────────────────────────────────
@@ -621,6 +621,10 @@ const JOBS = [
   { id:'marketing',  title:'Marketing Assistant',tier:'entry', minAge:18, minEdu:'college', basePay:42000, degrees:['Business','Journalism','Film & Media'] },
   { id:'jdev',       title:'Junior Developer',   tier:'entry', minAge:18, minEdu:'college', basePay:60000, degrees:['Computer Science','Engineering','Mathematics'] },
   { id:'analyst',    title:'Business Analyst',   tier:'entry', minAge:18, minEdu:'college', basePay:52000, degrees:['Business','Economics','Finance'] },
+  { id:'data_analyst',title:'Data Analyst',       tier:'entry', minAge:21, minEdu:'college', basePay:61000, degrees:['Computer Science','Mathematics','Economics','Physics'], certsPreferred:['data'] },
+  { id:'ux_researcher',title:'UX Researcher',     tier:'entry', minAge:21, minEdu:'college', basePay:64000, degrees:['Psychology','Arts','Film & Media','Computer Science'] },
+  { id:'policy_aide', title:'Policy Aide',        tier:'entry', minAge:21, minEdu:'college', basePay:50000, degrees:['Political Science','Economics','Law','Public Health'] },
+  { id:'lab_tech',    title:'Lab Technician',     tier:'entry', minAge:21, minEdu:'college', basePay:54000, degrees:['Biology','Medicine','Public Health'] },
   { id:'teacher',    title:'Teacher',            tier:'entry', minAge:22, minEdu:'college', basePay:43000, degrees:['Education','Psychology','Arts'] },
   { id:'nurse',      title:'Registered Nurse',   tier:'entry', minAge:22, minEdu:'college', basePay:62000, degrees:['Nursing'] },
 
@@ -630,16 +634,29 @@ const JOBS = [
   { id:'accountant', title:'Accountant',         tier:'mid',   minAge:22, minEdu:'college', basePay:68000, degrees:['Business','Finance','Economics'] },
   { id:'manager',    title:'HR Manager',         tier:'mid',   minAge:24, minEdu:'college', basePay:74000, degrees:['Business','Psychology','Education'] },
   { id:'architect',  title:'Architect',          tier:'mid',   minAge:24, minEdu:'college', basePay:82000, degrees:['Architecture'] },
+  { id:'data_engineer',title:'Data Engineer',    tier:'mid',   minAge:24, minEdu:'college', basePay:112000,degrees:['Computer Science','Engineering','Mathematics','Physics'], certsPreferred:['cloud','data'], track:'specialist' },
+  { id:'cyber_analyst',title:'Cybersecurity Analyst', tier:'mid', minAge:23, minEdu:'college', basePay:106000,degrees:['Computer Science','Engineering','Mathematics'], certsPreferred:['cloud'], track:'specialist' },
+  { id:'biotech_engineer',title:'Biotech Engineer', tier:'mid', minAge:24, minEdu:'college', basePay:98000,degrees:['Biology','Engineering','Medicine','Public Health'], track:'specialist' },
+  { id:'supply_manager',title:'Supply Chain Manager', tier:'mid', minAge:24, minEdu:'college', basePay:92000,degrees:['Business','Economics','Engineering'], certsPreferred:['pmp'], track:'managerial' },
+  { id:'renewable_analyst',title:'Renewable Energy Analyst', tier:'mid', minAge:23, minEdu:'college', basePay:94000,degrees:['Engineering','Physics','Economics'], certsPreferred:['data'], track:'specialist' },
+  { id:'game_designer',title:'Game Designer',    tier:'mid',   minAge:22, minEdu:'college', basePay:88000,degrees:['Computer Science','Arts','Film & Media'], track:'specialist' },
 
   // senior
   { id:'swe_s',      title:'Senior Engineer',    tier:'senior',minAge:26, minEdu:'college', basePay:120000,degrees:['Computer Science','Engineering','Mathematics','Physics'] },
   { id:'pm',         title:'Product Manager',    tier:'senior',minAge:26, minEdu:'college', basePay:130000,degrees:['Business','Computer Science','Engineering'] },
   { id:'fin_mgr',    title:'Finance Manager',    tier:'senior',minAge:26, minEdu:'college', basePay:115000,degrees:['Finance','Economics','Business'] },
   { id:'principal',  title:'School Principal',   tier:'senior',minAge:30, minEdu:'college', basePay:98000, degrees:['Education','Psychology'] },
+  { id:'ai_engineer',title:'AI/ML Engineer',     tier:'senior',minAge:26, minEdu:'college', basePay:158000,degrees:['Computer Science','Mathematics','Physics','Engineering'], certsPreferred:['cloud','data'], track:'specialist' },
+  { id:'product_mkt_mgr',title:'Product Marketing Manager', tier:'senior', minAge:27, minEdu:'college', basePay:128000,degrees:['Business','Journalism','Film & Media','Economics'], certsPreferred:['pmp'], track:'managerial' },
+  { id:'risk_analyst',title:'Risk Analyst',      tier:'senior',minAge:27, minEdu:'college', basePay:142000,degrees:['Finance','Economics','Mathematics','Physics'], certsPreferred:['finance','data'], track:'specialist' },
+  { id:'strategy_consultant',title:'Strategy Consultant', tier:'senior', minAge:27, minEdu:'college', basePay:150000,degrees:['Business','Economics','Engineering','Political Science'], certsPreferred:['pmp','finance'], track:'managerial' },
+  { id:'clinical_psych',title:'Clinical Psychologist', tier:'senior', minAge:27, minEdu:'college', basePay:118000,degrees:['Psychology','Public Health','Biology'], track:'specialist' },
 
   // executive / elite
   { id:'director',   title:'Director',           tier:'exec',  minAge:32, minEdu:'college', basePay:170000,degrees:[] },
   { id:'vp',         title:'VP / Executive',     tier:'exec',  minAge:35, minEdu:'college', basePay:230000,degrees:[] },
+  { id:'chief_staff',title:'Chief of Staff',     tier:'exec',  minAge:32, minEdu:'college', basePay:215000,degrees:['Business','Political Science','Economics','Law'], certsPreferred:['pmp'], track:'executive' },
+  { id:'ops_exec',   title:'Operations Executive',tier:'exec', minAge:34, minEdu:'college', basePay:245000,degrees:['Business','Engineering','Economics'], certsPreferred:['pmp','finance'], track:'executive' },
   { id:'ib',         title:'Investment Banker',  tier:'elite', minAge:24, minEdu:'college', basePay:160000,degrees:['Finance','Economics','Business','Mathematics'] },
   { id:'quant',      title:'Quant Analyst',      tier:'elite', minAge:24, minEdu:'college', basePay:190000,degrees:['Mathematics','Physics','Computer Science'] },
 
@@ -747,18 +764,124 @@ const HEIST_LOCATIONS = [
 ];
 
 const GANG_ARCHETYPES = [
-  { id:'set', label:'Set-Based Urban Crew', colors:'Red/Blue', symbol:'🟥', style:'Reputation-driven', conflict:0.8, loyalty:0.7, income:0.5 },
-  { id:'local', label:'Neighborhood Crew', colors:'Black/Gray', symbol:'⚫', style:'Survival-focused', conflict:0.6, loyalty:0.4, income:0.3 },
-  { id:'hustle', label:'Hustle Crew', colors:'Gold', symbol:'💰', style:'Profit-focused', conflict:0.5, loyalty:0.3, income:0.7 },
-  { id:'clout', label:'Culture/Clout Crew', colors:'Neon', symbol:'🎤', style:'Viral identity', conflict:0.7, loyalty:0.5, income:0.4 },
+  {
+    id:'bloods',
+    label:'Bloods',
+    colors:'Red',
+    symbol:'🟥',
+    style:'Set-based identity, high retaliation culture',
+    incomeFocus:'Street tax + neighborhood distribution',
+    conflictStyle:'Retaliation-first',
+    modifier:'Retaliation momentum',
+    conflict:0.88,
+    loyalty:0.74,
+    income:0.56,
+    beefBias:1.2,
+    territoryBias:1.0,
+    betrayalBias:0.86,
+  },
+  {
+    id:'crips',
+    label:'Crips',
+    colors:'Blue',
+    symbol:'🟦',
+    style:'Decentralized sets, rivalry-driven power',
+    incomeFocus:'Distributed corner operations',
+    conflictStyle:'Set-on-set rivalry pressure',
+    modifier:'Flexible expansion',
+    conflict:0.84,
+    loyalty:0.68,
+    income:0.58,
+    beefBias:1.15,
+    territoryBias:1.08,
+    betrayalBias:0.92,
+  },
+  {
+    id:'terry',
+    label:'Terry\'s Crew',
+    colors:'Black/Gold',
+    symbol:'🕶️',
+    style:'Profit-first network with flexible allegiances',
+    incomeFocus:'Fast cash and opportunistic flips',
+    conflictStyle:'Only fight for margin',
+    modifier:'High income, high betrayal',
+    conflict:0.52,
+    loyalty:0.42,
+    income:0.78,
+    beefBias:0.72,
+    territoryBias:0.9,
+    betrayalBias:1.26,
+  },
+  {
+    id:'18th',
+    label:'18th Street',
+    colors:'White/Green',
+    symbol:'🧱',
+    style:'Small neighborhood gang, unstable and reactive',
+    incomeFocus:'Block-level hustles',
+    conflictStyle:'Reactive volatility',
+    modifier:'Fast escalation, weak stability',
+    conflict:0.8,
+    loyalty:0.48,
+    income:0.44,
+    beefBias:1.1,
+    territoryBias:0.72,
+    betrayalBias:1.08,
+  },
+  {
+    id:'getmoney',
+    label:'Get Money Gang',
+    colors:'Neon/Purple',
+    symbol:'🎤',
+    style:'Fame and music-driven affiliation culture',
+    incomeFocus:'Music buzz + side distribution',
+    conflictStyle:'Public disrespect cycles',
+    modifier:'Clout spikes beef risk',
+    conflict:0.76,
+    loyalty:0.54,
+    income:0.52,
+    beefBias:1.28,
+    territoryBias:0.62,
+    betrayalBias:1.02,
+  },
 ];
 
+const GANG_RIVAL_MAP = {
+  bloods:['crips','18th'],
+  crips:['bloods','18th'],
+  terry:['18th','getmoney'],
+  '18th':['bloods','crips','terry'],
+  getmoney:['terry','bloods'],
+};
+
+// Drug ecosystem catalog (trade-focused).
+// profit: rough per-unit margin in the ecosystem loop.
+// heatMult: how much law-enforcement pressure each unit tends to create.
+// addictionRate: per-use pressure toward dependence.
+// socialImpact: how strongly use harms social stability / reputation.
 const DRUG_TYPES = [
-  { id:'low', label:'Low-Tier', profit:400, heat:1.1, addict:0.1, violence:0.2 },
-  { id:'mid', label:'Mid-Tier', profit:800, heat:1.3, addict:0.15, violence:0.3 },
-  { id:'high', label:'High-Tier', profit:1600, heat:1.6, addict:0.2, violence:0.45 },
-  { id:'party', label:'Party Drugs', profit:900, heat:1.4, addict:0.12, violence:0.25 },
-  { id:'rx', label:'Prescription Abuse', profit:700, heat:1.2, addict:0.18, violence:0.15 },
+  { id:'marijuana', label:'Marijuana', profit:210, heatMult:0.55, addictionRate:0.06, socialImpact:0.10, violence:0.08, fatality:0.002 },
+  { id:'cocaine',   label:'Cocaine',   profit:620, heatMult:1.05, addictionRate:0.19, socialImpact:0.32, violence:0.22, fatality:0.010 },
+  { id:'heroin',    label:'Heroin',    profit:780, heatMult:1.30, addictionRate:0.34, socialImpact:0.58, violence:0.30, fatality:0.030 },
+  { id:'meth',      label:'Meth',      profit:730, heatMult:1.38, addictionRate:0.31, socialImpact:0.62, violence:0.44, fatality:0.025 },
+  { id:'speed',     label:'Speed',     profit:460, heatMult:0.95, addictionRate:0.17, socialImpact:0.24, violence:0.18, fatality:0.008 },
+  { id:'fentanyl',  label:'Fentanyl',  profit:980, heatMult:1.85, addictionRate:0.40, socialImpact:0.78, violence:0.55, fatality:0.090 },
+];
+
+const HALLUCINOGEN_TYPES = [
+  { id:'mushrooms', label:'Mushrooms', icon:'🍄', price:[80,240], mindSwing:[-8,12], stressSwing:[-16,8], healthSwing:[-4,2] },
+  { id:'lsd',       label:'LSD',       icon:'🧪', price:[120,320], mindSwing:[-12,14], stressSwing:[-18,10], healthSwing:[-5,1] },
+  { id:'salvia',    label:'Salvia',    icon:'🌿', price:[60,190], mindSwing:[-16,10], stressSwing:[-12,14], healthSwing:[-6,0] },
+  { id:'dmt',       label:'DMT',       icon:'🌀', price:[180,420], mindSwing:[-18,18], stressSwing:[-20,12], healthSwing:[-7,1] },
+];
+
+const HALLUCINOGEN_TRIP_EVENTS = [
+  { msg:'You are certain you crossed into another dimension and forgot to bring your body.', tone:'warn' },
+  { msg:'Time loops the same 20 seconds until you negotiate peace with a lamp.', tone:'warn' },
+  { msg:'An imaginary entity gives you life advice. Half of it is brilliant. Half is nonsense.', tone:'warn' },
+  { msg:'The room turns into a low-budget sci-fi bridge. You are somehow the captain.', tone:'good' },
+  { msg:'You explain the universe to a houseplant. The plant seems unconvinced.', tone:'warn' },
+  { msg:'Every sound looks like geometry for a while. Very profound. Very impractical.', tone:'warn' },
 ];
 const MAFIA_RANKS = ['Associate','Soldier','Caporegime','Underboss','Boss'];
 const MAFIA_RACKETS = [

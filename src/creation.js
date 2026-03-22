@@ -27,11 +27,32 @@ function confirmName(){
   goTo('screen-create-stats');
 }
 
+function setSportsBoostChoice(choice){
+  G.sportsBoostChoice = choice==='athlete' ? 'athlete' : 'none';
+  const el = document.getElementById('sports-boost-preview');
+  if(!el) return;
+  const athlete = G.sportsBoostChoice==='athlete';
+  el.innerHTML = `
+    <div class="choice-grid">
+      <div class="choice${athlete?' selected':''}" onclick="setSportsBoostChoice('athlete')">
+        <div class="choice-icon">🏅</div>
+        <div class="choice-name">Sports Boost</div>
+        <div class="choice-desc">Improves outcomes in school, MMA, NFL, and NBA paths.</div>
+      </div>
+      <div class="choice${!athlete?' selected':''}" onclick="setSportsBoostChoice('none')">
+        <div class="choice-icon">📘</div>
+        <div class="choice-name">No Sports Boost</div>
+        <div class="choice-desc">Standard character start.</div>
+      </div>
+    </div>`;
+}
+
 function rollStats(){
   G.health = rnd(50,95);
   G.happy  = rnd(45,90);
   G.smarts = rnd(15,90);
   G.looks  = rnd(15,90);
+  G.stress = rnd(22,48);
   G.money  = 0;
   G.age    = 0;
   G.state  = pick(STATES);
@@ -39,6 +60,7 @@ function rollStats(){
   const dad = G.family.find(p=>p.role==='Father');
   const mom = G.family.find(p=>p.role==='Mother');
   G.traits = inheritTraits(dad, mom);
+  if(typeof G.sportsBoostChoice!=='string') G.sportsBoostChoice = 'none';
 
   document.getElementById('stat-preview').innerHTML =
     `<div class="stat-roll-card">
@@ -46,7 +68,12 @@ function rollStats(){
       ${statBar('Happiness',G.happy,'bar-p')}
       ${statBar('Smarts',G.smarts,'bar-s')}
       ${statBar('Looks',G.looks,'bar-l')}
+    </div>
+    <div class="card" style="margin-top:10px">
+      <div class="card-title">Starting Perk</div>
+      <div id="sports-boost-preview"></div>
     </div>`;
+  setSportsBoostChoice(G.sportsBoostChoice);
 
   // people preview using inline HTML so no dependency on relationships.js
   const famHTML = G.family.map(p=>`
@@ -64,6 +91,10 @@ function beginLife(){
   G.lifeEvents = [{ text:`You were born in ${G.state}. Your story begins.`, type:'' }];
   G.yearEvents  = [...G.lifeEvents];
   G.travel = { log:[], visited:[] };
+  G.sim = {
+    mode:'balanced',
+    director:{ lastPressure:0, lastRecovery:0, lastNet:0, lastStressDelta:0, lastAge:0, history:[] },
+  };
   G.school = {
     stage:'none', grade:0, gpa:2.5,
     trouble:0, expelled:false, teachers:[], classmates:[],
@@ -88,7 +119,7 @@ function beginLife(){
   };
   G.social = {
     clique:null, rival:null, partyCount:0,
-    reputation:50, drugFlags:{}, dramaFlags:{}
+    reputation:50, drugFlags:{}, dramaFlags:{}, exLovers:[]
   };
   G.medical    = { conditions:[], history:[] };
   G.sm = {
@@ -116,24 +147,6 @@ function beginLife(){
       comebacks:0, retired:false,
     },
     talkShowAppearances:0,
-  };
-  G.career = {
-    employed:false,
-    jobId:null,
-    title:'',
-    company:'',
-    salary:0,
-    level:0,
-    years:0,
-    performance:50,
-    reputation:50,
-    hrRisk:0,
-    boss:null,
-    coworkers:[],
-    fired:false,
-    medSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false },
-    lawSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false },
-    licenses:{ medical:false, law:false },
   };
   G.acting = {
     active:false, skill:0, hasAgent:false, agentTier:0,
@@ -182,6 +195,7 @@ function beginLife(){
     injuries:[],
     injured:false,
     recoveryWeeks:0,
+    bjjBelt:'White Belt',
     trainingSessionsThisYear:0,
     sparsThisYear:0,
     compsThisYear:0,
@@ -199,12 +213,33 @@ function beginLife(){
     totalEarned:0,
   };
   G.children    = [];
+  G.pets        = [];
   G.spouse      = null;
   G.marriageYears = 0;
   G.divorces    = 0;
   G.assets      = { home:false, homeValue:0, savings:0 };
   G.finance     = {
     rent:0, mortgage:0, mortgageYears:0, debt:0, credit:680, investments:0, retirement:0,
+    portfolio:{ indexFund:0, bonds:0, realEstateFund:0, ventureFund:0, growthEtf:0, dividendFund:0, commodities:0, treasuries:0 },
+    crypto:{
+      btc:0, eth:0, sol:0, meme:0,
+      marketCycle:'neutral', marketMomentum:0, lastYearPnl:0, lastEvent:'',
+      prices:{ btc:100, eth:100, sol:100, meme:100 }, history:[],
+      dayTradesThisYear:0, traderSkill:20, tradesWon:0, tradesLost:0,
+    },
+    business:{
+      active:false, name:'', sector:'', stage:'idea',
+      employees:0, reputation:50, product:45, operations:45, marketing:40,
+      burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+      startupId:'', difficulty:1, complexity:20, managementSkill:24, founderExp:0,
+      customerBase:0, equitySold:0, investorTier:0, investorName:'', actionsThisYear:0, negativeYears:0, timeline:[],
+      marketShare:12, moat:24, warReadiness:28, priceWar:false, espionageRisk:8, prHeat:12, openDisputes:0, rivals:[],
+    },
+    empire:{
+      holdings:[], nextHoldingId:1,
+      totalAcquisitions:0, totalFranchises:0, totalSmallBiz:0,
+      lastYearCashflow:0, lastYearValueDelta:0,
+    },
     tax:{
       lastPaid:0, lastRefund:0, lastTaxableIncome:0, lastEffectiveRate:0, lastBracket:'None',
       lastStateRate:0, lastYearSummary:null, delinquentYears:0,
@@ -212,18 +247,102 @@ function beginLife(){
   };
   G.housing     = { type:'none', comfort:40, neighborhood:50, roommates:0, roommateList:[], upkeep:0, utilities:0 };
   G.relTab      = 'family';
+  G.stress     = 35;
   G.darkScore  = 0;
   G.totalYears = 0;
   G.traits = [];
   G.familyFlags = { parentsDivorced:false, stepFamilyAdded:false };
   G.proSportsTab = 'nfl';
+  G.sportsBoost = G.sportsBoostChoice==='athlete' ? 1 : 0;
+  // Hidden fertility baseline used by relationship pregnancy systems.
+  if(G.gender==='female'){
+    let base = rnd(90,99);
+    if(Math.random()<0.22) base = rnd(78,92);
+    if(Math.random()<0.08) base = rnd(52,77);
+    G.fertilityBase = base;
+  } else {
+    G.fertilityBase = null;
+  }
+  G.repro = { pregnant:false, dueAge:0, partnerName:'', source:'' };
   G.crime = { heat:0, notoriety:0, record:[], log:[], skills:{ scam:0, hack:0, violence:0 }, crew:[], currentHeist:null,
+    heists:{ active:null, history:[], market:{}, planningQuality:0, crewEfficiency:0, betrayalRisk:0, cooldown:0, totalTake:0, setupPopupSeen:[] },
     police:{ closeness:0, arrested:false, sentence:0, inPrison:false },
     prison:{ respect:10, fear:10, protection:0, sanity:70, security:'Low', faction:null, guards:{ strict:50, corrupt:20 } },
-    gang:{ joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0 },
-    drugs:{ active:false, tier:'low', supply:0, model:'street', heatMult:1.0, income:0, risk:0 },
+    gang:{
+      joined:false, type:null, name:null, colors:'', symbol:'', style:'', territory:1, cred:10, notoriety:5, crew:[], leader:null, affiliation:'', clout:0,
+      members:[],
+      hierarchy:{ shotCaller:'', core:[], young:[] },
+      beef:{ rival:'', level:0, score:0, lastTrigger:'', yearsAtWar:0 },
+      relationships:{ cohesion:55, internalConflict:0, powerStruggle:0 },
+      retaliations:0,
+      recentViolence:0,
+    },
+    drugs:{
+      active:false,
+      route:'independent',
+      tradeDrug:'marijuana',
+      inventory:{},
+      supplyQuality:45,
+      instability:20,
+      zones:[],
+      dealers:{ independent:1, gang:0, mafia:0 },
+      income:0,
+      lastIncome:0,
+      addictionScore:0,
+      addictionLevel:'None',
+      inRecovery:false,
+      relapseRisk:8,
+      junkie:{ active:false, years:0, housing:'none', isolation:0 },
+      trip:{ active:false, label:'', expiresAge:0, rebound:{ happy:0, smarts:0, stress:0 } },
+      familyCases:[],
+      recentViolence:0,
+      useCount:{},
+    },
     mafia:{ joined:false, rank:0, fear:10, respect:10, loyalty:40, obedience:50, earnings:0, heat:0,
       rackets:[], crew:[], territory:1, order:null, fronts:0, corruption:0 },
+  };
+  G.legal = {
+    lawsuits:[],
+    finesDue:0,
+    probationYears:0,
+    criminalStrikes:0,
+    lawyer:{ casesWon:0, settlements:0, profile:20, campaignWins:0, electedOffice:null, officeYears:0 },
+  };
+  G.gov = {
+    approval:50,
+    party:'Centrist',
+    cycleYear:0,
+    popularity:35,
+    funding:0,
+    trust:50,
+    scandalRisk:12,
+    politicalCapital:38,
+    control:44,
+    stability:55,
+    economy:52,
+    activism:8,
+    campaigningSkill:20,
+    governingSkill:20,
+    survivalSkill:20,
+    policiesPassed:0,
+    legacyScore:0,
+    legacyRank:'Unproven',
+    legacyHistory:[],
+    policyStack:[],
+    office:{ level:'none', label:'Citizen', inOffice:false, termYear:0, termsWon:0, termLimit:2, removed:false, nextElectionIn:0 },
+    campaign:{
+      active:false, office:'', entryPath:'', focus:'economy', demographic:'working', tone:'unity',
+      popularity:35, funding:0, trust:50, scandalRisk:12, momentum:0,
+      speeches:0, ads:0, debates:0, travel:0, nextRunAge:0, events:[],
+      regions:{ urban:50, suburban:50, rural:50 },
+    },
+    legislature:{ upper:48, lower:49, opposition:52, gridlock:40 },
+    world:{ allies:6, rivals:3, neutral:12, tension:38, tradeDeals:0, sanctions:0, wars:0, diplomacyWins:0 },
+    media:{ bias:0, heat:34, lastNarrative:'Normal cycle' },
+    ethics:{ corruption:8, investigations:0, impeachmentRisk:4, dirtyMoney:0, coverups:0, removedByImpeachment:false },
+    crisis:{ active:null, resolved:0, mishandled:0, lastOutcome:'none' },
+    policy:{ taxShift:0, policing:50, justice:50, businessClimate:50, healthcare:50, education:50 },
+    activeLaw:'Status Quo',
   };
   G.career = {
     employed:false,
@@ -244,14 +363,52 @@ function beginLife(){
     stockValue:0,
     benefits:{ healthPlan:false, retirement:false },
     milestones:[],
+    track:'specialist',
+    influence:45,
+    burnout:12,
+    layoffShield:20,
+    certifications:[],
+    careerActionsUsed:0,
+    trackCooldown:0,
     medSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, residency:false },
     lawSchool:{ enrolled:false, year:0, gpa:3.0, debt:0, completed:false, barPassed:false },
     licenses:{ medical:false, law:false },
+    medicalCareer:{
+      active:false,
+      role:'student',
+      specialization:'gp',
+      hospitalId:'public',
+      knowledge:34,
+      skill:26,
+      stress:22,
+      reputation:34,
+      ethics:60,
+      burnout:12,
+      casesHandled:0,
+      correctDx:0,
+      misDx:0,
+      majorFailures:0,
+      bonuses:0,
+      penalties:0,
+      investigations:0,
+      malpracticeStrikes:0,
+      insurance:0,
+      patientVolume:0,
+      timeBudget:0,
+      lastSalary:0,
+      lastYearSummary:{},
+      patients:[],
+      history:[],
+      pendingBreakdown:false,
+      lastSwitchYear:-1,
+    },
   };
 
   document.getElementById('hud').style.display    = 'block';
   document.getElementById('tab-bar').style.display = 'flex';
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   updateHUD();
   switchTab('life');
+  if(typeof saveGame==='function') saveGame(true);
 }
 

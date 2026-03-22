@@ -415,7 +415,7 @@ function nbaEnterLeague(team,pos,round,draftPick,salary){
   n.jerseyNumber=pick([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,30,31,32,33,34,35]);
   n.age_entered=G.age;
   n.depth=round===1&&draftPick<=14?'starter':round===1?'rotation':'bench';
-  n.skill=clamp(45+rnd(0,12)+(round===1?10:0));
+  n.skill=clamp(45+rnd(0,12)+(round===1?10:0)+sportsBoostFlat(10));
   n.chemistry=clamp(45+rnd(0,15));
   const isLottery=round===1&&draftPick<=14;
   const years=isLottery?4:round===1?3:2;
@@ -586,9 +586,9 @@ function nbaAct(type){
     showPopup('🏀 Training Camp Focus',
       'Pick your camp emphasis.',
       [
-        { label:'Shooting volume', action:()=>{ n.skill=clamp(n.skill+rnd(4,8)); n.publicImage=Math.min(100,n.publicImage+rnd(2,5));
+        { label:'Shooting volume', action:()=>{ n.skill=clamp(n.skill+rnd(4,8)+sportsBoostFlat(3)); n.publicImage=Math.min(100,n.publicImage+rnd(2,5));
           addEv('Training camp was a shot lab. Rhythm looks automatic.','good'); renderNBA(); } },
-        { label:'Handle & creation', action:()=>{ n.skill=clamp(n.skill+rnd(3,7)); G.smarts=clamp(G.smarts+rnd(2,4));
+        { label:'Handle & creation', action:()=>{ n.skill=clamp(n.skill+rnd(3,7)+sportsBoostFlat(2)); G.smarts=clamp(G.smarts+rnd(2,4));
           addEv('Handle-focused camp. You get to your spots easier now.','good'); renderNBA(); } },
         { label:'Defense & conditioning', action:()=>{ G.health=clamp(G.health+rnd(4,8)); n.durability=clamp(n.durability+rnd(3,7));
           addEv('Defense and conditioning. You stay in front of anyone.','good'); renderNBA(); } },
@@ -599,7 +599,7 @@ function nbaAct(type){
     );
     return;
   } else if(type==='film'){
-    G.smarts=clamp(G.smarts+rnd(2,6)); n.skill=clamp(n.skill+rnd(1,4)); n.chemistry=clamp(n.chemistry+rnd(2,4));
+    G.smarts=clamp(G.smarts+rnd(2,6)); n.skill=clamp(n.skill+rnd(1,4)+sportsBoostFlat(2)); n.chemistry=clamp(n.chemistry+rnd(2,4));
     addEv(`Film session. You catalogued every tendency of your next matchup. You saw something nobody else saw.`,'good');
     flash(`+Smarts · film 📹`,'good');
   } else if(type==='skill_focus'){
@@ -607,17 +607,17 @@ function nbaAct(type){
     showPopup(`🎯 ${pos.label} Focus`,
       `Pick your focus this offseason.`,
       [
-        { label:'Shot creation', action:()=>{ n.skill=clamp(n.skill+rnd(4,8)); addEv('Shot creation work. The footwork looks surgical now.','good'); renderNBA(); } },
-        { label:'Playmaking & IQ', action:()=>{ G.smarts=clamp(G.smarts+rnd(3,6)); n.skill=clamp(n.skill+rnd(2,5)); n.chemistry=clamp(n.chemistry+rnd(2,5));
+        { label:'Shot creation', action:()=>{ n.skill=clamp(n.skill+rnd(4,8)+sportsBoostFlat(2)); addEv('Shot creation work. The footwork looks surgical now.','good'); renderNBA(); } },
+        { label:'Playmaking & IQ', action:()=>{ G.smarts=clamp(G.smarts+rnd(3,6)); n.skill=clamp(n.skill+rnd(2,5)+sportsBoostFlat(2)); n.chemistry=clamp(n.chemistry+rnd(2,5));
           addEv('Playmaking reps. You read the floor a half-second faster.','good'); renderNBA(); } },
-        { label:'Defense & conditioning', action:()=>{ G.health=clamp(G.health+rnd(3,7)); n.skill=clamp(n.skill+rnd(2,5)); n.durability=clamp(n.durability+rnd(2,5));
+        { label:'Defense & conditioning', action:()=>{ G.health=clamp(G.health+rnd(3,7)); n.skill=clamp(n.skill+rnd(2,5)+sportsBoostFlat(2)); n.durability=clamp(n.durability+rnd(2,5));
           addEv('Defense focus. Legs feel stronger, rotations are sharper.','good'); renderNBA(); } },
       ],
       'dark'
     );
     return;
   } else if(type==='skills'){
-    G.health=clamp(G.health+rnd(2,5)); G.smarts=clamp(G.smarts+rnd(1,3)); n.skill=clamp(n.skill+rnd(2,5));
+    G.health=clamp(G.health+rnd(2,5)); G.smarts=clamp(G.smarts+rnd(1,3)); n.skill=clamp(n.skill+rnd(2,5)+sportsBoostFlat(2));
     const skills=['post moves','three-point shot','ball handling','defensive footwork','mid-range game'];
     addEv(`Skills trainer. ${pick(skills)} specifically. The work: surgical.`,'good');
     flash(`Skills work done 🎯`,'good');

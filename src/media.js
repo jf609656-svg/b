@@ -154,6 +154,16 @@ const CONTROVERSY_EVENTS = [
 // ── FORMAT FOLLOWERS ─────────────────────────────────────────────
 const fmtF = n => n>=1000000?`${(n/1000000).toFixed(1)}M`:n>=1000?`${(n/1000).toFixed(1)}K`:`${n}`;
 
+function smRevenueScale(pid, followers){
+  const fame = G.sm?.totalFame||0;
+  const followerPower = Math.log10(Math.max(10, followers||0));
+  const followerBonus = 1 + Math.min(0.45, followerPower*0.06);
+  const fameBonus = 1 + Math.min(1.1, fame/95);
+  const controversyTax = Math.max(0.68, 1 - Math.min(0.32, (G.sm?.controversies||0)*0.045));
+  const platformBias = pid==='youtube' ? 1.18 : pid==='instagram' ? 1.1 : pid==='tiktok' ? 0.92 : pid==='twitch' ? 1.22 : 1.0;
+  return platformBias * followerBonus * fameBonus * controversyTax;
+}
+
 // ── INIT PLATFORM ────────────────────────────────────────────────
 function smInit(pid){
   if(!G.sm.platforms[pid]){
@@ -531,12 +541,13 @@ function smAction(pid, actionId){
   }
 
   // Apply gains
+  const monetizedGain = Math.max(0, Math.floor(revGain * smRevenueScale(pid, acc.followers||0)));
   acc.followers  = Math.max(0, acc.followers + follGain);
-  acc.revenue   += revGain;
+  acc.revenue   += monetizedGain;
   acc.posts++;
   acc.streak    = (actionId === 'grind' || actionId === 'upload' || actionId.startsWith('stream')) ? acc.streak+1 : Math.max(0,acc.streak-1);
-  G.sm.totalRevenue += revGain;
-  G.money           += revGain;
+  G.sm.totalRevenue += monetizedGain;
+  G.money           += monetizedGain;
   G.sm.totalFame     = clamp(G.sm.totalFame + famGain);
 
   // Verify threshold
@@ -550,7 +561,7 @@ function smAction(pid, actionId){
   if(Math.random() < (0.03 + acc.streak*0.004)){
     const ve = pick(VIRAL_EVENTS);
     const viralfoll = Math.floor(acc.followers * (ve.mult/10) * basePerf + rnd(500,5000));
-    const viralrev  = Math.floor(viralfoll * p.revenueMulti * 0.004);
+    const viralrev  = Math.floor(viralfoll * p.revenueMulti * 0.004 * smRevenueScale(pid, acc.followers||0));
     acc.followers   += viralfoll;
     acc.revenue     += viralrev;
     G.money         += viralrev;
@@ -1400,53 +1411,155 @@ function startMusic(genre){
   renderMedia();
 }
 
+function musicReleasePayout(streams, mus){
+  const royaltyRate = mus.labelContract ? mus.labelContract.royaltyRate : 0.85;
+  const fameMoneyMult = 1 + Math.min(1.4, (G.sm.totalFame||0)/90);
+  const labelBoost = mus.labelTier>=3 ? 1.32 : mus.labelTier>=2 ? 1.18 : mus.labelTier>=1 ? 1.08 : 1;
+  return Math.floor(streams * 0.0038 * royaltyRate * fameMoneyMult * labelBoost);
+}
+
+function musicPayCreativeCost(choice){
+  const cost = choice?.cost||0;
+  if(cost<=0) return true;
+  if(G.money < cost){
+    flash(`Need ${fmt$(cost)} for this rollout.`,'warn');
+    return false;
+  }
+  G.money -= cost;
+  return true;
+}
+
+function musicCreativePlans(type){
+  const pushReqFame = type==='record' ? 10 : type==='album' ? 25 : 16;
+  return [
+    {
+      id:'raw',
+      label:'Raw Session',
+      desc:'Fast drop, authentic tone, low budget.',
+      streamMult:0.94, fame:1, crit:4, cost:0, opinion:2,
+      disabled:false,
+    },
+    {
+      id:'hook',
+      label:'Viral Hook Push',
+      desc:'Catchy and algorithm-friendly with lower critic upside.',
+      streamMult:1.22, fame:3, crit:-2, cost:2500, opinion:0,
+      disabled:false,
+    },
+    {
+      id:'cinematic',
+      label:'Cinematic Rollout',
+      desc:'Visual-heavy campaign with stronger prestige potential.',
+      streamMult:1.1, fame:2, crit:7, cost:9000, opinion:3,
+      disabled:false,
+    },
+    {
+      id:'feature',
+      label:'Headline Feature',
+      desc:`Expensive co-sign. Best when your name is already hot (needs ${pushReqFame}+ fame).`,
+      streamMult:1.38, fame:5, crit:1, cost:22000, opinion:2,
+      disabled:(G.sm.totalFame||0) < pushReqFame,
+    },
+  ];
+}
+
+function openMusicCreativePopup(type){
+  const labels = { record:'single', ep:'EP', mixtape:'mixtape', album:'album', deluxe:'deluxe' };
+  const plans = musicCreativePlans(type);
+  const title = `Creative Direction: ${labels[type]||'release'}`;
+  const html = `<div style="font-size:.82rem;color:var(--muted2);margin-bottom:8px">Choose your creative strategy before release. Direction now impacts streams, critic response, and payout.</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${plans.map(p=>`<div style="background:var(--surface3);border-radius:var(--r-sm);padding:8px 10px">
+        <div style="font-family:var(--fh);font-weight:700;font-size:.84rem">${p.label}${p.disabled?' · locked':''}</div>
+        <div style="font-size:.72rem;color:var(--muted2)">${p.desc}</div>
+        <div style="font-size:.68rem;color:var(--muted2);margin-top:3px">Streams x${p.streamMult.toFixed(2)} · Crit ${p.crit>=0?'+':''}${p.crit} · Fame +${p.fame} · Cost ${fmt$(p.cost)}</div>
+      </div>`).join('')}
+    </div>`;
+  showPopupHTML(
+    title,
+    html,
+    [
+      ...plans.map(p=>({
+        label:p.label,
+        cls:p.id==='hook' ? 'btn-primary' : 'btn-ghost',
+        disabled:p.disabled,
+        onClick:()=>musicDo(type, p),
+      })),
+      { label:'Cancel', cls:'btn-ghost', onClick:()=>{} },
+    ]
+  );
+}
+
 // ── MAIN MUSIC ACTION ─────────────────────────────────────────────
-function musicDo(type){
+function musicDo(type, creative){
   const mus = G.sm.music;
   if(!mus.active) return;
+  if(['record','ep','mixtape','album','deluxe'].includes(type) && !creative){
+    openMusicCreativePopup(type);
+    return;
+  }
   const gd = MUSIC_GENRES_DATA[mus.genre]||{streamMult:1};
   const ib = instBonus(mus);
   const base = Math.floor((rnd(1,3) + mus.tracks * 0.5 + G.sm.totalFame * 2) * gd.streamMult * ib * (mus.publicOpinion/60));
+  const creativeChoice = creative || { label:'Standard Drop', streamMult:1, fame:0, crit:0, cost:0, opinion:0 };
+  const streamMult = Math.max(0.6, creativeChoice.streamMult||1);
 
   if(type==='record'){
+    if(!musicPayCreativeCost(creativeChoice)) return;
     mus.tracks++;
-    const streams = Math.floor(rnd(200,3000) * base / 3 + rnd(100,500));
+    const streams = Math.floor((rnd(200,3000) * base / 3 + rnd(100,500)) * streamMult);
+    const rev = musicReleasePayout(streams, mus);
     mus.streams += streams;
-    mus.criticalScore = Math.min(100, mus.criticalScore + rnd(0,3));
-    G.sm.totalFame = clamp(G.sm.totalFame + (streams>5000?2:1));
-    addEv(`Track recorded as "${mus.stageName}". ${fmtF(streams)} streams first week. ${ib>1.2?'The instrumental skill shows in the mix.':''}`,'good');
+    mus.revenue += rev; G.sm.totalRevenue += rev; G.money += rev;
+    mus.criticalScore = Math.min(100, mus.criticalScore + rnd(0,3) + (creativeChoice.crit||0));
+    mus.publicOpinion = Math.min(100, Math.max(0, mus.publicOpinion + (creativeChoice.opinion||0)));
+    G.sm.totalFame = clamp(G.sm.totalFame + (streams>5000?2:1) + (creativeChoice.fame||0));
+    addEv(`Track recorded as "${mus.stageName}" (${creativeChoice.label}). ${fmtF(streams)} streams first week · ${fmt$(rev)} earned. ${ib>1.2?'The instrumental skill shows in the mix.':''}`,'good');
     flash(`🎙️ Track dropped! +${fmtF(streams)} streams`,'good');
     if(gd.beefChance && Math.random()<gd.beefChance*0.3) musicIndustryEvent();
   }
   else if(type==='ep'){
     if(mus.tracks<3){ flash('Need 3+ tracks for an EP','warn'); return; }
+    if(!musicPayCreativeCost(creativeChoice)) return;
     mus.eps++; mus.tracks+=2; // ep adds new tracks
-    const streams = Math.floor(rnd(5000,30000) * base / 3 * 1.2);
-    mus.streams += streams; mus.criticalScore = Math.min(100, mus.criticalScore+rnd(2,6));
-    G.sm.totalFame = clamp(G.sm.totalFame + rnd(2,5));
+    const streams = Math.floor(rnd(5000,30000) * base / 3 * 1.2 * streamMult);
+    const rev = musicReleasePayout(streams, mus);
+    mus.streams += streams; mus.revenue += rev;
+    G.sm.totalRevenue += rev; G.money += rev;
+    mus.criticalScore = Math.min(100, mus.criticalScore+rnd(2,6) + (creativeChoice.crit||0));
+    mus.publicOpinion = Math.min(100, Math.max(0, mus.publicOpinion + (creativeChoice.opinion||0)));
+    G.sm.totalFame = clamp(G.sm.totalFame + rnd(2,5) + (creativeChoice.fame||0));
     G.happy = clamp(G.happy + rnd(5,10));
-    addEv(`EP dropped. ${fmtF(streams)} streams. The blogs are talking.`,'love');
+    addEv(`EP dropped (${creativeChoice.label}). ${fmtF(streams)} streams · ${fmt$(rev)} earned. The blogs are talking.`,'love');
     flash(`💿 EP out! +${fmtF(streams)} streams`,'good');
   }
   else if(type==='mixtape'){
     if(mus.tracks<5){ flash('Need 5+ tracks for a mixtape','warn'); return; }
+    if(!musicPayCreativeCost(creativeChoice)) return;
     mus.mixtapes++; mus.tracks+=3;
-    const streams = Math.floor(rnd(8000,60000) * base / 3);
-    mus.streams += streams; G.sm.totalFame = clamp(G.sm.totalFame + rnd(3,8));
+    const streams = Math.floor(rnd(8000,60000) * base / 3 * streamMult);
+    const rev = Math.floor(musicReleasePayout(streams, mus) * 0.68);
+    mus.streams += streams; mus.revenue += rev;
+    G.sm.totalRevenue += rev; G.money += rev;
+    mus.publicOpinion = Math.min(100, Math.max(0, mus.publicOpinion + (creativeChoice.opinion||0)));
+    mus.criticalScore = Math.min(100, mus.criticalScore + Math.max(0, creativeChoice.crit||0));
+    G.sm.totalFame = clamp(G.sm.totalFame + rnd(3,8) + (creativeChoice.fame||0));
     G.happy = clamp(G.happy + rnd(8,14));
-    addEv(`Mixtape dropped free on DatPiff/SoundCloud. ${fmtF(streams)} streams. Organic fanbase building.`,'love');
+    addEv(`Mixtape dropped (${creativeChoice.label}). ${fmtF(streams)} streams · ${fmt$(rev)} earned from upsells/rights. Organic fanbase building.`,'love');
     flash(`📼 Mixtape out! +${fmtF(streams)} streams`,'good');
   }
   else if(type==='album'){
     if(mus.tracks<10){ flash('Need 10+ tracks for an album','warn'); return; }
+    if(!musicPayCreativeCost(creativeChoice)) return;
     mus.albums++; mus.tracks+=4;
-    const streams = Math.floor(rnd(50000,500000) * base / 3 * (mus.labelTier+1));
-    const rev = Math.floor(streams * (mus.labelContract?mus.labelContract.royaltyRate:0.85) * 0.004);
+    const streams = Math.floor(rnd(50000,500000) * base / 3 * (mus.labelTier+1) * streamMult);
+    const rev = musicReleasePayout(streams, mus);
     mus.streams += streams; mus.revenue += rev;
     G.sm.totalRevenue += rev; G.money += rev;
-    G.sm.totalFame = clamp(G.sm.totalFame + rnd(8,20));
+    mus.publicOpinion = Math.min(100, Math.max(0, mus.publicOpinion + (creativeChoice.opinion||0)));
+    G.sm.totalFame = clamp(G.sm.totalFame + rnd(8,20) + (creativeChoice.fame||0));
     G.happy = clamp(G.happy + rnd(12,20));
-    mus.criticalScore = Math.min(100, mus.criticalScore + rnd(3,12));
+    mus.criticalScore = Math.min(100, mus.criticalScore + rnd(3,12) + (creativeChoice.crit||0));
     // Label album obligation
     if(mus.labelContract){
       mus.labelContract.albumsDone++;
@@ -1455,17 +1568,22 @@ function musicDo(type){
         flash('Label contract complete!','good');
       }
     }
-    addEv(`Album released. ${fmtF(streams)} streams first week. ${fmt$(rev)} earned. ${G.sm.totalFame>=60?'Career-defining.':G.sm.totalFame>=40?'Momentum is real.':'People are listening.'}`,'love');
+    addEv(`Album released (${creativeChoice.label}). ${fmtF(streams)} streams first week · ${fmt$(rev)} earned. ${G.sm.totalFame>=60?'Career-defining.':G.sm.totalFame>=40?'Momentum is real.':'People are listening.'}`,'love');
     flash(`🎵 ALBUM OUT! ${fmtF(streams)} streams`,'good');
     // Chart chance on album
     if(Math.random()<0.4+mus.publicOpinion/200){ mus.chartsHit++; addEv(`Charted on Billboard. #${Math.max(1,Math.floor(100-mus.publicOpinion-streams/1000000))} this week.`,'love'); }
   }
   else if(type==='deluxe'){
     if(mus.albums<1){ flash('Need an album first','warn'); return; }
+    if(!musicPayCreativeCost(creativeChoice)) return;
     mus.tracks+=2;
-    const streams = Math.floor(rnd(20000,100000) * (mus.publicOpinion/60));
+    const streams = Math.floor(rnd(20000,100000) * (mus.publicOpinion/60) * streamMult);
+    const rev = musicReleasePayout(streams, mus);
     mus.streams+=streams;
-    addEv(`Deluxe edition dropped with new tracks. ${fmtF(streams)} additional streams from the re-run.`,'good');
+    mus.revenue += rev; G.sm.totalRevenue += rev; G.money += rev;
+    mus.publicOpinion = Math.min(100, Math.max(0, mus.publicOpinion + (creativeChoice.opinion||0)));
+    G.sm.totalFame = clamp(G.sm.totalFame + Math.max(0, (creativeChoice.fame||0)-1));
+    addEv(`Deluxe edition dropped (${creativeChoice.label}). ${fmtF(streams)} additional streams · ${fmt$(rev)} earned.`,'good');
     flash(`💎 Deluxe edition out!`,'good');
   }
   else if(type==='produce'){

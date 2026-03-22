@@ -62,7 +62,102 @@ function genCoworkers(){
   return { boss, coworkers };
 }
 
+const BUSINESS_SECTORS = [
+  { id:'saas', label:'SaaS', icon:'🧠', startCost:12000, burn:18000, upside:1.25, risk:0.5 },
+  { id:'ecom', label:'E-commerce', icon:'📦', startCost:7000, burn:13000, upside:1.1, risk:0.6 },
+  { id:'fintech', label:'FinTech', icon:'🏦', startCost:20000, burn:24000, upside:1.35, risk:0.68 },
+  { id:'media', label:'Media Brand', icon:'🎥', startCost:5000, burn:9000, upside:1.05, risk:0.45 },
+  { id:'consumer', label:'Consumer Goods', icon:'🛍️', startCost:9000, burn:14000, upside:1.12, risk:0.55 },
+];
+
+const INVESTMENT_BUCKETS = [
+  { id:'indexFund', label:'Index Fund', icon:'📈', desc:'Broad market, balanced risk' },
+  { id:'bonds', label:'Bond Fund', icon:'🧾', desc:'Lower volatility, lower upside' },
+  { id:'realEstateFund', label:'REIT Fund', icon:'🏢', desc:'Property exposure and yield' },
+  { id:'ventureFund', label:'Venture Fund', icon:'🚀', desc:'High risk, high upside' },
+];
+
+const CRYPTO_ASSETS = [
+  { id:'btc', label:'Bitcoin', icon:'₿', minAge:16 },
+  { id:'eth', label:'Ethereum', icon:'Ξ', minAge:16 },
+  { id:'sol', label:'Solana', icon:'◎', minAge:16 },
+  { id:'meme', label:'Meme Coin', icon:'🐸', minAge:18 },
+];
+
+const CAREER_TRACKS = [
+  { id:'specialist', label:'Specialist (IC)', desc:'Deep skill focus, strong execution track.' },
+  { id:'managerial', label:'Manager', desc:'People leadership, visibility, and politics.' },
+  { id:'executive', label:'Executive', desc:'High pressure leadership with higher upside.' },
+];
+
+const CAREER_CERTIFICATIONS = [
+  { id:'pmp', label:'PMP', cost:3200, minSmarts:42, boost:{ perf:5, rep:3, shield:5 }, tracks:['managerial','executive'] },
+  { id:'data', label:'Data/Analytics Cert', cost:2400, minSmarts:45, boost:{ perf:6, rep:2, shield:3 }, tracks:['specialist','managerial'] },
+  { id:'cloud', label:'Cloud Architect Cert', cost:2800, minSmarts:50, boost:{ perf:7, rep:2, shield:4 }, tracks:['specialist','executive'] },
+  { id:'finance', label:'Finance Modeling Cert', cost:3000, minSmarts:48, boost:{ perf:4, rep:4, shield:4 }, tracks:['managerial','executive'] },
+];
+
+function ensureAdvancedFinanceState(){
+  ensureFinanceShape();
+  if(typeof G.stress!=='number') G.stress = 35;
+}
+
+function ensureCareerOverhaulState(){
+  if(!G.career) G.career = {};
+  if(!G.career.track) G.career.track = 'specialist';
+  if(typeof G.career.influence!=='number') G.career.influence = 45;
+  if(typeof G.career.burnout!=='number') G.career.burnout = 12;
+  if(typeof G.career.layoffShield!=='number') G.career.layoffShield = 20;
+  if(!Array.isArray(G.career.certifications)) G.career.certifications = [];
+  if(typeof G.career.careerActionsUsed!=='number') G.career.careerActionsUsed = 0;
+  if(typeof G.career.trackCooldown!=='number') G.career.trackCooldown = 0;
+  G.career.influence = clamp(G.career.influence);
+  G.career.burnout = clamp(G.career.burnout);
+  G.career.layoffShield = clamp(G.career.layoffShield);
+  if(typeof ensureMedicalCareerState==='function') ensureMedicalCareerState();
+}
+
+function inferCareerTrack(job){
+  if(!job) return G.career.track || 'specialist';
+  if(job.track) return job.track;
+  if(['manager','principal','director','vp'].includes(job.id)) return 'managerial';
+  if(['ib','quant','partner','judge'].includes(job.id)) return 'executive';
+  return 'specialist';
+}
+
+function jobFitScore(job){
+  const c = G.career;
+  const deg = degreeName();
+  let score = jobQualificationScore();
+  if(deg && job.degrees && job.degrees.includes(deg)) score += 16;
+  if(job.track && c.track===job.track) score += 12;
+  else if(job.track && c.track!==job.track) score -= 7;
+  const certs = c.certifications || [];
+  if(job.certsPreferred && job.certsPreferred.length){
+    score += job.certsPreferred.reduce((acc,id)=>acc + (certs.includes(id)?6:0), 0);
+  }
+  score += Math.floor((c.influence||45)/10);
+  return score;
+}
+
+function portfolioTotalValue(){
+  ensureAdvancedFinanceState();
+  const p = G.finance.portfolio;
+  return (G.finance.investments||0) + (p.indexFund||0) + (p.bonds||0) + (p.realEstateFund||0) + (p.ventureFund||0);
+}
+
+function cryptoTotalValue(){
+  ensureAdvancedFinanceState();
+  const c = G.finance.crypto;
+  return (c.btc||0) + (c.eth||0) + (c.sol||0) + (c.meme||0);
+}
+
+function businessSectorById(id){
+  return BUSINESS_SECTORS.find(s=>s.id===id);
+}
+
 function startJob(job){
+  ensureCareerOverhaulState();
   const lvl = 0;
   const mult = JOB_LEVELS[lvl].payMult;
   const company = pick(COMPANIES);
@@ -84,6 +179,12 @@ function startJob(job){
   G.career.fired = false;
   G.career.bonusRate = bonusRate;
   G.career.benefits = benefits;
+  G.career.track = inferCareerTrack(job);
+  G.career.trackCooldown = 0;
+  G.career.careerActionsUsed = 0;
+  G.career.burnout = clamp((G.career.burnout||12) + rnd(2,6));
+  G.career.influence = clamp((G.career.influence||45) + rnd(2,7));
+  G.career.layoffShield = clamp((G.career.layoffShield||20) + rnd(1,4));
   if(job.tier==='elite' || job.tier==='exec'){
     G.career.stockUnits += rnd(10,40);
     G.career.stockValue = Math.max(10, G.career.stockValue || rnd(20,60));
@@ -95,13 +196,14 @@ function startJob(job){
 }
 
 function applyForJob(jobId){
+  ensureCareerOverhaulState();
   const job = JOBS.find(j=>j.id===jobId);
   if(!job || !jobEligible(job)) return;
 
-  const score = jobQualificationScore();
+  const score = jobFitScore(job);
   const base = Math.min(0.85, 0.35 + score/200);
   const tierBoost = job.tier==='elite' ? -0.1 : job.tier==='exec' ? -0.05 : 0;
-  const chance = Math.max(0.15, base + tierBoost);
+  const chance = Math.max(0.15, Math.min(0.95, base + tierBoost + ((G.career.influence||45)-50)/250));
 
   if(Math.random() < chance){
     startJob(job);
@@ -112,6 +214,7 @@ function applyForJob(jobId){
 }
 
 function quitJob(){
+  ensureCareerOverhaulState();
   if(!G.career.employed){ flash('No job to quit.','warn'); return; }
   addEv(`You quit your job at ${G.career.company}. It was time.`, 'warn');
   G.career.employed = false;
@@ -124,10 +227,13 @@ function quitJob(){
   G.career.boss = null;
   G.career.coworkers = [];
   G.career.hrRisk = Math.max(0, G.career.hrRisk-10);
+  G.career.burnout = clamp((G.career.burnout||20) - rnd(8,14));
+  G.career.careerActionsUsed = 0;
   renderJobs();
 }
 
 function jobAction(targetName, action){
+  ensureCareerOverhaulState();
   const c = G.career;
   if(!c.employed){ flash('No job right now.','warn'); return; }
 
@@ -135,20 +241,23 @@ function jobAction(targetName, action){
   if(action==='boss') t = c.boss;
   else t = c.coworkers.find(x=>x.name===targetName);
 
-  const needsTarget = !['work','slack','ask_raise'].includes(action);
+  const needsTarget = !['work','slack','ask_raise','visibility','politics','protect_role','recover'].includes(action);
   if(needsTarget && !t){ flash('Could not find them.','warn'); return; }
 
   if(action==='befriend'){
     t.relation = clamp(t.relation + rnd(6,12));
     G.career.reputation = clamp(G.career.reputation + rnd(1,4));
+    G.stress = clamp((G.stress||35) - rnd(1,3));
     addEv(`You built rapport with ${t.firstName} at work. Connections matter.`, 'good');
   } else if(action==='troll'){
     t.relation = clamp(t.relation - rnd(10,18));
     G.career.hrRisk = clamp(G.career.hrRisk + rnd(6,12));
+    G.stress = clamp((G.stress||35) + rnd(3,7));
     addEv(`You trolled ${t.firstName} at work. It landed… badly.`, 'bad');
   } else if(action==='hang'){
     t.relation = clamp(t.relation + rnd(5,10));
     G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) - rnd(2,5));
     addEv(`You hung out with ${t.firstName} after work. They were cooler than expected.`, 'good');
   } else if(action==='hookup'){
     G.happy = clamp(G.happy + rnd(8,16));
@@ -160,6 +269,7 @@ function jobAction(targetName, action){
     t.relation = clamp(t.relation + rnd(4,10));
     G.career.performance = clamp(G.career.performance + rnd(5,12));
     G.career.hrRisk = clamp(G.career.hrRisk + rnd(1,5));
+    G.stress = clamp((G.stress||35) + rnd(1,3));
     addEv(`You and ${t.firstName} collaborated on a project. It went well.`, 'good');
   } else if(action==='network'){
     c.reputation = clamp(c.reputation + rnd(4,8));
@@ -173,26 +283,101 @@ function jobAction(targetName, action){
       c.reputation = clamp(c.reputation + 3);
       addEv(`You asked for a raise. Approved. +${fmt$(bump)}/yr.`, 'good');
       flash('Raise approved!','good');
+      G.stress = clamp((G.stress||35) - rnd(2,5));
     } else {
       c.hrRisk = clamp(c.hrRisk + 5);
       addEv(`You asked for a raise. It was awkward. The answer was "not right now."`, 'warn');
       flash('Raise denied.','warn');
+      G.stress = clamp((G.stress||35) + rnd(3,6));
     }
   } else if(action==='work'){
     c.performance = clamp(c.performance + rnd(5,12));
     G.happy = clamp(G.happy - rnd(1,4));
+    G.stress = clamp((G.stress||35) + rnd(3,7));
     addEv('You put in a strong year at work. Performance improved.','good');
   } else if(action==='slack'){
     c.performance = clamp(c.performance - rnd(6,12));
     G.happy = clamp(G.happy + rnd(2,6));
     c.hrRisk = clamp(c.hrRisk + rnd(3,8));
+    G.stress = clamp((G.stress||35) - rnd(1,4));
+    c.burnout = clamp((c.burnout||12) - rnd(2,5));
     addEv('You slacked off at work. It felt good. Someone noticed.', 'warn');
+  } else if(action==='visibility'){
+    c.performance = clamp(c.performance + rnd(3,8));
+    c.reputation = clamp(c.reputation + rnd(2,6));
+    c.influence = clamp((c.influence||45) + rnd(5,11));
+    c.burnout = clamp((c.burnout||12) + rnd(2,6));
+    G.stress = clamp((G.stress||35) + rnd(2,5));
+    c.careerActionsUsed = (c.careerActionsUsed||0) + 1;
+    addEv('You increased your visibility with a high-impact project update.', 'good');
+  } else if(action==='politics'){
+    c.influence = clamp((c.influence||45) + rnd(7,14));
+    c.reputation = clamp(c.reputation + rnd(-2,5));
+    c.hrRisk = clamp(c.hrRisk + rnd(1,6));
+    c.burnout = clamp((c.burnout||12) + rnd(1,4));
+    G.stress = clamp((G.stress||35) + rnd(1,4));
+    c.careerActionsUsed = (c.careerActionsUsed||0) + 1;
+    addEv('You played office politics to secure allies and future leverage.', 'warn');
+  } else if(action==='protect_role'){
+    c.layoffShield = clamp((c.layoffShield||20) + rnd(7,15));
+    c.performance = clamp(c.performance + rnd(1,4));
+    c.influence = clamp((c.influence||45) + rnd(1,4));
+    c.burnout = clamp((c.burnout||12) + rnd(1,3));
+    G.stress = clamp((G.stress||35) + rnd(1,3));
+    c.careerActionsUsed = (c.careerActionsUsed||0) + 1;
+    addEv('You documented impact and cross-trained to protect your role.', 'good');
+  } else if(action==='recover'){
+    c.burnout = clamp((c.burnout||12) - rnd(8,16));
+    c.performance = clamp(c.performance - rnd(0,3));
+    G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) - rnd(5,11));
+    addEv('You intentionally set boundaries and recovered from work strain.', 'good');
   }
 
   updateHUD(); renderJobs();
 }
 
+function setCareerTrack(trackId){
+  ensureCareerOverhaulState();
+  const c = G.career;
+  const track = CAREER_TRACKS.find(t=>t.id===trackId);
+  if(!track){ flash('Career track not found.','warn'); return; }
+  if(c.track===trackId){ flash('Already on this track.','warn'); return; }
+  if(c.trackCooldown>0){ flash('You recently switched tracks. Wait a year.','warn'); return; }
+  c.track = trackId;
+  c.trackCooldown = 1;
+  c.reputation = clamp(c.reputation + rnd(-1,3));
+  c.burnout = clamp((c.burnout||12) + rnd(1,4));
+  G.stress = clamp((G.stress||35) + rnd(1,4));
+  addEv(`You pivoted to the ${track.label} career track.`, 'good');
+  renderJobs();
+}
+
+function earnCertification(certId){
+  ensureCareerOverhaulState();
+  const c = G.career;
+  const cert = CAREER_CERTIFICATIONS.find(x=>x.id===certId);
+  if(!cert){ flash('Certification not found.','warn'); return; }
+  if(c.certifications.includes(cert.id)){ flash('Already completed this certification.','warn'); return; }
+  if(G.money < cert.cost){ flash(`Need ${fmt$(cert.cost)}.`,'warn'); return; }
+  if(G.smarts < cert.minSmarts){ flash(`Need ${cert.minSmarts}+ smarts.`,'warn'); return; }
+  if(cert.tracks && cert.tracks.length && !cert.tracks.includes(c.track)){
+    flash(`Best for ${cert.tracks.join(' / ')} tracks.`,'warn'); return;
+  }
+  G.money -= cert.cost;
+  c.certifications.push(cert.id);
+  c.performance = clamp(c.performance + (cert.boost.perf||0));
+  c.reputation = clamp(c.reputation + (cert.boost.rep||0));
+  c.layoffShield = clamp((c.layoffShield||20) + (cert.boost.shield||0));
+  c.influence = clamp((c.influence||45) + rnd(1,4));
+  G.stress = clamp((G.stress||35) + rnd(0,2));
+  addEv(`Certification earned: ${cert.label}. Career leverage improved.`, 'good');
+  renderJobs();
+}
+
 function jobSpecial(action){
+  ensureAdvancedFinanceState();
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   const c = G.career;
   if(!c.employed){ flash('No job right now.','warn'); return; }
   const job = JOBS.find(j=>j.id===c.jobId) || {};
@@ -202,19 +387,35 @@ function jobSpecial(action){
     c.performance = clamp(c.performance + rnd(8,16));
     c.reputation = clamp(c.reputation + rnd(6,12));
     G.happy = clamp(G.happy + rnd(4,8));
+    G.stress = clamp((G.stress||35) + rnd(1,4));
+    if(G.legal && G.legal.lawyer){
+      G.legal.lawyer.casesWon++;
+      G.legal.lawyer.profile = clamp(G.legal.lawyer.profile + rnd(3,7));
+      // Occasionally resolve an open legal issue if you're a strong lawyer.
+      if(G.legal.lawsuits.length && Math.random()<0.3){
+        const s = G.legal.lawsuits.shift();
+        addEv(`Your legal expertise helped clear a pending ${s.kind}.`, 'good');
+      }
+    }
     addEv('You won a major case. Your name carried weight afterward.','love');
   } else if(action==='settlement'){
     const bonus = Math.floor(c.salary * 0.06);
     G.money += bonus;
     c.performance = clamp(c.performance + rnd(4,8));
+    if(G.legal && G.legal.lawyer){
+      G.legal.lawyer.settlements++;
+      G.legal.lawyer.profile = clamp(G.legal.lawyer.profile + rnd(2,5));
+    }
     addEv(`You negotiated a settlement. Bonus: ${fmt$(bonus)}.`, 'good');
   } else if(action==='surgery'){
     c.performance = clamp(c.performance + rnd(8,14));
     G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
     addEv('Successful surgery. It reminded you why you chose medicine.','love');
   } else if(action==='night_shift'){
     c.performance = clamp(c.performance + rnd(4,10));
     G.health = clamp(G.health - rnd(4,10));
+    G.stress = clamp((G.stress||35) + rnd(5,10));
     addEv('You took a brutal night shift. Patients were saved. You lost sleep.','warn');
   } else if(action==='launch'){
     c.performance = clamp(c.performance + rnd(6,12));
@@ -224,18 +425,34 @@ function jobSpecial(action){
     const bonus = Math.floor(c.salary * 0.08);
     G.money += bonus;
     c.performance = clamp(c.performance + rnd(5,9));
+    G.stress = clamp((G.stress||35) + rnd(1,4));
     addEv(`You closed a deal. Bonus: ${fmt$(bonus)}.`, 'good');
   } else if(action==='mentor'){
     c.reputation = clamp(c.reputation + rnd(5,10));
     G.happy = clamp(G.happy + rnd(4,7));
+    G.stress = clamp((G.stress||35) - rnd(2,5));
     addEv('You mentored someone at work. It felt meaningful.','good');
   } else if(action==='mistake'){
     c.performance = clamp(c.performance - rnd(8,14));
     c.hrRisk = clamp(c.hrRisk + rnd(8,16));
+    G.stress = clamp((G.stress||35) + rnd(5,9));
     addEv('A serious mistake happened on your watch. HR took notes.','bad');
   } else if(action==='press'){
     G.sm.totalFame = clamp(G.sm.totalFame + rnd(1,4));
     addEv('You got featured in a trade publication. Small fame boost.','good');
+  } else if(action==='constitutional'){
+    c.performance = clamp(c.performance + rnd(6,12));
+    c.reputation = clamp(c.reputation + rnd(6,11));
+    G.legal.lawyer.profile = clamp((G.legal.lawyer.profile||20) + rnd(5,10));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    addEv('You argued a constitutional challenge. It raised your legal profile nationally.', 'love');
+  } else if(action==='public_defense'){
+    c.performance = clamp(c.performance + rnd(4,9));
+    c.reputation = clamp(c.reputation + rnd(3,8));
+    G.happy = clamp(G.happy + rnd(3,7));
+    G.stress = clamp((G.stress||35) + rnd(3,8));
+    G.legal.lawyer.profile = clamp((G.legal.lawyer.profile||20) + rnd(2,6));
+    addEv('You took a demanding public defense case. Heavy work, meaningful impact.', 'good');
   }
 
   updateHUD(); renderJobs();
@@ -364,10 +581,253 @@ function refinanceMortgage(){
 }
 
 function invest(amount){
+  // Backward compatible quick action = index fund buy.
+  investAsset('indexFund', amount);
+}
+
+function investAsset(bucketId, amount){
+  ensureAdvancedFinanceState();
+  const bucket = INVESTMENT_BUCKETS.find(b=>b.id===bucketId);
+  if(!bucket){ flash('Investment bucket not found','warn'); return; }
+  if(amount<=0){ flash('Invalid amount','warn'); return; }
   if(G.money < amount){ flash('Not enough cash to invest','warn'); return; }
   G.money -= amount;
-  G.finance.investments += amount;
-  addEv(`You invested ${fmt$(amount)}.`, 'good');
+  G.finance.portfolio[bucketId] = (G.finance.portfolio[bucketId]||0) + amount;
+  G.stress = clamp((G.stress||35) + rnd(0,2));
+  addEv(`You allocated ${fmt$(amount)} to ${bucket.label}.`, 'good');
+  renderJobs();
+}
+
+function buyCrypto(assetId, amount){
+  ensureAdvancedFinanceState();
+  const asset = CRYPTO_ASSETS.find(a=>a.id===assetId);
+  if(!asset){ flash('Crypto asset not found','warn'); return; }
+  if(G.age < asset.minAge){ flash(`${asset.label} trading unlocks at age ${asset.minAge}.`,'warn'); return; }
+  if(amount<=0){ flash('Invalid amount','warn'); return; }
+  if(G.money < amount){ flash('Not enough cash','warn'); return; }
+  G.money -= amount;
+  G.finance.crypto[assetId] = (G.finance.crypto[assetId]||0) + amount;
+  G.stress = clamp((G.stress||35) + rnd(1,4));
+  addEv(`You bought ${fmt$(amount)} of ${asset.label}. Volatility accepted.`, 'warn');
+  renderJobs();
+}
+
+function sellCrypto(assetId, pct){
+  ensureAdvancedFinanceState();
+  const asset = CRYPTO_ASSETS.find(a=>a.id===assetId);
+  if(!asset){ flash('Crypto asset not found','warn'); return; }
+  const current = G.finance.crypto[assetId]||0;
+  if(current<=0){ flash(`No ${asset.label} position to sell.`,'warn'); return; }
+  const ratio = Math.max(0.05, Math.min(1, pct||1));
+  const amount = Math.floor(current * ratio);
+  if(amount<=0){ flash('Position too small to sell.','warn'); return; }
+  G.finance.crypto[assetId] = Math.max(0, current - amount);
+  G.money += amount;
+  G.stress = clamp((G.stress||35) - rnd(1,4));
+  addEv(`You sold ${fmt$(amount)} of ${asset.label}.`, 'good');
+  renderJobs();
+}
+
+function startBusiness(sectorId){
+  ensureAdvancedFinanceState();
+  const b = G.finance.business;
+  if(b.active){ flash('You already run a business.','warn'); return; }
+  const sector = businessSectorById(sectorId);
+  if(!sector){ flash('Sector not found.','warn'); return; }
+  if(G.age<18){ flash('Business founder mode unlocks at age 18.','warn'); return; }
+  if(G.money < sector.startCost){ flash(`Need ${fmt$(sector.startCost)} to launch this business.`,'warn'); return; }
+
+  G.money -= sector.startCost;
+  const brand = `${pick(['Nova','Apex','Pulse','Vertex','BlueSky','Orbit','Bright','Prime'])}${pick([' Labs',' Ventures',' Studio',' Works',' Systems',' Capital',' Collective'])}`;
+  b.active = true;
+  b.name = brand;
+  b.sector = sector.label;
+  b.stage = 'idea';
+  b.employees = 1;
+  b.reputation = clamp(38 + Math.floor(G.smarts/5) + rnd(-6,6));
+  b.product = clamp(42 + Math.floor(G.smarts/4) + rnd(-8,8));
+  b.operations = clamp(40 + rnd(-7,7));
+  b.marketing = clamp(36 + rnd(-8,8));
+  b.burn = sector.burn;
+  b.cashReserve = Math.floor(sector.startCost * 0.7);
+  b.valuation = Math.floor(sector.startCost * 2.2);
+  b.years = 0;
+  b.lastProfit = 0;
+  b.hasInvestor = false;
+  if(!G.career.milestones) G.career.milestones = [];
+  G.career.milestones.push({ year:G.age, text:`Founded ${brand} (${sector.label})` });
+  G.stress = clamp((G.stress||35) + rnd(8,15));
+  addEv(`You founded ${brand} in ${sector.label}. Risk up. Potential way up.`, 'love');
+  renderJobs();
+}
+
+function businessAction(action){
+  ensureAdvancedFinanceState();
+  const b = G.finance.business;
+  if(!b.active){ flash('No active business to manage.','warn'); return; }
+
+  if(action==='build'){
+    const cost = 3000 + b.employees*1200;
+    if(G.money<cost){ flash(`Need ${fmt$(cost)}`,'warn'); return; }
+    G.money -= cost;
+    b.product = clamp(b.product + rnd(4,10));
+    b.operations = clamp(b.operations + rnd(1,4));
+    b.burn += rnd(1500,4500);
+    G.stress = clamp((G.stress||35) + rnd(4,8));
+    addEv(`${b.name}: product sprint completed. Better offering, bigger monthly burn.`, 'good');
+  } else if(action==='market'){
+    const cost = 2500 + rnd(500,3500);
+    if(G.money<cost){ flash(`Need ${fmt$(cost)}`,'warn'); return; }
+    G.money -= cost;
+    b.marketing = clamp(b.marketing + rnd(4,10));
+    b.reputation = clamp(b.reputation + rnd(2,6));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    addEv(`${b.name} marketing campaign launched. Reach improved after spending ${fmt$(cost)}.`, 'good');
+  } else if(action==='hire'){
+    const hireCost = 7000 + b.employees*3500;
+    if(G.money<hireCost){ flash(`Need ${fmt$(hireCost)} to hire.`,'warn'); return; }
+    G.money -= hireCost;
+    b.employees++;
+    b.operations = clamp(b.operations + rnd(2,5));
+    b.burn += rnd(9000,19000);
+    b.reputation = clamp(b.reputation + rnd(0,3));
+    G.stress = clamp((G.stress||35) + rnd(3,7));
+    addEv(`You hired for ${b.name}. Team size is now ${b.employees}.`, 'warn');
+  } else if(action==='cut'){
+    if(b.employees<=1){ flash('No team to cut.','warn'); return; }
+    b.employees--;
+    b.burn = Math.max(6000, b.burn - rnd(7000,16000));
+    b.reputation = clamp(b.reputation - rnd(2,6));
+    b.operations = clamp(b.operations - rnd(1,4));
+    G.stress = clamp((G.stress||35) + rnd(2,6));
+    addEv(`You cut headcount at ${b.name} to extend runway.`, 'bad');
+  } else if(action==='fund'){
+    const chance = 0.28 + b.product/240 + b.reputation/260 + Math.min(0.18, b.valuation/2500000);
+    if(Math.random()<chance){
+      const raise = rnd(120000,950000);
+      b.cashReserve += raise;
+      b.valuation += Math.floor(raise * rnd(6,14)/10);
+      b.hasInvestor = true;
+      b.stage = 'growth';
+      G.stress = clamp((G.stress||35) + rnd(2,5));
+      addEv(`You raised ${fmt$(raise)} for ${b.name}. Cap table got complicated.`, 'love');
+    } else {
+      b.reputation = clamp(b.reputation - rnd(1,4));
+      G.stress = clamp((G.stress||35) + rnd(3,8));
+      addEv(`Investor roadshow for ${b.name} ended in "circle back later."`, 'warn');
+    }
+  } else if(action==='salary'){
+    if(b.cashReserve<12000){ flash('Need at least $12k in business reserve.','warn'); return; }
+    const pay = Math.floor(Math.min(b.cashReserve*0.4, rnd(8000,45000)));
+    b.cashReserve -= pay;
+    G.money += pay;
+    G.stress = clamp((G.stress||35) - rnd(2,5));
+    addEv(`Founder salary withdrawn from ${b.name}: ${fmt$(pay)}.`, 'good');
+  } else if(action==='exit'){
+    if(b.valuation<250000){ flash('Valuation too low for an exit right now.','warn'); return; }
+    const multiple = b.hasInvestor ? rnd(8,15)/100 : rnd(18,32)/100;
+    const payout = Math.floor(b.valuation * multiple);
+    G.money += payout;
+    G.career.reputation = clamp(G.career.reputation + rnd(8,15));
+    G.sm.totalFame = clamp(G.sm.totalFame + rnd(2,8));
+    G.stress = clamp((G.stress||35) - rnd(8,16));
+    addEv(`You exited ${b.name} for ${fmt$(payout)}. Founder arc completed.`, 'love');
+    G.finance.business = {
+      active:false, name:'', sector:'', stage:'idea',
+      employees:0, reputation:50, product:45, operations:45, marketing:40,
+      burn:0, cashReserve:0, valuation:0, years:0, lastProfit:0, hasInvestor:false,
+    };
+  }
+
+  updateHUD();
+  renderJobs();
+}
+
+function legalGovAction(action){
+  ensureAdvancedFinanceState();
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
+  if((action==='campaign' || action==='policy_business' || action==='policy_justice' || action==='policy_policing') && typeof politicsQuickAction==='function'){
+    politicsQuickAction(
+      action==='campaign' ? 'campaign_mayor' :
+      action==='policy_business' ? 'policy_business' :
+      action==='policy_justice' ? 'policy_justice' :
+      'policy_policing'
+    );
+    switchTab('politics');
+    return;
+  }
+  const L = G.legal;
+  const gov = G.gov;
+  const lw = L.lawyer;
+  const isLawPro = !!(G.career.licenses?.law || ['attorney','in_house','partner','judge'].includes(G.career.jobId));
+
+  if(action==='pay_fine'){
+    if(L.finesDue<=0){ flash('No legal fines due.','warn'); return; }
+    const amt = Math.min(L.finesDue, Math.max(500, Math.floor(G.money*0.4)));
+    if(G.money<amt){ flash('Not enough cash to pay fine.','warn'); return; }
+    G.money -= amt;
+    L.finesDue -= amt;
+    G.stress = clamp((G.stress||35) - rnd(2,6));
+    addEv(`Paid legal fines: ${fmt$(amt)}. Remaining: ${fmt$(L.finesDue)}.`, 'good');
+  } else if(action==='defend_self'){
+    if(!L.lawsuits.length){ flash('No active lawsuits to defend.','warn'); return; }
+    const caseItem = L.lawsuits[0];
+    const prepCost = rnd(2000,15000);
+    if(G.money<prepCost){ flash(`Need ${fmt$(prepCost)} for legal prep.`,'warn'); return; }
+    G.money -= prepCost;
+    const chance = 0.32 + (isLawPro?0.18:0) + (lw.profile/260) + (G.smarts/320);
+    if(Math.random()<chance){
+      L.lawsuits.shift();
+      G.stress = clamp((G.stress||35) - rnd(3,7));
+      addEv(`You successfully beat a ${caseItem.kind} after spending ${fmt$(prepCost)} on defense.`, 'good');
+    } else {
+      const penalty = Math.floor(caseItem.amount * rnd(55,105)/100);
+      L.finesDue += penalty;
+      G.stress = clamp((G.stress||35) + rnd(4,9));
+      addEv(`Defense failed. Court imposed ${fmt$(penalty)} in penalties.`, 'bad');
+    }
+  } else if(action==='campaign'){
+    if(!isLawPro){ flash('Campaigning requires a law background or license.','warn'); return; }
+    if(G.age<30){ flash('Need age 30+ to run for office.','warn'); return; }
+    const spend = rnd(10000,80000);
+    if(G.money<spend){ flash(`Need ${fmt$(spend)} campaign funds.`,'warn'); return; }
+    G.money -= spend;
+    const profile = lw.profile||20;
+    const chance = 0.22 + profile/240 + (G.career.reputation/220) + (G.smarts/300) + (G.sm.totalFame/600);
+    if(Math.random()<chance){
+      const office = profile>=75 ? pick(['Attorney General','Governor']) : 'District Attorney';
+      lw.electedOffice = office;
+      lw.campaignWins++;
+      gov.approval = clamp(gov.approval + rnd(8,16));
+      G.stress = clamp((G.stress||35) + rnd(3,8));
+      addEv(`You won a ${office} election campaign. Public office begins now.`, 'love');
+      flash(`🗳️ Elected ${office}`,'good');
+    } else {
+      gov.approval = clamp(gov.approval - rnd(2,8));
+      G.stress = clamp((G.stress||35) + rnd(4,9));
+      addEv('You lost the election campaign. Valuable network gained, result denied.', 'warn');
+    }
+  } else if(action==='policy_business'){
+    if(!lw.electedOffice){ flash('You need elected office to influence policy directly.','warn'); return; }
+    gov.policy.businessClimate = clamp(gov.policy.businessClimate + rnd(5,12));
+    gov.policy.taxShift = Math.max(-25, Math.min(25, gov.policy.taxShift - rnd(1,4)));
+    gov.activeLaw = 'Business Incentive Ordinance';
+    addEv('You passed a business-friendly policy package.', 'good');
+  } else if(action==='policy_justice'){
+    if(!lw.electedOffice){ flash('You need elected office to influence policy directly.','warn'); return; }
+    gov.policy.justice = clamp(gov.policy.justice + rnd(5,12));
+    gov.policy.policing = clamp(gov.policy.policing - rnd(1,7));
+    gov.activeLaw = 'Sentencing & Justice Reform';
+    addEv('You advanced justice reform and sentencing updates.', 'good');
+  } else if(action==='policy_policing'){
+    if(!lw.electedOffice){ flash('You need elected office to influence policy directly.','warn'); return; }
+    gov.policy.policing = clamp(gov.policy.policing + rnd(5,12));
+    gov.policy.justice = clamp(gov.policy.justice - rnd(1,5));
+    gov.activeLaw = 'Public Safety Enforcement Act';
+    addEv('You pushed stricter policing policy statewide.', 'warn');
+  }
+
+  updateHUD();
   renderJobs();
 }
 
@@ -377,12 +837,15 @@ function payDebt(amount){
   G.money -= amount;
   G.finance.debt = Math.max(0, G.finance.debt - amount);
   G.finance.credit = Math.min(850, G.finance.credit + 5);
+  G.stress = clamp((G.stress||35) - rnd(2,6));
   addEv(`Debt payment: ${fmt$(amount)}. Remaining debt: ${fmt$(G.finance.debt)}.`, 'good');
   renderJobs();
 }
 
 function renderJobs(){
-  ensureFinanceShape();
+  ensureAdvancedFinanceState();
+  ensureCareerOverhaulState();
+  if(typeof ensureGovLegalShape==='function') ensureGovLegalShape();
   const jc = document.getElementById('jobs-content');
   if(G.age < 16){
     jc.innerHTML = `<div class="notif warn">Jobs unlock at age 16.</div>`; return;
@@ -390,6 +853,28 @@ function renderJobs(){
 
   let html = '';
   const c = G.career;
+  html += `<div class="card">
+    <div class="card-title">Work-Life Pressure</div>
+    ${statBar('Stress', G.stress||35, 'bar-stress')}
+    <p style="font-size:.78rem;color:var(--muted2);margin-top:8px">
+      ${(G.stress||35)>=80?'Very high stress: burnout risk and health penalties are likely.':(G.stress||35)>=60?'Stress is high: manage workload and finances to avoid decline.':(G.stress||35)<=30?'Stress is low: you are recovering well.':'Stress is manageable right now.'}
+    </p>
+  </div>`;
+
+  const activeTrack = CAREER_TRACKS.find(t=>t.id===c.track) || CAREER_TRACKS[0];
+  const certLabels = (c.certifications||[])
+    .map(id=>(CAREER_CERTIFICATIONS.find(x=>x.id===id)||{}).label)
+    .filter(Boolean);
+  html += `<div class="card">
+    <div class="card-title">Career Architecture</div>
+    <p style="font-size:.78rem;color:var(--muted2)">Track: <strong style="color:var(--text)">${activeTrack.label}</strong></p>
+    <p style="font-size:.76rem;color:var(--muted2)">${activeTrack.desc}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Influence ${c.influence||45} · Layoff Shield ${c.layoffShield||20} · Burnout ${c.burnout||12}</p>
+    <p style="font-size:.76rem;color:var(--muted2)">Certifications: ${certLabels.length?certLabels.join(', '):'None yet'}</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      ${CAREER_TRACKS.map(t=>`<button class="btn btn-ghost btn-sm${c.track===t.id?' disabled':''}" onclick="setCareerTrack('${t.id}')">${t.label}</button>`).join('')}
+    </div>
+  </div>`;
 
   // Current job
   if(c.employed){
@@ -398,7 +883,7 @@ function renderJobs(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div>
           <div style="font-family:var(--fh);font-weight:800;font-size:1.1rem">${c.title}</div>
-          <div style="font-size:.78rem;color:var(--muted2)">${c.company} · ${fmt$(c.salary)}/yr · ${JOB_LEVELS[c.level]?.label||'Entry'} level</div>
+          <div style="font-size:.78rem;color:var(--muted2)">${c.company} · ${fmt$(c.salary)}/yr · ${JOB_LEVELS[c.level]?.label||'Entry'} level · ${activeTrack.label}</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:.72rem;color:var(--muted2)">Performance</div>
@@ -414,7 +899,35 @@ function renderJobs(){
       <div style="margin-top:10px;font-size:.72rem;color:${c.hrRisk>60?'var(--danger)':c.hrRisk>35?'var(--gold)':'var(--muted2)'}">
         HR Risk: ${c.hrRisk}/100
       </div>
+      <div style="margin-top:5px;font-size:.72rem;color:${(c.burnout||12)>70?'var(--danger)':(c.burnout||12)>45?'var(--gold)':'var(--muted2)'}">
+        Burnout: ${c.burnout||12}/100 · Influence: ${c.influence||45} · Layoff Shield: ${c.layoffShield||20}
+      </div>
     </div>`;
+
+    html += `<div class="card">
+      <div class="card-title">Career Strategy</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="jobAction('', 'visibility')">📣 Increase Visibility</button>
+        <button class="btn btn-ghost btn-sm" onclick="jobAction('', 'politics')">🧠 Office Politics</button>
+        <button class="btn btn-ghost btn-sm" onclick="jobAction('', 'protect_role')">🛡️ Protect Role</button>
+        <button class="btn btn-ghost btn-sm" onclick="jobAction('', 'recover')">🧘 Recover</button>
+      </div>
+      <p style="font-size:.74rem;color:var(--muted2);margin-top:8px">Career actions this year: ${c.careerActionsUsed||0}</p>
+    </div>`;
+
+    const certChoices = CAREER_CERTIFICATIONS.filter(cert=>!c.certifications.includes(cert.id));
+    if(certChoices.length){
+      html += `<div class="card">
+        <div class="card-title">Professional Certifications</div>
+        <div class="choice-grid">
+          ${certChoices.map(cert=>`<div class="choice" onclick="earnCertification('${cert.id}')">
+            <div class="choice-icon">🎓</div>
+            <div class="choice-name">${cert.label}</div>
+            <div class="choice-desc">${fmt$(cert.cost)} · ${cert.minSmarts}+ smarts</div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
 
     // Perks & milestones
     html += `<div class="card">
@@ -428,13 +941,15 @@ function renderJobs(){
     const job = JOBS.find(j=>j.id===c.jobId) || {};
     const isLegal   = job.minEdu==='law';
     const isMedical = job.minEdu==='med';
-    const isTech    = ['jdev','swe','swe_s','pm'].includes(job.id);
-    const isFin     = ['analyst','ib','quant','fin_mgr'].includes(job.id);
+    const isTech    = ['jdev','swe','swe_s','pm','data_engineer','ai_engineer','cyber_analyst','ux_researcher','game_designer'].includes(job.id);
+    const isFin     = ['analyst','ib','quant','fin_mgr','risk_analyst','strategy_consultant'].includes(job.id);
     const isEdu     = ['teacher','principal'].includes(job.id);
     html += `<div class="card"><div class="card-title">Special Actions</div>
       <div class="choice-grid">
         ${isLegal?`<div class="choice" onclick="jobSpecial('case_win')"><div class="choice-icon">⚖️</div><div class="choice-name">Win a Case</div><div class="choice-desc">+Reputation +Performance</div></div>
-        <div class="choice" onclick="jobSpecial('settlement')"><div class="choice-icon">🤝</div><div class="choice-name">Negotiate Settlement</div><div class="choice-desc">+Bonus</div></div>`:''}
+        <div class="choice" onclick="jobSpecial('settlement')"><div class="choice-icon">🤝</div><div class="choice-name">Negotiate Settlement</div><div class="choice-desc">+Bonus</div></div>
+        <div class="choice" onclick="jobSpecial('constitutional')"><div class="choice-icon">🏛️</div><div class="choice-name">Constitutional Challenge</div><div class="choice-desc">+Legal profile +Rep</div></div>
+        <div class="choice" onclick="jobSpecial('public_defense')"><div class="choice-icon">🧑‍⚖️</div><div class="choice-name">Public Defense</div><div class="choice-desc">Impactful, stressful work</div></div>`:''}
         ${isMedical?`<div class="choice" onclick="jobSpecial('surgery')"><div class="choice-icon">🩺</div><div class="choice-name">Successful Surgery</div><div class="choice-desc">+Performance</div></div>
         <div class="choice" onclick="jobSpecial('night_shift')"><div class="choice-icon">🌙</div><div class="choice-name">Night Shift</div><div class="choice-desc">+Performance -Health</div></div>`:''}
         ${isTech?`<div class="choice" onclick="jobSpecial('launch')"><div class="choice-icon">🚀</div><div class="choice-name">Ship Launch</div><div class="choice-desc">+Performance +Rep</div></div>`:''}
@@ -528,10 +1043,11 @@ function renderJobs(){
     <div class="card-title">Finances</div>
     <p style="font-size:.78rem;color:var(--muted2)">Credit score: <strong style="color:${G.finance.credit>=720?'var(--accent)':G.finance.credit>=660?'var(--gold)':'var(--danger)'}">${G.finance.credit}</strong></p>
     <p style="font-size:.78rem;color:var(--muted2)">Rent: ${G.finance.rent?fmt$(G.finance.rent*12)+'/yr':'None'} · Mortgage: ${G.finance.mortgage?fmt$(G.finance.mortgage)+'/yr':'None'} · Debt: ${fmt$(G.finance.debt)}</p>
-    <p style="font-size:.78rem;color:var(--muted2)">Investments: ${fmt$(G.finance.investments)} · Retirement: ${fmt$(G.finance.retirement||0)}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Retirement: ${fmt$(G.finance.retirement||0)}</p>
     <p style="font-size:.78rem;color:var(--muted2)">Last tax filing: ${filedLine}</p>
     <p style="font-size:.78rem;color:var(--muted2)">State tax estimate: ${statePct}% · Taxable income: ${fmt$(tax.lastTaxableIncome||0)}</p>
     ${tax.delinquentYears>0?`<div class="notif bad" style="margin-bottom:10px">⚠️ Tax delinquency: ${tax.delinquentYears} year(s) unresolved. Penalties are compounding your debt.</div>`:''}
+    <p style="font-size:.78rem;color:var(--muted2);margin:8px 0 4px">Founder tools and market investing moved to the <strong style="color:var(--text)">Business</strong> tab.</p>
     <div class="choice-grid">
       ${HOUSING_OPTIONS.map(o=>`<div class="choice" onclick="setRent('${o.id}')">
         <div class="choice-icon">🏠</div><div class="choice-name">${o.label}</div><div class="choice-desc">${fmt$(o.rent*12)}/yr · ${o.minCredit}+ credit</div>
@@ -543,10 +1059,31 @@ function renderJobs(){
       </div>`).join('')}
     </div>
     <div class="choice-grid" style="margin-top:10px">
-      <div class="choice" onclick="invest(1000)"><div class="choice-icon">📈</div><div class="choice-name">Invest $1k</div><div class="choice-desc">Long-term growth</div></div>
-      <div class="choice" onclick="invest(5000)"><div class="choice-icon">📈</div><div class="choice-name">Invest $5k</div><div class="choice-desc">Long-term growth</div></div>
-      <div class="choice" onclick="invest(10000)"><div class="choice-icon">📈</div><div class="choice-name">Invest $10k</div><div class="choice-desc">Long-term growth</div></div>
       <div class="choice" onclick="payDebt(1000)"><div class="choice-icon">💳</div><div class="choice-name">Pay Debt $1k</div><div class="choice-desc">Boost credit</div></div>
+    </div>
+  </div>`;
+
+  const lawsuits = G.legal.lawsuits || [];
+  const lw = G.legal.lawyer || {};
+  const gov = G.gov || { policy:{} };
+  const isLawTrack = !!(G.career.licenses?.law || ['attorney','in_house','partner','judge'].includes(G.career.jobId));
+  html += `<div class="card">
+    <div class="card-title">Legal & Government</div>
+    <p style="font-size:.78rem;color:var(--muted2)">Open lawsuits: ${lawsuits.length} · Fines due: ${fmt$(G.legal.finesDue||0)} · Probation: ${G.legal.probationYears||0} year(s)</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Law profile: ${lw.profile||20} · Cases won: ${lw.casesWon||0} · Settlements: ${lw.settlements||0}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Gov: ${gov.party||'Centrist'} · Approval ${gov.approval||50}% · Active law: ${gov.activeLaw||'Status Quo'}</p>
+    <p style="font-size:.78rem;color:var(--muted2)">Policy → Tax shift ${gov.policy?.taxShift||0} · Policing ${gov.policy?.policing||50} · Justice ${gov.policy?.justice||50} · Business climate ${gov.policy?.businessClimate||50}</p>
+    <p style="font-size:.76rem;color:var(--muted2);margin-top:8px">Full campaigning, governing, diplomacy, crises, corruption and impeachment now live in the <strong style="color:var(--text)">Politics</strong> tab.</p>
+    <div class="choice-grid" style="margin-top:10px">
+      <div class="choice" onclick="legalGovAction('pay_fine')"><div class="choice-icon">💸</div><div class="choice-name">Pay Fines</div><div class="choice-desc">Reduce legal pressure</div></div>
+      <div class="choice" onclick="legalGovAction('defend_self')"><div class="choice-icon">🛡️</div><div class="choice-name">Defend Lawsuit</div><div class="choice-desc">Spend cash to fight claims</div></div>
+      ${isLawTrack
+        ? `<div class="choice" onclick="legalGovAction('campaign')"><div class="choice-icon">🗳️</div><div class="choice-name">Run for Office</div><div class="choice-desc">Launch mayor campaign in Politics tab</div></div>`
+        : `<div class="choice disabled"><div class="choice-icon">🗳️</div><div class="choice-name">Run for Office</div><div class="choice-desc">Requires law track / entry path prep</div></div>`
+      }
+      <div class="choice" onclick="switchTab('politics')"><div class="choice-icon">🏛️</div><div class="choice-name">Open Politics HQ</div><div class="choice-desc">Campaign, govern, survive office</div></div>
+      <div class="choice" onclick="legalGovAction('policy_business')"><div class="choice-icon">🏢</div><div class="choice-name">Tax-Cut Agenda</div><div class="choice-desc">Quick policy shortcut</div></div>
+      <div class="choice" onclick="legalGovAction('policy_justice')"><div class="choice-icon">⚖️</div><div class="choice-name">Justice Reform</div><div class="choice-desc">Quick policy shortcut</div></div>
     </div>
   </div>`;
 
@@ -583,17 +1120,18 @@ function renderJobs(){
   }
 
   // Job market
-  const eligible = JOBS.filter(jobEligible);
+  const eligible = JOBS.filter(jobEligible).sort((a,b)=>jobFitScore(b)-jobFitScore(a));
   html += `<div class="card"><div class="card-title">Job Market</div>`;
   if(!eligible.length){
     html += `<div class="notif warn">No jobs you qualify for right now. Improve your education or skills.</div>`;
   } else {
     html += `<div class="choice-grid">`;
-    eligible.slice(0,16).forEach(j=>{
+    eligible.slice(0,24).forEach(j=>{
+      const fit = jobFitScore(j);
       html += `<div class="choice" onclick="applyForJob('${j.id}')">
         <div class="choice-icon">💼</div>
         <div class="choice-name" style="font-size:.8rem">${j.title}</div>
-        <div class="choice-desc">${j.tier.toUpperCase()} · ${fmt$(j.basePay)}/yr base</div>
+        <div class="choice-desc">${j.tier.toUpperCase()} · ${fmt$(j.basePay)}/yr base · Fit ${Math.floor(fit)}</div>
       </div>`;
     });
     html += `</div>`;
