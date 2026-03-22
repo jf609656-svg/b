@@ -52,17 +52,21 @@ const STREET_RACING_CARS = [
 const STREET_RACING_TRACKS = [
   {
     id:'harbor_oval',
-    name:'Harbor Oval',
+    name:'Liberty Bowl Speedway',
     reqLevel:1,
     difficulty:1,
     entry:[300,1200],
     payout:[1800,5600],
     hazard:9,
-    laps:3,
-    width:42,
-    lengthKm:3.6,
-    theme:{ bg:'#0a1322', road:'#243449', line:'#71d5ff' },
-    path:[[130,95],[560,95],[650,190],[650,350],[560,445],[130,445],[40,350],[40,190]],
+    laps:4,
+    width:40,
+    lengthKm:4.2,
+    theme:{ bg:'#0a1322', road:'#243449', line:'#71d5ff', venueA:'#991b1b', venueB:'#1d4ed8' },
+    path:[
+      [110,118],[248,96],[386,86],[534,102],[620,150],[654,236],[628,322],[552,382],
+      [484,430],[414,450],[334,430],[270,386],[236,330],[188,318],[132,342],[86,404],
+      [44,338],[38,246],[58,168]
+    ],
   },
   {
     id:'neon_chicane',
@@ -73,10 +77,14 @@ const STREET_RACING_TRACKS = [
     payout:[5200,14600],
     hazard:18,
     laps:3,
-    width:36,
-    lengthKm:5.1,
-    theme:{ bg:'#140d1f', road:'#372047', line:'#ff6af4' },
-    path:[[90,90],[300,70],[470,120],[620,90],[670,200],[580,280],[650,390],[520,455],[350,420],[230,470],[90,420],[40,300],[75,210]],
+    width:34,
+    lengthKm:5.6,
+    theme:{ bg:'#140d1f', road:'#372047', line:'#ff6af4', venueA:'#7e22ce', venueB:'#1d4ed8' },
+    path:[
+      [78,110],[152,88],[248,82],[344,102],[430,142],[498,116],[570,96],[632,132],[662,206],
+      [624,262],[566,286],[594,340],[650,396],[606,444],[524,456],[448,430],[382,392],[330,438],
+      [252,472],[172,452],[106,414],[72,352],[50,284],[56,216]
+    ],
   },
   {
     id:'mountain_serpent',
@@ -87,10 +95,15 @@ const STREET_RACING_TRACKS = [
     payout:[14000,38000],
     hazard:31,
     laps:2,
-    width:30,
-    lengthKm:7.8,
-    theme:{ bg:'#0e1a14', road:'#2d3c33', line:'#9cff7b' },
-    path:[[80,430],[150,370],[110,310],[180,250],[120,190],[210,130],[320,95],[420,135],[510,95],[600,145],[650,220],[620,300],[670,380],[600,445],[500,410],[430,465],[320,430],[230,470],[160,430]],
+    width:29,
+    lengthKm:8.4,
+    theme:{ bg:'#0e1a14', road:'#2d3c33', line:'#9cff7b', venueA:'#166534', venueB:'#1e3a8a' },
+    path:[
+      [84,442],[144,394],[122,350],[96,304],[128,264],[178,232],[150,194],[170,154],[240,122],
+      [316,96],[386,114],[430,150],[484,130],[552,98],[620,136],[654,186],[640,240],[602,278],
+      [624,332],[666,386],[620,438],[560,452],[500,424],[450,392],[412,432],[362,468],[298,448],
+      [242,474],[188,456],[146,420]
+    ],
   },
 ];
 
@@ -562,6 +575,20 @@ function streetRaceDrawCar(ctx, x, y, angle, color, label){
 function streetRaceDrawAmericanStadium(ctx, canvas){
   ctx.fillStyle = 'rgba(17,24,39,0.96)';
   ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Crowd bowl with layered stands.
+  ctx.fillStyle = 'rgba(30,41,59,0.68)';
+  ctx.fillRect(6,6,canvas.width-12,canvas.height-12);
+  ctx.fillStyle = 'rgba(15,23,42,0.88)';
+  ctx.fillRect(18,18,canvas.width-36,canvas.height-36);
+  // Seating stripe pattern.
+  for(let y=22; y<74; y+=6){
+    ctx.fillStyle = (y%12===0) ? 'rgba(220,38,38,0.26)' : 'rgba(37,99,235,0.22)';
+    ctx.fillRect(20,y,canvas.width-40,3);
+  }
+  for(let y=canvas.height-76; y<canvas.height-22; y+=6){
+    ctx.fillStyle = (y%12===0) ? 'rgba(220,38,38,0.22)' : 'rgba(37,99,235,0.20)';
+    ctx.fillRect(20,y,canvas.width-40,3);
+  }
   ctx.fillStyle = 'rgba(191,24,32,0.22)';
   ctx.fillRect(12,12,canvas.width-24,36);
   ctx.fillStyle = 'rgba(30,64,175,0.2)';
@@ -587,6 +614,16 @@ function streetRaceDrawAmericanStadium(ctx, canvas){
   ctx.fillStyle = 'rgba(255,255,255,0.10)';
   ctx.font = 'bold 12px system-ui';
   ctx.fillText('AMERICAN STREET SERIES', canvas.width*0.37, canvas.height*0.465);
+  // Flag pennants.
+  for(let x=28; x<canvas.width-28; x+=52){
+    ctx.fillStyle = 'rgba(248,250,252,0.72)';
+    ctx.beginPath();
+    ctx.moveTo(x, 12);
+    ctx.lineTo(x+12, 16);
+    ctx.lineTo(x, 20);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 function streetRaceApplyBarrierCollision(entity, track, proj){
@@ -702,6 +739,7 @@ function streetRacingResolveMiniRace(track, entry, winner){
   if(!car) return;
   const rt = STREET_RACE_RUNTIME;
   const elapsedMs = Math.max(0, Math.floor(performance.now() - (rt.startTs||performance.now())));
+  const qualMs = Math.max(0, Math.floor(rt.qualTime||0));
   const offTrackHits = Math.floor((rt.offTrackFrames||0)/16);
   r.races += 1;
   car.races = (car.races||0) + 1;
@@ -721,7 +759,7 @@ function streetRacingResolveMiniRace(track, entry, winner){
     r.skill = clamp((r.skill||18) + rnd(2,5));
     G.happy = clamp((G.happy||50) + rnd(5,11));
     G.stress = clamp((G.stress||35) - rnd(2,7));
-    addEv(`2D race win at ${track.name}. Prize: ${fmt$(payout)}. Time: ${streetRaceTimeFmt(elapsedMs)}.`, 'love');
+    addEv(`2D race win at ${track.name}. Prize: ${fmt$(payout)}. Qualifying: ${streetRaceTimeFmt(qualMs)} · Race: ${streetRaceTimeFmt(elapsedMs)}.`, 'love');
     flash('🏁 You won the race!', 'good');
   } else {
     r.losses += 1;
@@ -767,6 +805,32 @@ function streetRaceLeaderboard(runtime){
     return b.prog - a.prog;
   });
   return racers;
+}
+
+function streetRaceCalcQualiScore(car, track, isPlayer){
+  const base =
+    (car.power||40)*0.34 +
+    (car.accel||40)*0.28 +
+    (car.grip||40)*0.2 +
+    (car.handling||40)*0.2 +
+    (car.reliability||40)*0.08 -
+    (track.difficulty||1)*4.2;
+  const skillTerm = (G.activities?.streetRacing?.skill||18) * (isPlayer ? 0.95 : 0.75);
+  return base + skillTerm + rnd(-18, 18) / 10;
+}
+
+function streetRaceApplyQualifyingGrid(rt, track, car){
+  const path = rt.path;
+  const playerQuali = streetRaceCalcQualiScore(car, track, true);
+  const quali = [{ id:'you', score:playerQuali }]
+    .concat((rt.opponents||[]).map((op, idx)=>({
+      id:op.id,
+      score:streetRaceCalcQualiScore(car, track, false) - idx*0.8 + rnd(-12,12)/10,
+    })));
+  quali.sort((a,b)=>b.score-a.score);
+  rt.qualiOrder = quali.map(q=>q.id);
+  rt.playerGrid = rt.qualiOrder.indexOf('you') + 1;
+  rt.qualTime = Math.max(36000, Math.floor(98000 - playerQuali*380));
 }
 
 function streetRacingMiniRaceLoop(){
@@ -899,6 +963,7 @@ function streetRacingStartMiniRace(track, car, entry){
   rt.finished = false;
   rt.track = track;
   rt.entry = entry;
+  rt.qualifying = null;
   rt.canvas = canvas;
   rt.ctx = ctx;
   rt.path = path;
@@ -907,6 +972,8 @@ function streetRacingStartMiniRace(track, car, entry){
   rt.offTrackFrames = 0;
   rt.cautionUntil = 0;
   rt.cautionReason = '';
+  rt.qualiOrder = [];
+  rt.playerGrid = 1;
   rt.playerCar = car;
   rt.player = {
     x:start.x, y:start.y, angle:start.angle, speed:0,
@@ -925,6 +992,7 @@ function streetRacingStartMiniRace(track, car, entry){
   for(let i=0;i<opponentCount;i++){
     const startPos = streetRacePointAtDistance(path, path.total*(0.12 + i*0.05));
     rt.opponents.push({
+      id:`op_${i+1}`,
       progress:path.total*(0.12 + i*0.05),
       speed:2.3 + track.difficulty*0.24 + rnd(0,20)/100 + Math.max(0, (track.reqLevel - (G.activities.streetRacing.level||1))*0.12),
       x:startPos.x,
@@ -934,6 +1002,40 @@ function streetRacingStartMiniRace(track, car, entry){
       color:palette[i%palette.length],
     });
   }
+  streetRaceApplyQualifyingGrid(rt, track, car);
+  // Snap cars to their grid spots after qualifying order is known.
+  rt.player.lap = 0;
+  rt.player.prevProgress = rt.player.progress;
+  const pPt = streetRacePointAtDistance(path, rt.player.progress);
+  rt.player.x = pPt.x; rt.player.y = pPt.y; rt.player.angle = pPt.angle;
+  (rt.opponents||[]).forEach(op=>{
+    op.lap = 0;
+    const pt = streetRacePointAtDistance(path, op.progress);
+    op.x = pt.x; op.y = pt.y; op.angle = pt.angle;
+  });
+  // Qualifying determines starting grid.
+  const playerQuali = streetRaceCalcQualiScore(car, track, true);
+  const quali = [{ id:'you', score:playerQuali }]
+    .concat(rt.opponents.map((op, idx)=>({ id:op.id, score:streetRaceCalcQualiScore(car, track, false) - idx*0.8 + rnd(-12,12)/10 })));
+  quali.sort((a,b)=>b.score-a.score);
+  rt.qualiOrder = quali.map(q=>q.id);
+  rt.playerGrid = rt.qualiOrder.indexOf('you') + 1;
+  const spacing = 0.04;
+  rt.qualiOrder.forEach((id, idx)=>{
+    const pAt = streetRacePointAtDistance(path, path.total*(0.02 - idx*spacing));
+    if(id==='you'){
+      rt.player.x = pAt.x;
+      rt.player.y = pAt.y;
+      rt.player.angle = pAt.angle;
+      rt.player.prevProgress = ((0.02 - idx*spacing) % 1 + 1) % 1 * path.total;
+    } else {
+      const op = rt.opponents.find(o=>o.id===id);
+      if(op){
+        op.x = pAt.x; op.y = pAt.y; op.angle = pAt.angle;
+        op.progress = ((0.02 - idx*spacing) % 1 + 1) % 1 * path.total;
+      }
+    }
+  });
   rt.keys = {};
   rt.onKeyDown = (e)=>{
     const k = String(e.key||'').toLowerCase();
