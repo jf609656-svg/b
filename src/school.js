@@ -8,6 +8,36 @@
 const FB_POSITIONS = ['QB','RB','WR','TE','OL','DE','DT','LB','CB','S','K'];
 const BB_POSITIONS = ['PG','SG','SF','PF','C'];
 
+const BAND_INSTRUMENTS = ['trumpet','trombone','clarinet','flute','saxophone','drums','tuba','percussion'];
+
+function ensureInstrumentState(){
+  if(!G.skills || typeof G.skills!=='object') G.skills = {};
+  if(!G.skills.music || typeof G.skills.music!=='object') G.skills.music = {};
+  if(!G.skills.music.instrument || typeof G.skills.music.instrument!=='object') G.skills.music.instrument = {};
+  BAND_INSTRUMENTS.forEach(id=>{
+    if(typeof G.skills.music.instrument[id]!=='number') G.skills.music.instrument[id] = 0;
+  });
+}
+
+function instrumentSkillLevel(id){
+  ensureInstrumentState();
+  const n = Number(G.skills.music.instrument[id]||0);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.floor(n))) : 0;
+}
+
+function improveInstrumentSkill(id, gain, source=''){
+  ensureInstrumentState();
+  if(!id) return 0;
+  const before = instrumentSkillLevel(id);
+  G.skills.music.instrument[id] = Math.min(100, before + Math.max(0, gain||0));
+  const after = instrumentSkillLevel(id);
+  if(after>before){
+    const src = source ? ` (${source})` : '';
+    addEv(`Your ${id} skill improved to ${after}${src}.`, 'good');
+  }
+  return after-before;
+}
+
 // ── REAL COLLEGE DATABASE ────────────────────────────────────────
 // Each entry: { name, tier, sportsTier, minGPA, minSAT, tuition, prestige,
 //               strongMajors[], researchInstitution, ivyLeague, conf }
@@ -2303,7 +2333,7 @@ function schoolAct(kind, action, name){
       const out = hsApplyNpcReaction(target, 'casual');
       const n = hsNarrativeFor('casual', out, target);
       G.smarts = clamp(G.smarts + rnd(1,5));
-      hsEvent(n.text, n.tone, { source:'school_social', popup:true, title:'Classmate Interaction' });
+      hsEvent(n.text, n.tone, { source:'school_social', popup:false, title:'Classmate Interaction' });
       hsReputationPulse('study');
     } else {
       target.relation = clamp(target.relation + rnd(3,8));

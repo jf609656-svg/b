@@ -113,6 +113,9 @@ const STREET_RACE_RUNTIME = {
   onKeyDown:null,
   onKeyUp:null,
   opponents:[],
+  cautionUntil:0,
+  cautionReason:'',
+  contactHits:0,
 };
 
 function streetRaceClampStat(v, min=0, max=160){
@@ -779,12 +782,19 @@ function streetRacingMiniRaceLoop(){
   const ds = dt / 16.67;
   const p = rt.player;
   const keys = rt.keys;
+  if(now < (rt.cautionUntil||0)){
+    p.speed = Math.min(p.speed, p.maxSpeed * 0.58);
+  }
   const throttle = !!(keys.arrowup || keys.w);
   const brake = !!(keys.arrowdown || keys.s);
-  const left = !!(keys.arrowleft || keys.a);
-  const right = !!(keys.arrowright || keys.d);
-  if(throttle) p.speed += p.accelRate*ds;
-  if(brake) p.speed -= p.brakeRate*ds;
+  const left = !!(keys.arrowleft || keys.a || keys.h);
+  const right = !!(keys.arrowright || keys.d || keys.l);
+  const brakeAssist = !!(keys.k);
+  const throttleAssist = !!(keys.j);
+  const effectiveThrottle = throttle || throttleAssist;
+  const effectiveBrake = brake || brakeAssist;
+  if(effectiveThrottle) p.speed += p.accelRate*ds;
+  if(effectiveBrake) p.speed -= p.brakeRate*ds;
   p.speed *= Math.pow(p.drag, ds);
   if(Math.abs(p.speed)<0.02) p.speed = 0;
   const turnInput = (left?-1:0) + (right?1:0);
@@ -816,6 +826,37 @@ function streetRacingMiniRaceLoop(){
     op.angle = aiPoint.angle;
   });
 
+  // Car-to-car contact with simple rebound and caution trigger.
+  const racers = [{ kind:'player', ref:p }].concat((rt.opponents||[]).map(op=>({ kind:'op', ref:op })));
+  for(let i=0;i<racers.length;i++){
+    for(let j=i+1;j<racers.length;j++){
+      const a = racers[i].ref;
+      const b = racers[j].ref;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.hypot(dx,dy);
+      if(d>0 && d<19){
+        const nx = dx/d;
+        const ny = dy/d;
+        const push = (19-d)*0.55;
+        a.x -= nx*push*0.5; a.y -= ny*push*0.5;
+        b.x += nx*push*0.5; b.y += ny*push*0.5;
+        const av = a.speed||0;
+        const bv = b.speed||0;
+        a.speed = -Math.abs(av)*0.20 + bv*0.08;
+        b.speed = -Math.abs(bv)*0.20 + av*0.08;
+        if(Math.random()<0.22){
+          rt.offTrackFrames += 1;
+          rt.playerCar.damage = streetRaceClampStat((rt.playerCar.damage||0) + 1, 0, 100);
+        }
+        if((rt.cautionUntil||0) < now + 2200){
+          rt.cautionUntil = now + 2200;
+          rt.cautionReason = 'Contact on track';
+        }
+      }
+    }
+  }
+
   const maxOppLap = Math.max(0, ...(rt.opponents||[]).map(op=>op.lap||0));
   if(p.lap>=rt.track.laps || maxOppLap>=rt.track.laps){
     rt.finished = true;
@@ -830,10 +871,14 @@ function streetRacingMiniRaceLoop(){
   const statusEl = document.getElementById('street-race-status');
   if(statusEl){
     const leaders = streetRaceLeaderboard(rt).slice(0,5).map((x,idx)=>`${idx+1}. ${x.name}`).join(' · ');
+    const caution = now < (rt.cautionUntil||0)
+      ? `<div style="color:#fde68a">⚠️ Yellow flag: ${rt.cautionReason||'Incident'} · Slow zone active</div>`
+      : '';
     statusEl.innerHTML = `
       <div><strong>${rt.track.name}</strong> · Lap ${Math.min(rt.track.laps, p.lap+1)}/${rt.track.laps}</div>
       <div>Time ${streetRaceTimeFmt(now-rt.startTs)} · Speed ${Math.floor(Math.abs(p.speed)*76)} km/h</div>
       <div>Positioning: ${leaders} · Barrier hits ${Math.floor(rt.offTrackFrames/2)}</div>
+      ${caution}
     `;
   }
   rt.raf = requestAnimationFrame(streetRacingMiniRaceLoop);
@@ -860,6 +905,8 @@ function streetRacingStartMiniRace(track, car, entry){
   rt.startTs = performance.now();
   rt.lastTs = rt.startTs;
   rt.offTrackFrames = 0;
+  rt.cautionUntil = 0;
+  rt.cautionReason = '';
   rt.playerCar = car;
   rt.player = {
     x:start.x, y:start.y, angle:start.angle, speed:0,
@@ -890,14 +937,14 @@ function streetRacingStartMiniRace(track, car, entry){
   rt.keys = {};
   rt.onKeyDown = (e)=>{
     const k = String(e.key||'').toLowerCase();
-    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','h','j','k','l'].includes(k)){
       rt.keys[k] = true;
       e.preventDefault();
     }
   };
   rt.onKeyUp = (e)=>{
     const k = String(e.key||'').toLowerCase();
-    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','h','j','k','l'].includes(k)){
       rt.keys[k] = false;
       e.preventDefault();
     }
@@ -931,7 +978,7 @@ function streetRacingLaunchMiniRace(trackId){
         <br>Grid: <strong>5-6 total cars</strong> (you + 4-5 rivals) · Barrier walls enabled
       </div>
       <canvas id="street-race-canvas" width="700" height="540" style="width:100%;max-width:700px;border:1px solid var(--border);border-radius:10px;background:#0b0f17"></canvas>
-      <div id="street-race-status" style="font-size:.78rem;color:var(--muted2)">Use Arrow keys or WASD to drive. Stay on track.</div>
+      <div id="street-race-status" style="font-size:.78rem;color:var(--muted2)">Use Arrow keys/WASD (or H/J/K/L on Mac keyboards). Stay on track.</div>
     </div>`;
   showPopupHTML(`🏁 2D Race: ${track.name}`, html, [
     { label:'Forfeit Race', cls:'btn-ghost', onClick:()=>streetRacingAbortMiniRace() },
